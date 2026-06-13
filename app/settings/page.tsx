@@ -61,17 +61,36 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col gap-4">
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Display name</label>
-                <Input defaultValue="Bayu Krisnayana" />
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Display name" value="Bayu Krisnayana" />
+                <Field label="Email" value="bayuajoes321@gmail.com" />
               </div>
+              <Field label="Phone" value="+6285 792 352 806" />
+              <Field label="Address" value="Jln. Dewi Sartika No.19, Semarapura Kaja, Klungkung, Bali, Indonesia, 80711" />
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Studio</label>
-                <Input defaultValue="Kamarupa Design Group" />
+                <Button className="w-fit">Save changes</Button>
               </div>
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Email</label>
-                <Input defaultValue="bayuajoes321@gmail.com" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Payment / Bank details */}
+        <Card>
+          <CardHeader>
+            <div>
+              <p className="text-[13px] font-semibold" style={{ color: "var(--color-ink)" }}>Payment Details</p>
+              <p className="text-[11px] mt-0.5" style={{ color: "var(--color-muted)" }}>Pre-filled into every invoice</p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-4">
+              <Field label="Bank Name" value="BCA (Bank Central Asia)" />
+              <Field label="Account Holder Name" value="I Komang Bayu Krisnayana" />
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Account No" value="3950456514" />
+                <Field label="Swift Code" value="CENAIDJA" />
+                <Field label="Bank Code" value="014" />
+                <Field label="Branch Code" value="0395" />
               </div>
               <div>
                 <Button className="w-fit">Save changes</Button>
@@ -81,5 +100,14 @@ export default function SettingsPage() {
         </Card>
       </div>
     </ShellLayout>
+  );
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>{label}</label>
+      <Input defaultValue={value} />
+    </div>
   );
 }
