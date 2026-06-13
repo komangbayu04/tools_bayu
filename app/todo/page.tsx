@@ -2,31 +2,24 @@
 
 import { ShellLayout } from "@/components/shell/Layout";
 import { useState } from "react";
-import { Plus, Upload, Search, X, Loader2 } from "lucide-react";
+import { Plus, Upload, Search, X, Loader2, GripVertical } from "lucide-react";
 import { clsx } from "clsx";
+import { useTaskStore, type Priority, type Task } from "@/lib/store";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
-type Priority = "high" | "medium" | "low";
-type Status = "todo" | "done";
 type FilterTab = "all" | Priority | "done";
-
-interface Task {
-  id: string;
-  title: string;
-  project: string;
-  priority: Priority;
-  status: Status;
-  due?: string;
-  source: "manual" | "transcript";
-}
-
-const initialTasks: Task[] = [
-  { id: "1", title: "Revisi cover slide deck Overclock ke light mode", project: "Overclock", priority: "high", status: "todo", due: "16 Jun", source: "transcript" },
-  { id: "2", title: "Build reusable email template Bedford", project: "Bedford", priority: "high", status: "todo", due: "18 Jun", source: "manual" },
-  { id: "3", title: 'Finalize "The Current" newsletter revision', project: "Bedford", priority: "medium", status: "todo", source: "transcript" },
-  { id: "4", title: "Update brand deck transition slides", project: "Overclock", priority: "medium", status: "todo", source: "transcript" },
-  { id: "5", title: "Research competitor moodboards for Q3", project: "Internal", priority: "low", status: "todo", source: "manual" },
-  { id: "6", title: "Send revised deck to Ahmed", project: "Overclock", priority: "high", status: "done", source: "transcript" },
-];
 
 const priorityMeta: Record<Priority, { label: string; dotColor: string; badgeBg: string; badgeText: string }> = {
   high: { label: "HIGH PRIORITY", dotColor: "bg-[#C64545]", badgeBg: "bg-red-50", badgeText: "text-[#C64545]" },
@@ -42,8 +35,55 @@ interface ExtractedItem {
   selected: boolean;
 }
 
+function SortableTask({ task, onToggle }: { task: Task; onToggle: (id: string) => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const meta = priorityMeta[task.priority];
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-4 px-5 py-3.5 hover:bg-[#FAFBFB] transition-colors group bg-white"
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab p-1 text-[#D0D9DC] hover:text-[#A8BDC3] flex-shrink-0"
+      >
+        <GripVertical size={14} />
+      </div>
+      <button
+        onClick={() => onToggle(task.id)}
+        className="w-4 h-4 rounded border-2 border-[#D0D9DC] hover:border-[#2A9D8F] flex-shrink-0 transition-colors"
+      />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-[#1A2B32] dark:text-[#E8F0F2] truncate">{task.title}</p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="text-xs text-[#7A9099]">{task.project}</span>
+          {task.due && (
+            <>
+              <span className="text-[#D0D9DC] text-xs">·</span>
+              <span className="text-xs text-[#A8BDC3]">Due {task.due}</span>
+            </>
+          )}
+          {task.source === "transcript" && (
+            <>
+              <span className="text-[#D0D9DC] text-xs">·</span>
+              <span className="text-[10px] font-medium text-[#7A9099] bg-[#F4F6F7] rounded px-1.5 py-0.5">transcript</span>
+            </>
+          )}
+        </div>
+      </div>
+      <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full capitalize ${meta.badgeBg} ${meta.badgeText}`}>
+        {task.priority}
+      </span>
+    </div>
+  );
+}
+
 export default function TodoPage() {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const { tasks, addTask, toggleDone, reorderTasks } = useTaskStore();
   const [filter, setFilter] = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
@@ -56,22 +96,17 @@ export default function TodoPage() {
   const [extracting, setExtracting] = useState(false);
   const [extracted, setExtracted] = useState<ExtractedItem[] | null>(null);
 
-  const toggleDone = (id: string) => {
-    setTasks((prev) =>
-      prev.map((t) => t.id === id ? { ...t, status: t.status === "done" ? "todo" : "done" } : t)
-    );
-  };
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  const addTask = () => {
+  const handleAddTask = () => {
     if (!newTitle.trim()) return;
-    setTasks((prev) => [...prev, {
-      id: crypto.randomUUID(),
+    addTask({
       title: newTitle.trim(),
       project: newProject.trim() || "General",
       priority: newPriority,
       status: "todo",
       source: "manual",
-    }]);
+    });
     setNewTitle("");
     setNewProject("");
     setNewPriority("medium");
@@ -86,10 +121,14 @@ export default function TodoPage() {
 
   const groupedByPriority = (["high", "medium", "low"] as Priority[]).map((p) => ({
     priority: p,
-    tasks: filteredTasks.filter((t) => t.priority === p),
+    tasks: filteredTasks
+      .filter((t) => t.priority === p)
+      .sort((a, b) => a.order - b.order),
   })).filter((g) => g.tasks.length > 0);
 
-  const doneTasks = filteredTasks.filter((t) => t.status === "done");
+  const doneTasks = tasks.filter((t) => t.status === "done").filter((t) =>
+    !search || t.title.toLowerCase().includes(search.toLowerCase())
+  );
 
   const mockExtract = async () => {
     setExtracting(true);
@@ -109,16 +148,16 @@ export default function TodoPage() {
 
   const addExtracted = () => {
     if (!extracted) return;
-    const newTasks = extracted.filter((e) => e.selected).map((e) => ({
-      id: crypto.randomUUID(),
-      title: e.task,
-      project: clientTag,
-      priority: e.priority,
-      status: "todo" as Status,
-      due: e.due_hint || undefined,
-      source: "transcript" as const,
-    }));
-    setTasks((prev) => [...newTasks, ...prev]);
+    extracted.filter((e) => e.selected).forEach((e) => {
+      addTask({
+        title: e.task,
+        project: clientTag,
+        priority: e.priority,
+        status: "todo",
+        due: e.due_hint || undefined,
+        source: "transcript",
+      });
+    });
     setShowImport(false);
     setTranscript("");
     setExtracted(null);
@@ -136,7 +175,7 @@ export default function TodoPage() {
     <ShellLayout>
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-[42px] font-semibold text-[#1C4F4F] tracking-tight leading-tight">To do list</h1>
+        <h1 className="text-[42px] font-semibold text-[#1C4F4F] dark:text-[#E8F0F2] tracking-tight leading-tight">To do list</h1>
         <div className="flex gap-3">
           <button
             onClick={() => setShowImport(true)}
@@ -191,7 +230,7 @@ export default function TodoPage() {
               autoFocus
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") addTask(); if (e.key === "Escape") setShowAddForm(false); }}
+              onKeyDown={(e) => { if (e.key === "Enter") handleAddTask(); if (e.key === "Escape") setShowAddForm(false); }}
               placeholder="What needs to be done?"
               className="w-full bg-white border border-[#E5E9EB] rounded-[8px] px-3 py-2 text-sm text-[#1A2B32] placeholder-[#A8BDC3] focus:outline-none focus:ring-2 focus:ring-[#2A9D8F]/30"
             />
@@ -217,7 +256,7 @@ export default function TodoPage() {
               <option value="low">Low</option>
             </select>
           </div>
-          <button onClick={addTask} className="px-4 py-2 bg-[#2A9D8F] text-white rounded-[8px] text-sm font-medium hover:bg-[#1E7268] transition-colors">Save</button>
+          <button onClick={handleAddTask} className="px-4 py-2 bg-[#2A9D8F] text-white rounded-[8px] text-sm font-medium hover:bg-[#1E7268] transition-colors">Save</button>
           <button onClick={() => setShowAddForm(false)} className="p-2 text-[#7A9099] hover:text-[#3D5159]"><X size={16} /></button>
         </div>
       )}
@@ -233,37 +272,23 @@ export default function TodoPage() {
                 <span className="text-xs font-bold text-[#7A9099] tracking-widest">{meta.label}</span>
                 <span className="text-xs font-medium text-[#A8BDC3] bg-[#F4F6F7] rounded-full px-2 py-0.5">{pts.length}</span>
               </div>
-              <div className="rounded-[14px] border border-[#E5E9EB] bg-white overflow-hidden divide-y divide-[#F4F6F7]">
-                {pts.map((task) => (
-                  <div key={task.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-[#FAFBFB] transition-colors group">
-                    <button
-                      onClick={() => toggleDone(task.id)}
-                      className="w-4 h-4 rounded border-2 border-[#D0D9DC] hover:border-[#2A9D8F] flex-shrink-0 transition-colors"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[#1A2B32] truncate">{task.title}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-[#7A9099]">{task.project}</span>
-                        {task.due && (
-                          <>
-                            <span className="text-[#D0D9DC] text-xs">·</span>
-                            <span className="text-xs text-[#A8BDC3]">Due {task.due}</span>
-                          </>
-                        )}
-                        {task.source === "transcript" && (
-                          <>
-                            <span className="text-[#D0D9DC] text-xs">·</span>
-                            <span className="text-[10px] font-medium text-[#7A9099] bg-[#F4F6F7] rounded px-1.5 py-0.5">transcript</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full capitalize ${meta.badgeBg} ${meta.badgeText}`}>
-                      {priority}
-                    </span>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={({ active, over }) => {
+                  if (over && active.id !== over.id) {
+                    reorderTasks(priority, String(active.id), String(over.id));
+                  }
+                }}
+              >
+                <SortableContext items={pts.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                  <div className="rounded-[14px] border border-[#E5E9EB] bg-white overflow-hidden divide-y divide-[#F4F6F7]">
+                    {pts.map((task) => (
+                      <SortableTask key={task.id} task={task} onToggle={toggleDone} />
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
             </div>
           );
         })}
@@ -278,6 +303,7 @@ export default function TodoPage() {
             <div className="rounded-[14px] border border-[#E5E9EB] bg-white overflow-hidden divide-y divide-[#F4F6F7]">
               {doneTasks.map((task) => (
                 <div key={task.id} className="flex items-center gap-4 px-5 py-3.5">
+                  <div className="w-6 pl-5" />
                   <button onClick={() => toggleDone(task.id)} className="w-4 h-4 rounded border-2 border-[#2A9D8F] bg-[#2A9D8F] flex-shrink-0 flex items-center justify-center">
                     <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
@@ -288,9 +314,15 @@ export default function TodoPage() {
           </div>
         )}
 
-        {filteredTasks.length === 0 && (
+        {filteredTasks.length === 0 && filter !== "done" && (
           <div className="text-center py-16 text-[#A8BDC3]">
             <p className="text-sm font-medium">No tasks here</p>
+          </div>
+        )}
+
+        {filter === "done" && doneTasks.length === 0 && (
+          <div className="text-center py-16 text-[#A8BDC3]">
+            <p className="text-sm font-medium">No completed tasks yet</p>
           </div>
         )}
       </div>

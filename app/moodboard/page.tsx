@@ -4,21 +4,9 @@ import { ShellLayout } from "@/components/shell/Layout";
 import { useState } from "react";
 import { Plus, X, ExternalLink, Trash2, Loader2 } from "lucide-react";
 import { clsx } from "clsx";
+import { useMoodStore, type MoodCategory } from "@/lib/store";
 
-type Category = "all" | "graphic_design" | "product_design" | "3d" | "motion";
-
-interface MoodItem {
-  id: string;
-  url: string;
-  title: string;
-  description?: string;
-  image_url?: string;
-  source_domain: string;
-  category: Exclude<Category, "all">;
-  tags: string[];
-  note?: string;
-  color: string; // fallback bg color
-}
+type Category = "all" | MoodCategory;
 
 const categoryLabels: Record<Category, string> = {
   all: "All",
@@ -28,7 +16,7 @@ const categoryLabels: Record<Category, string> = {
   motion: "Motion",
 };
 
-const categoryShort: Record<Exclude<Category, "all">, string> = {
+const categoryShort: Record<MoodCategory, string> = {
   graphic_design: "GD",
   product_design: "PD",
   "3d": "3D",
@@ -37,34 +25,21 @@ const categoryShort: Record<Exclude<Category, "all">, string> = {
 
 const sampleColors = ["#E0F0F0", "#F4E8D8", "#DDE8F5", "#F0E0F0", "#E0F0E8", "#FDE8D8", "#E8E0F5", "#D8F0F4"];
 
-const initialItems: MoodItem[] = [
-  { id: "1", url: "https://dribbble.com", title: "Minimal Brand Identity System", source_domain: "dribbble.com", category: "graphic_design", tags: ["branding", "minimal"], color: "#E0F0F0", note: "Love the whitespace handling" },
-  { id: "2", url: "https://behance.net", title: "Product UI Design Case Study", source_domain: "behance.net", category: "product_design", tags: ["ui", "case study"], color: "#DDE8F5" },
-  { id: "3", url: "https://are.na", title: "Brutalist Web Design Collection", source_domain: "are.na", category: "graphic_design", tags: ["brutalism", "web"], color: "#F4E8D8" },
-  { id: "4", url: "https://vimeo.com", title: "Motion Graphics Showreel 2025", source_domain: "vimeo.com", category: "motion", tags: ["motion", "showreel"], color: "#F0E0F0" },
-  { id: "5", url: "https://awwwards.com", title: "Experimental 3D Typography", source_domain: "awwwards.com", category: "3d", tags: ["3d", "typography"], color: "#E0F0E8" },
-  { id: "6", url: "https://pinterest.com", title: "Packaging Design Inspiration", source_domain: "pinterest.com", category: "graphic_design", tags: ["packaging"], color: "#FDE8D8" },
-  { id: "7", url: "https://behance.net", title: "Dark Mode App Design System", source_domain: "behance.net", category: "product_design", tags: ["dark mode", "design system"], color: "#E8E0F5" },
-  { id: "8", url: "https://motionographer.com", title: "Title Sequence Animation", source_domain: "motionographer.com", category: "motion", tags: ["title", "film"], color: "#D8F0F4" },
-];
-
 // Staggered heights for masonry feel
 const cardHeights = ["h-48", "h-64", "h-52", "h-56", "h-60", "h-44", "h-72", "h-52"];
 
 export default function MoodboardPage() {
-  const [items, setItems] = useState<MoodItem[]>(initialItems);
+  const { items, addItem, deleteItem } = useMoodStore();
   const [activeCategory, setActiveCategory] = useState<Category>("all");
   const [showModal, setShowModal] = useState(false);
   const [newUrl, setNewUrl] = useState("");
-  const [newCategory, setNewCategory] = useState<Exclude<Category, "all">>("graphic_design");
+  const [newCategory, setNewCategory] = useState<MoodCategory>("graphic_design");
   const [newTags, setNewTags] = useState("");
   const [newNote, setNewNote] = useState("");
   const [preview, setPreview] = useState<{ title?: string; domain?: string } | null>(null);
   const [fetchingPreview, setFetchingPreview] = useState(false);
 
   const filtered = activeCategory === "all" ? items : items.filter((i) => i.category === activeCategory);
-
-  const deleteItem = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id));
 
   const handleUrlBlur = async () => {
     if (!newUrl) return;
@@ -79,12 +54,11 @@ export default function MoodboardPage() {
     setFetchingPreview(false);
   };
 
-  const addItem = () => {
+  const handleAddItem = () => {
     if (!newUrl.trim()) return;
     let domain = newUrl;
     try { domain = new URL(newUrl).hostname.replace("www.", ""); } catch {}
-    setItems((prev) => [{
-      id: crypto.randomUUID(),
+    addItem({
       url: newUrl,
       title: preview?.title || domain,
       source_domain: preview?.domain || domain,
@@ -92,7 +66,7 @@ export default function MoodboardPage() {
       tags: newTags.split(",").map((t) => t.trim()).filter(Boolean),
       note: newNote,
       color: sampleColors[Math.floor(Math.random() * sampleColors.length)],
-    }, ...prev]);
+    });
     setShowModal(false);
     setNewUrl("");
     setNewCategory("graphic_design");
@@ -107,7 +81,7 @@ export default function MoodboardPage() {
     <ShellLayout>
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-[42px] font-semibold text-[#1C4F4F] tracking-tight leading-tight">Moodboard</h1>
+        <h1 className="text-[42px] font-semibold text-[#1C4F4F] dark:text-[#E8F0F2] tracking-tight leading-tight">Moodboard</h1>
         <button
           onClick={() => setShowModal(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-[10px] bg-[#2A9D8F] text-white text-sm font-medium hover:bg-[#1E7268] transition-colors"
@@ -211,7 +185,7 @@ export default function MoodboardPage() {
                 <label className="block text-xs font-semibold text-[#7A9099] uppercase tracking-wide mb-2">Category</label>
                 <select
                   value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value as Exclude<Category, "all">)}
+                  onChange={(e) => setNewCategory(e.target.value as MoodCategory)}
                   className="w-full bg-white border border-[#E5E9EB] rounded-[8px] px-3 py-2 text-sm text-[#1A2B32] focus:outline-none focus:ring-2 focus:ring-[#2A9D8F]/30"
                 >
                   <option value="graphic_design">Graphic Design</option>
@@ -246,7 +220,7 @@ export default function MoodboardPage() {
                 <button onClick={() => setShowModal(false)} className="flex-1 py-2.5 border border-[#E5E9EB] text-sm font-medium text-[#3D5159] rounded-[10px] hover:bg-[#F4F6F7] transition-colors">
                   Cancel
                 </button>
-                <button onClick={addItem} className="flex-1 py-2.5 bg-[#2A9D8F] text-white rounded-[10px] text-sm font-medium hover:bg-[#1E7268] transition-colors">
+                <button onClick={handleAddItem} className="flex-1 py-2.5 bg-[#2A9D8F] text-white rounded-[10px] text-sm font-medium hover:bg-[#1E7268] transition-colors">
                   Add to Board
                 </button>
               </div>
