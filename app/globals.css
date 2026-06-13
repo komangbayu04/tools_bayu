@@ -17,7 +17,7 @@
   --color-error: #c64545;
   --color-warning: #e8a55a;
   --color-success: #5db872;
-  --color-global-bg: #edf0f2;
+  --color-global-bg: #f4f6f7;
 }
 
 .dark {
@@ -30,7 +30,7 @@
   --color-body: #b0c8d0;
   --color-muted: #5f7f8a;
   --color-muted-soft: #3d5560;
-  --color-global-bg: #0f1618;
+  --color-global-bg: #141b1e;
 }
 
 html, body {
