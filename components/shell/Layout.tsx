@@ -21,7 +21,7 @@ export function ShellLayout({ children }: ShellLayoutProps) {
         }}
       >
         <div className="px-6 py-8 md:px-[52px] md:py-12 min-h-full">
-          <div className="mx-auto w-full max-w-[1100px] pb-16 md:pb-0">
+          <div className="mx-auto w-full max-w-[1472px] pb-16 md:pb-0">
             <PageTransition>{children}</PageTransition>
           </div>
         </div>
