@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Urbanist } from "next/font/google";
 import "./globals.css";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
 
 const urbanist = Urbanist({
   subsets: ["latin"],
@@ -19,9 +20,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${urbanist.variable} h-full`}>
-      <body className="h-full font-[family-name:var(--font-urbanist)] antialiased bg-[#EDF0F2]">
-        {children}
+    <html lang="en" className={`${urbanist.variable} h-full`} suppressHydrationWarning>
+      <body className="h-full font-[family-name:var(--font-urbanist)] antialiased bg-[#EDF0F2] dark:bg-[#1A2428]">
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -20,6 +20,18 @@
   --color-success: #5db872;
 }
 
+.dark {
+  --color-canvas: #1A2428;
+  --color-surface: #1E2B30;
+  --color-surface-card: #243035;
+  --color-hairline: #2D3F47;
+  --color-ink: #E8F0F2;
+  --color-body: #B8CDD3;
+  --color-muted: #6A8892;
+  --color-muted-soft: #4A6570;
+  --color-primary-light: #0D2E2C;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
