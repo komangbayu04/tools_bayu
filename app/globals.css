@@ -33,12 +33,6 @@
   --color-global-bg: #0f1618;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
 html, body {
   height: 100%;
 }

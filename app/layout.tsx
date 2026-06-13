@@ -22,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${urbanist.variable} h-full`} suppressHydrationWarning>
       <body className="h-full font-[family-name:var(--font-urbanist)] antialiased">
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="kamarupa-theme">
           {children}
         </ThemeProvider>
       </body>

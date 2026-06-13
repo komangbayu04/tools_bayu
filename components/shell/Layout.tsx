@@ -20,8 +20,10 @@ export function ShellLayout({ children }: ShellLayoutProps) {
           boxShadow: "-6px 8px 42px 0px rgba(1,135,134,0.10)",
         }}
       >
-        <div className="p-6 md:p-[52px] min-h-full">
-          <PageTransition>{children}</PageTransition>
+        <div className="px-6 py-8 md:px-12 md:py-12 min-h-full">
+          <div className="mx-auto w-full max-w-[1100px] pb-16 md:pb-0">
+            <PageTransition>{children}</PageTransition>
+          </div>
         </div>
       </main>
     </div>
