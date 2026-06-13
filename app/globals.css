@@ -1,0 +1,35 @@
+@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700&display=swap");
+
+:root {
+  --color-primary: #2a9d8f;
+  --color-primary-dark: #1e7268;
+  --color-primary-ink: #1c4f4f;
+  --color-primary-light: #e6f4f2;
+  --color-primary-muted: #b2ddd9;
+  --color-canvas: #f4f6f7;
+  --color-surface: #ffffff;
+  --color-surface-card: #f9fafb;
+  --color-hairline: #e5e9eb;
+  --color-ink: #1a2b32;
+  --color-body: #3d5159;
+  --color-muted: #7a9099;
+  --color-muted-soft: #a8bdc3;
+  --color-error: #c64545;
+  --color-warning: #e8a55a;
+  --color-success: #5db872;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  font-family: "Urbanist", sans-serif;
+  background-color: #edf0f2;
+  color: var(--color-ink);
+  height: 100%;
+}
