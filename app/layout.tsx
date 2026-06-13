@@ -21,8 +21,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${urbanist.variable} h-full`} suppressHydrationWarning>
-      <body className="h-full font-[family-name:var(--font-urbanist)] antialiased bg-[#EDF0F2] dark:bg-[#1A2428]">
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+      <body className="h-full font-[family-name:var(--font-urbanist)] antialiased">
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           {children}
         </ThemeProvider>
       </body>

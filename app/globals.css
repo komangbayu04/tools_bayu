@@ -1,4 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 :root {
@@ -18,18 +17,20 @@
   --color-error: #c64545;
   --color-warning: #e8a55a;
   --color-success: #5db872;
+  --color-global-bg: #edf0f2;
 }
 
 .dark {
-  --color-canvas: #1A2428;
-  --color-surface: #1E2B30;
-  --color-surface-card: #243035;
-  --color-hairline: #2D3F47;
-  --color-ink: #E8F0F2;
-  --color-body: #B8CDD3;
-  --color-muted: #6A8892;
-  --color-muted-soft: #4A6570;
-  --color-primary-light: #0D2E2C;
+  --color-primary-light: #0d2e2c;
+  --color-canvas: #141b1e;
+  --color-surface: #1a2428;
+  --color-surface-card: #1f2d32;
+  --color-hairline: #263238;
+  --color-ink: #ecf2f4;
+  --color-body: #b0c8d0;
+  --color-muted: #5f7f8a;
+  --color-muted-soft: #3d5560;
+  --color-global-bg: #0f1618;
 }
 
 * {
@@ -38,10 +39,13 @@
   padding: 0;
 }
 
-html,
-body {
-  font-family: "Urbanist", sans-serif;
-  background-color: #edf0f2;
-  color: var(--color-ink);
+html, body {
   height: 100%;
+}
+
+body {
+  font-family: var(--font-urbanist), "Urbanist", sans-serif;
+  background-color: var(--color-global-bg);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
 }

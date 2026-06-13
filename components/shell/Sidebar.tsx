@@ -3,16 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
-import {
-  LayoutDashboard,
-  FileText,
-  CheckSquare,
-  Image,
-  Settings,
-  Moon,
-  Sun,
-} from "lucide-react";
-import { clsx } from "clsx";
+import { LayoutDashboard, FileText, CheckSquare, Image, Settings, Moon, Sun } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -28,89 +20,94 @@ export function Sidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-[200px] flex-shrink-0 bg-[#F4F6F7] dark:bg-[#1A2428] h-screen flex-col sticky top-0">
+      <aside
+        className="hidden md:flex w-[200px] flex-shrink-0 h-screen flex-col"
+        style={{ background: "var(--color-canvas)" }}
+      >
         {/* Logo */}
         <div className="px-5 pt-7 pb-8">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-[#1C4F4F] flex items-center justify-center">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-[#1C4F4F] flex items-center justify-center shadow-sm">
               <span className="text-white font-bold text-lg leading-none">L</span>
             </div>
-            <span className="text-[#1C4F4F] dark:text-[#E8F0F2] font-bold text-base tracking-tight">
+            <span className="font-bold text-[15px] tracking-tight" style={{ color: "var(--color-primary-ink)" }}>
               Layla
             </span>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 flex flex-col gap-1">
+        <nav className="flex-1 px-3 flex flex-col gap-0.5">
           {navItems.map(({ label, href, icon: Icon }) => {
             const isActive = pathname === href || pathname.startsWith(href + "/");
             return (
               <Link
                 key={href}
                 href={href}
-                className={clsx(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors",
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-150",
                   isActive
-                    ? "bg-[#E0F0F0] dark:bg-[#0D2E2C] text-[#1C4F4F] dark:text-[#E8F0F2]"
-                    : "text-[#7A9099] hover:bg-white dark:hover:bg-[#1E2B30] hover:text-[#3D5159] dark:hover:text-[#E8F0F2]"
+                    ? "text-[#1C4F4F]"
+                    : "hover:text-[var(--color-body)]"
                 )}
+                style={
+                  isActive
+                    ? { background: "var(--color-primary-light)" }
+                    : { color: "var(--color-muted)" }
+                }
               >
-                <Icon
-                  size={18}
-                  className={isActive ? "text-[#2A9D8F]" : "text-[#A8BDC3]"}
-                />
+                <Icon size={17} style={{ color: isActive ? "#2A9D8F" : "var(--color-muted-soft)" }} />
                 {label}
               </Link>
             );
           })}
         </nav>
 
-        {/* Bottom: Settings + Dark mode toggle */}
-        <div className="px-3 pb-6 flex flex-col gap-1">
+        {/* Bottom */}
+        <div className="px-3 pb-6 flex flex-col gap-0.5">
+          <div className="h-px mb-3" style={{ background: "var(--color-hairline)" }} />
           <Link
             href="/settings"
-            className={clsx(
-              "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors",
-              pathname === "/settings"
-                ? "bg-[#E0F0F0] dark:bg-[#0D2E2C] text-[#1C4F4F] dark:text-[#E8F0F2]"
-                : "text-[#7A9099] hover:bg-white dark:hover:bg-[#1E2B30] hover:text-[#3D5159] dark:hover:text-[#E8F0F2]"
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-150",
+              pathname === "/settings" ? "text-[#1C4F4F]" : ""
             )}
+            style={
+              pathname === "/settings"
+                ? { background: "var(--color-primary-light)" }
+                : { color: "var(--color-muted)" }
+            }
           >
-            <Settings
-              size={18}
-              className={
-                pathname === "/settings" ? "text-[#2A9D8F]" : "text-[#A8BDC3]"
-              }
-            />
+            <Settings size={17} style={{ color: pathname === "/settings" ? "#2A9D8F" : "var(--color-muted-soft)" }} />
             Settings
           </Link>
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors text-[#7A9099] hover:bg-white dark:hover:bg-[#1E2B30] hover:text-[#3D5159] dark:hover:text-[#E8F0F2]"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-150 w-full text-left"
+            style={{ color: "var(--color-muted)" }}
           >
-            {theme === "dark" ? (
-              <Sun size={18} className="text-[#A8BDC3]" />
-            ) : (
-              <Moon size={18} className="text-[#A8BDC3]" />
-            )}
+            {theme === "dark"
+              ? <Sun size={17} style={{ color: "var(--color-muted-soft)" }} />
+              : <Moon size={17} style={{ color: "var(--color-muted-soft)" }} />
+            }
             {theme === "dark" ? "Light Mode" : "Dark Mode"}
           </button>
         </div>
       </aside>
 
       {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-[#1E2B30] border-t border-[#E5E9EB] dark:border-[#2D3F47] flex items-center justify-around px-2 py-2 z-50">
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 flex items-center justify-around px-2 py-2 z-50 border-t"
+        style={{ background: "var(--color-surface)", borderColor: "var(--color-hairline)" }}
+      >
         {navItems.map(({ href, icon: Icon }) => {
           const isActive = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
               key={href}
               href={href}
-              className={clsx(
-                "flex flex-col items-center p-2 rounded-xl transition-colors",
-                isActive ? "text-[#2A9D8F]" : "text-[#A8BDC3]"
-              )}
+              className="flex flex-col items-center p-2.5 rounded-xl transition-colors"
+              style={{ color: isActive ? "#2A9D8F" : "var(--color-muted-soft)" }}
             >
               <Icon size={22} />
             </Link>

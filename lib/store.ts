@@ -80,14 +80,14 @@ export const useMoodStore = create<MoodStore>()(
   persist(
     (set) => ({
       items: [
-        { id: "1", url: "https://dribbble.com", title: "Minimal Brand Identity System", source_domain: "dribbble.com", category: "graphic_design", tags: ["branding", "minimal"], color: "#E0F0F0", note: "Love the whitespace handling" },
-        { id: "2", url: "https://behance.net", title: "Product UI Design Case Study", source_domain: "behance.net", category: "product_design", tags: ["ui"], color: "#DDE8F5" },
-        { id: "3", url: "https://are.na", title: "Brutalist Web Design Collection", source_domain: "are.na", category: "graphic_design", tags: ["brutalism"], color: "#F4E8D8" },
-        { id: "4", url: "https://vimeo.com", title: "Motion Graphics Showreel 2025", source_domain: "vimeo.com", category: "motion", tags: ["motion"], color: "#F0E0F0" },
-        { id: "5", url: "https://awwwards.com", title: "Experimental 3D Typography", source_domain: "awwwards.com", category: "3d", tags: ["3d"], color: "#E0F0E8" },
-        { id: "6", url: "https://pinterest.com", title: "Packaging Design Inspiration", source_domain: "pinterest.com", category: "graphic_design", tags: ["packaging"], color: "#FDE8D8" },
-        { id: "7", url: "https://behance.net", title: "Dark Mode App Design System", source_domain: "behance.net", category: "product_design", tags: ["dark mode"], color: "#E8E0F5" },
-        { id: "8", url: "https://motionographer.com", title: "Title Sequence Animation", source_domain: "motionographer.com", category: "motion", tags: ["film"], color: "#D8F0F4" },
+        { id: "1", url: "https://dribbble.com", title: "Minimal Brand Identity System", source_domain: "dribbble.com", category: "graphic_design", tags: ["branding", "minimal"], color: "https://picsum.photos/seed/brand1/600/420", note: "Love the whitespace handling" },
+        { id: "2", url: "https://behance.net", title: "Product UI Design Case Study", source_domain: "behance.net", category: "product_design", tags: ["ui", "dark mode"], color: "https://picsum.photos/seed/ui2/600/680" },
+        { id: "3", url: "https://are.na", title: "Brutalist Web Design Collection", source_domain: "are.na", category: "graphic_design", tags: ["brutalism", "typography"], color: "https://picsum.photos/seed/brut3/600/520" },
+        { id: "4", url: "https://vimeo.com", title: "Motion Graphics Showreel 2025", source_domain: "vimeo.com", category: "motion", tags: ["motion", "film"], color: "https://picsum.photos/seed/motion4/600/460" },
+        { id: "5", url: "https://awwwards.com", title: "Experimental 3D Typography", source_domain: "awwwards.com", category: "3d", tags: ["3d", "type"], color: "https://picsum.photos/seed/type5/600/600" },
+        { id: "6", url: "https://pinterest.com", title: "Packaging Design Inspiration", source_domain: "pinterest.com", category: "graphic_design", tags: ["packaging", "print"], color: "https://picsum.photos/seed/pack6/600/400" },
+        { id: "7", url: "https://behance.net", title: "Dark Mode App Design System", source_domain: "behance.net", category: "product_design", tags: ["system design"], color: "https://picsum.photos/seed/sys7/600/500" },
+        { id: "8", url: "https://motionographer.com", title: "Title Sequence Animation", source_domain: "motionographer.com", category: "motion", tags: ["film", "title"], color: "https://picsum.photos/seed/seq8/600/640" },
       ],
       addItem: (item) => set((s) => ({ items: [{ ...item, id: crypto.randomUUID() }, ...s.items] })),
       deleteItem: (id) => set((s) => ({ items: s.items.filter(i => i.id !== id) })),
