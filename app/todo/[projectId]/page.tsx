@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   DndContext, DragOverlay,
   PointerSensor, useSensor, useSensors,
@@ -31,12 +32,24 @@ import { id as idLocale } from "date-fns/locale";
 
 const COLUMNS: TaskStatus[] = ["todo", "in_progress", "done"];
 
+type ViewMode = "kanban" | "timeline";
+
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
     <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>
       {children}
     </label>
   );
+}
+
+function remainingMeta(task: Task): { label: string; color: string } {
+  if (task.status === "done") return { label: "Selesai", color: "#5DB872" };
+  if (!task.deadline) return { label: "Tanpa deadline", color: "var(--color-muted-soft)" };
+  const days = differenceInCalendarDays(new Date(task.deadline), new Date());
+  if (days < 0) return { label: `Telat ${Math.abs(days)} hari`, color: "#C64545" };
+  if (days === 0) return { label: "Hari ini", color: "#E8A55A" };
+  if (days === 1) return { label: "Besok", color: "#E8A55A" };
+  return { label: `${days} hari lagi`, color: "var(--color-body)" };
 }
 
 export default function ProjectDetailPage() {
@@ -50,6 +63,7 @@ export default function ProjectDetailPage() {
 
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("kanban");
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -67,7 +81,6 @@ export default function ProjectDetailPage() {
 
   const activeTask = activeTaskId ? tasks.find((t) => t.id === activeTaskId) : null;
 
-  // Add task dialog
   const [showAdd, setShowAdd] = useState(false);
   const [tTitle, setTTitle] = useState("");
   const [tDesc, setTDesc] = useState("");
@@ -146,59 +159,104 @@ export default function ProjectDetailPage() {
               <span className="text-[11px] flex-shrink-0" style={{ color: "var(--color-muted-soft)" }}>{done}/{total} done</span>
             </div>
           </div>
-          <Button onClick={() => setShowAdd(true)}>
-            <Icon name="plus" size={15} /> Add Task
-          </Button>
+
+          {/* Actions + View Toggle */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Mode toggle */}
+            <div
+              className="flex items-center rounded-xl p-1 gap-0.5"
+              style={{ background: "var(--color-canvas)", border: "1px solid var(--color-hairline)" }}
+            >
+              {(["kanban", "timeline"] as ViewMode[]).map((mode) => {
+                const active = viewMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    onClick={() => setViewMode(mode)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all"
+                    style={active
+                      ? { background: "var(--color-surface)", color: "var(--color-ink)", boxShadow: "var(--shadow-card)" }
+                      : { color: "var(--color-muted)" }}
+                  >
+                    <Icon name={mode === "kanban" ? "columns" : "calendar"} size={12} />
+                    {mode === "kanban" ? "Kanban" : "Timeline"}
+                  </button>
+                );
+              })}
+            </div>
+            <Button onClick={() => setShowAdd(true)}>
+              <Icon name="plus" size={15} /> Add Task
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Kanban board */}
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-          {COLUMNS.map((col) => {
-            const colTasks = projectTasks
-              .filter((t) => t.status === col)
-              .sort((a, b) => a.order - b.order);
-            const meta = STATUS_META[col];
-            return (
-              <DroppableColumn key={col} col={col}>
-                <Card className="p-3">
-                  <div className="flex items-center justify-between px-1.5 py-1 mb-2">
-                    <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>
-                      <span className="w-2 h-2 rounded-full" style={{ background: meta.color }} />
-                      {meta.label}
-                    </span>
-                    <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md" style={{ color: "var(--color-muted-soft)", background: "var(--color-canvas)" }}>
-                      {colTasks.length}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-2 min-h-[40px]">
-                    {colTasks.length === 0 && (
-                      <p className="text-[12px] px-1.5 py-4 text-center" style={{ color: "var(--color-muted-soft)" }}>No tasks</p>
-                    )}
-                    {colTasks.map((task) => (
-                      <DraggableTaskChip key={task.id} task={task} onOpen={() => setOpenTaskId(task.id)} onSetStatus={(s) => setStatus(task.id, s)} />
-                    ))}
-                  </div>
-                </Card>
-              </DroppableColumn>
-            );
-          })}
-        </div>
-        <DragOverlay>
-          {activeTask ? (
-            <div className="rounded-[10px] border p-3 shadow-lg bg-[var(--color-surface)] opacity-95" style={{ borderColor: "var(--color-hairline)" }}>
-              <p className="text-[13px] font-medium leading-snug" style={{ color: "var(--color-ink)" }}>{activeTask.title}</p>
-              <div className="flex items-center gap-2 mt-2">
-                <Badge variant={activeTask.priority} className="capitalize">{activeTask.priority}</Badge>
+      {/* Content — animated switch between Kanban and Timeline */}
+      <AnimatePresence mode="wait">
+        {viewMode === "kanban" ? (
+          <motion.div
+            key="kanban"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
+          >
+            <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                {COLUMNS.map((col) => {
+                  const colTasks = projectTasks
+                    .filter((t) => t.status === col)
+                    .sort((a, b) => a.order - b.order);
+                  const meta = STATUS_META[col];
+                  return (
+                    <DroppableColumn key={col} col={col}>
+                      <Card className="p-3">
+                        <div className="flex items-center justify-between px-1.5 py-1 mb-2">
+                          <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>
+                            <span className="w-2 h-2 rounded-full" style={{ background: meta.color }} />
+                            {meta.label}
+                          </span>
+                          <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md" style={{ color: "var(--color-muted-soft)", background: "var(--color-canvas)" }}>
+                            {colTasks.length}
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-2 min-h-[40px]">
+                          {colTasks.length === 0 && (
+                            <p className="text-[12px] px-1.5 py-4 text-center" style={{ color: "var(--color-muted-soft)" }}>No tasks</p>
+                          )}
+                          {colTasks.map((task) => (
+                            <DraggableTaskChip key={task.id} task={task} onOpen={() => setOpenTaskId(task.id)} onSetStatus={(s) => setStatus(task.id, s)} />
+                          ))}
+                        </div>
+                      </Card>
+                    </DroppableColumn>
+                  );
+                })}
               </div>
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
-
-      {/* Timeline — tasks ordered by deadline, connected to the project */}
-      <ProjectTimeline tasks={projectTasks} color={project.color} onOpen={setOpenTaskId} />
+              <DragOverlay>
+                {activeTask ? (
+                  <div className="rounded-[10px] border p-3 shadow-lg bg-[var(--color-surface)] opacity-95" style={{ borderColor: "var(--color-hairline)" }}>
+                    <p className="text-[13px] font-medium leading-snug" style={{ color: "var(--color-ink)" }}>{activeTask.title}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge variant={activeTask.priority} className="capitalize">{activeTask.priority}</Badge>
+                    </div>
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="timeline"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
+          >
+            <ProjectTimeline tasks={projectTasks} color={project.color} onOpen={setOpenTaskId} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <TaskDetailDialog taskId={openTaskId} onClose={() => setOpenTaskId(null)} />
 
@@ -257,99 +315,144 @@ export default function ProjectDetailPage() {
   );
 }
 
-function remainingMeta(task: Task): { label: string; color: string } {
-  if (task.status === "done") return { label: "Selesai", color: "#5DB872" };
-  if (!task.deadline) return { label: "Tanpa deadline", color: "var(--color-muted-soft)" };
-  const days = differenceInCalendarDays(new Date(task.deadline), new Date());
-  if (days < 0) return { label: `Telat ${Math.abs(days)} hari`, color: "#C64545" };
-  if (days === 0) return { label: "Hari ini", color: "#E8A55A" };
-  if (days === 1) return { label: "Besok", color: "#E8A55A" };
-  return { label: `${days} hari lagi`, color: "var(--color-body)" };
-}
-
 function ProjectTimeline({ tasks, color, onOpen }: { tasks: Task[]; color: string; onOpen: (id: string) => void }) {
-  // Tasks with deadlines first (sorted by date), then undated tasks.
   const dated = tasks
     .filter((t) => t.deadline)
     .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime());
   const undated = tasks.filter((t) => !t.deadline);
   const ordered = [...dated, ...undated];
 
-  return (
-    <Card className="mt-6 p-5">
-      <div className="flex items-center gap-2 mb-5">
-        <Icon name="calendar" size={16} style={{ color: "var(--color-primary)" }} />
-        <h3 className="text-[14px] font-bold" style={{ color: "var(--color-ink)" }}>Timeline</h3>
-        <span className="text-[12px]" style={{ color: "var(--color-muted-soft)" }}>· {tasks.length} task</span>
-      </div>
-
-      {ordered.length === 0 ? (
-        <p className="text-[13px] py-4 text-center" style={{ color: "var(--color-muted-soft)" }}>
-          Belum ada task pada project ini.
-        </p>
-      ) : (
-        <div className="relative pl-1">
-          {/* vertical line */}
-          <div className="absolute left-[7px] top-1.5 bottom-1.5 w-px" style={{ background: "var(--color-hairline)" }} />
-          <div className="flex flex-col gap-4">
-            {ordered.map((task) => {
-              const meta = STATUS_META[task.status];
-              const rem = remainingMeta(task);
-              return (
-                <button
-                  key={task.id}
-                  onClick={() => onOpen(task.id)}
-                  className="relative flex items-start gap-3.5 text-left group"
-                >
-                  {/* node */}
-                  <span
-                    className="relative z-10 mt-0.5 w-[15px] h-[15px] rounded-full flex-shrink-0 flex items-center justify-center"
-                    style={{ background: "var(--color-surface)", border: `2px solid ${meta.color}` }}
-                  >
-                    {task.status === "done" && (
-                      <span className="w-[7px] h-[7px] rounded-full" style={{ background: meta.color }} />
-                    )}
-                  </span>
-
-                  <div className="flex-1 min-w-0 -mt-0.5">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span
-                        className="text-[12px] font-bold tabular-nums"
-                        style={{ color: task.deadline ? "var(--color-ink)" : "var(--color-muted-soft)" }}
-                      >
-                        {task.deadline ? format(new Date(task.deadline), "d MMM yyyy", { locale: idLocale }) : "—"}
-                      </span>
-                      <span
-                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                        style={{ background: `color-mix(in srgb, ${rem.color} 16%, transparent)`, color: rem.color }}
-                      >
-                        {rem.label}
-                      </span>
-                    </div>
-                    <p
-                      className="text-[13px] font-medium mt-0.5 group-hover:underline truncate"
-                      style={{ color: "var(--color-body)" }}
-                    >
-                      {task.title}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: "var(--color-muted-soft)" }}>
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: meta.color }} /> {meta.label}
-                      </span>
-                      {task.hours ? (
-                        <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: "var(--color-muted-soft)" }}>
-                          <Icon name="clock" size={10} /> {task.hours}h
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+  if (ordered.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: "var(--color-primary-light)" }}>
+          <Icon name="calendar" size={20} style={{ color: "var(--color-primary)" }} />
         </div>
-      )}
-    </Card>
+        <p className="text-[14px] font-semibold" style={{ color: "var(--color-ink)" }}>Belum ada task</p>
+        <p className="text-[13px]" style={{ color: "var(--color-muted)" }}>Tambah task untuk melihat timeline</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      {ordered.map((task, i) => {
+        const meta = STATUS_META[task.status];
+        const rem = remainingMeta(task);
+        const isLast = i === ordered.length - 1;
+
+        return (
+          <div key={task.id} className="flex gap-0 items-stretch">
+            {/* LEFT: timeline rail */}
+            <div className="flex flex-col items-center" style={{ width: 160, minWidth: 160, flexShrink: 0 }}>
+              {/* Date label */}
+              <div className="pt-3 pb-2 text-right pr-4 w-full">
+                <p
+                  className="text-[11px] font-bold tabular-nums leading-tight"
+                  style={{ color: task.deadline ? "var(--color-ink)" : "var(--color-muted-soft)" }}
+                >
+                  {task.deadline
+                    ? format(new Date(task.deadline), "d MMM", { locale: idLocale })
+                    : "—"}
+                </p>
+                {task.deadline && (
+                  <p className="text-[10px]" style={{ color: "var(--color-muted-soft)" }}>
+                    {format(new Date(task.deadline), "yyyy", { locale: idLocale })}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* CENTER: dot + vertical line */}
+            <div className="flex flex-col items-center flex-shrink-0" style={{ width: 32 }}>
+              {/* top connector */}
+              <div className="w-px flex-1" style={{ background: i === 0 ? "transparent" : "var(--color-hairline)", minHeight: 12 }} />
+              {/* dot node */}
+              <div
+                className="relative z-10 w-[18px] h-[18px] rounded-full flex items-center justify-center flex-shrink-0"
+                style={{
+                  background: "var(--color-surface-card)",
+                  border: `2.5px solid ${task.status === "done" ? "#5DB872" : meta.color}`,
+                  boxShadow: `0 0 0 3px color-mix(in srgb, ${task.status === "done" ? "#5DB872" : meta.color} 14%, transparent)`,
+                }}
+              >
+                {task.status === "done" && (
+                  <span className="w-[7px] h-[7px] rounded-full" style={{ background: "#5DB872" }} />
+                )}
+                {task.status === "in_progress" && (
+                  <span className="w-[6px] h-[6px] rounded-full animate-pulse" style={{ background: meta.color }} />
+                )}
+              </div>
+              {/* bottom connector */}
+              {!isLast && (
+                <div className="w-px flex-1" style={{ background: "var(--color-hairline)", minHeight: 16 }} />
+              )}
+            </div>
+
+            {/* RIGHT: task card */}
+            <div className="flex-1 min-w-0 py-3 pl-4 pr-0 pb-5">
+              <button
+                onClick={() => onOpen(task.id)}
+                className="w-full text-left rounded-[14px] border p-4 transition-all hover:shadow-md group"
+                style={{
+                  background: "var(--color-surface-card)",
+                  borderColor: "var(--color-hairline)",
+                  boxShadow: "var(--shadow-card)",
+                }}
+              >
+                {/* Card header row */}
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-[14px] font-semibold leading-snug flex-1 group-hover:text-[var(--color-primary)] transition-colors" style={{ color: "var(--color-ink)" }}>
+                    {task.title}
+                  </p>
+                  <span
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5"
+                    style={{
+                      background: `color-mix(in srgb, ${rem.color} 14%, transparent)`,
+                      color: rem.color,
+                    }}
+                  >
+                    {rem.label}
+                  </span>
+                </div>
+
+                {/* Description */}
+                {task.description && (
+                  <p className="text-[12px] mt-1.5 line-clamp-2 leading-relaxed" style={{ color: "var(--color-muted)" }}>
+                    {task.description}
+                  </p>
+                )}
+
+                {/* Footer row */}
+                <div className="flex items-center gap-2 mt-3 flex-wrap">
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md"
+                    style={{
+                      background: `color-mix(in srgb, ${meta.color} 14%, transparent)`,
+                      color: meta.color,
+                    }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: meta.color }} />
+                    {meta.label}
+                  </span>
+                  <Badge variant={task.priority} className="capitalize">{task.priority}</Badge>
+                  {task.hours ? (
+                    <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: "var(--color-muted-soft)" }}>
+                      <Icon name="clock" size={10} /> {task.hours}h
+                    </span>
+                  ) : null}
+                  {task.invoiceLinked && (
+                    <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: "var(--color-primary)" }}>
+                      <Icon name="receipt" size={10} /> invoiced
+                    </span>
+                  )}
+                </div>
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -400,7 +503,6 @@ function TaskChip({ task, onOpen, onSetStatus }: { task: Task; onOpen: () => voi
           </span>
         )}
       </div>
-      {/* Quick status buttons */}
       <div className="flex items-center gap-1 mt-2.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
         {COLUMNS.filter((c) => c !== task.status).map((c) => (
           <button

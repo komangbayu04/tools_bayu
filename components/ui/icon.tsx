@@ -54,6 +54,7 @@ const REGISTRY: Record<string, IconProp> = {
   "chevron-right": faChevronRight,
   "chevron-down": faChevronDown,
   dashboard: faTableColumns,
+  columns: faTableColumns,
   "check-square": faSquareCheck,
   image: faImage,
   settings: faGear,
