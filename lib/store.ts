@@ -89,7 +89,7 @@ export const useProjectStore = create<ProjectStore>()(
   persist(
     (set) => ({
       projects: [
-        { id: "p1", name: "Artivo", client: "Artivo Studio", color: "#FF6E00", status: "active", createdAt: Date.now() - 14 * 86400000 },
+        { id: "p1", name: "Artivo", client: "Artivo Studio", color: "#4e7d2e", status: "active", createdAt: Date.now() - 14 * 86400000 },
         { id: "p2", name: "Lumina", client: "Lumina Co.", color: "#6D8DF0", status: "active", createdAt: Date.now() - 7 * 86400000 },
         { id: "p3", name: "Internal", client: "Internal", color: "#E8A55A", status: "active", createdAt: Date.now() - 3 * 86400000 },
       ],
@@ -161,7 +161,7 @@ export const useMoodStore = create<MoodStore>()(
   persist(
     (set) => ({
       items: [
-        { id: "1", url: "https://dribbble.com", title: "Minimal Brand Identity System", source_domain: "dribbble.com", category: "graphic_design", tags: ["branding", "minimal"], color: "linear-gradient(135deg,#FF6E00,#7A2E00)", note: "Love the whitespace handling", createdAt: Date.now() - 7 * 86400000 },
+        { id: "1", url: "https://dribbble.com", title: "Minimal Brand Identity System", source_domain: "dribbble.com", category: "graphic_design", tags: ["branding", "minimal"], color: "linear-gradient(135deg,#4e7d2e,#2e4d1b)", note: "Love the whitespace handling", createdAt: Date.now() - 7 * 86400000 },
         { id: "2", url: "https://behance.net", title: "Product UI Design Case Study", source_domain: "behance.net", category: "product_design", tags: ["ui", "dark mode"], color: "linear-gradient(135deg,#6D8DF0,#3A4FC4)", createdAt: Date.now() - 6 * 86400000 },
         { id: "3", url: "https://are.na", title: "Brutalist Web Design Collection", source_domain: "are.na", category: "graphic_design", tags: ["brutalism", "typography"], color: "linear-gradient(135deg,#E8A55A,#C16A2E)", createdAt: Date.now() - 5 * 86400000 },
         { id: "4", url: "https://vimeo.com", title: "Motion Graphics Showreel 2025", source_domain: "vimeo.com", category: "motion", tags: ["motion", "film"], color: "linear-gradient(135deg,#C77DD6,#7C4D9E)", createdAt: Date.now() - 4 * 86400000 },
@@ -209,7 +209,7 @@ interface FinanceStore {
 }
 
 const DEFAULT_CATEGORIES: FinanceCategory[] = [
-  { id: "c1", name: "Freelance", color: "#FF6E00", type: "income", icon: "building" },
+  { id: "c1", name: "Freelance", color: "#4e7d2e", type: "income", icon: "building" },
   { id: "c2", name: "Project Bonus", color: "#5DB872", type: "income", icon: "flag" },
   { id: "c3", name: "Software & Tools", color: "#6D8DF0", type: "expense", icon: "settings" },
   { id: "c4", name: "Food & Beverage", color: "#E8A55A", type: "expense", icon: "receipt" },

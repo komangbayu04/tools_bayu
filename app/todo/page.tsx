@@ -393,15 +393,15 @@ export default function TodoPage() {
                       onClick={() => toggleExtracted(idx)}
                       className="flex items-start gap-3 p-3 rounded-[10px] border text-left transition-colors"
                       style={{
-                        borderColor: item.selected ? "#FF6E00" : "var(--color-hairline)",
+                        borderColor: item.selected ? "var(--color-primary)" : "var(--color-hairline)",
                         background: item.selected ? "var(--color-primary-light)" : "var(--color-surface)",
                       }}
                     >
                       <div
                         className="w-[18px] h-[18px] rounded-md flex-shrink-0 mt-0.5 flex items-center justify-center"
                         style={{
-                          border: item.selected ? "2px solid #FF6E00" : "2px solid var(--color-hairline)",
-                          background: item.selected ? "#FF6E00" : "transparent",
+                          border: item.selected ? "2px solid var(--color-primary)" : "2px solid var(--color-hairline)",
+                          background: item.selected ? "var(--color-primary)" : "transparent",
                         }}
                       >
                         {item.selected && <Icon name="check" size={11} className="text-white" />}

@@ -286,7 +286,7 @@ function TaskChip({ task, onOpen, onSetStatus }: { task: Task; onOpen: () => voi
           </span>
         ) : null}
         {task.invoiceLinked && (
-          <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: "#FF6E00" }}>
+          <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: "var(--color-primary)" }}>
             <Icon name="receipt" size={10} /> invoiced
           </span>
         )}

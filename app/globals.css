@@ -1,36 +1,49 @@
 @import "tailwindcss";
 
 :root {
-  --color-primary: #FF6E00;
-  --color-primary-dark: #cc5800;
-  --color-primary-ink: #7A2E00;
-  --color-primary-light: #fff0e6;
-  --color-primary-muted: #ffc99a;
-  --color-canvas: #f4f6f7;
+  /* Brand: sage green #CDE5B7 — used as the soft active tint, with a deep
+     green scale derived around it for readable accents, text and fills. */
+  --color-primary: #4e7d2e;        /* accent / filled buttons (white text ~5:1) */
+  --color-primary-dark: #3d6323;   /* hover */
+  --color-primary-ink: #2e4d1b;    /* accent text / headings (high contrast) */
+  --color-primary-light: #cde5b7;  /* the brand sage — soft active backgrounds */
+  --color-primary-muted: #a9ce86;  /* borders / secondary fills */
+  --color-canvas: #f3f6f0;
   --color-surface: #ffffff;
-  --color-surface-card: #f9fafb;
-  --color-hairline: #e5e9eb;
-  --color-ink: #1a2b32;
-  --color-body: #3d5159;
-  --color-muted: #7a9099;
-  --color-muted-soft: #a8bdc3;
+  --color-surface-card: #f7faf3;
+  --color-hairline: #e6ebe0;
+  --color-ink: #1e2a18;
+  --color-body: #475141;
+  --color-muted: #7d8a74;
+  --color-muted-soft: #a9b3a0;
   --color-error: #c64545;
-  --color-warning: #e8a55a;
-  --color-success: #5db872;
-  --color-global-bg: #f4f6f7;
+  --color-warning: #d99a3c;
+  --color-success: #4e9d54;
+  --color-global-bg: #f3f6f0;
+  /* One-tone content shadow (single soft cast, light & subtle) */
+  --shadow-card: 0 1px 3px rgba(31, 45, 24, 0.07);
+  --shadow-pop: 0 8px 24px rgba(31, 45, 24, 0.12);
 }
 
 .dark {
-  --color-primary-light: #2e1500;
-  --color-canvas: #141b1e;
-  --color-surface: #1a2428;
-  --color-surface-card: #1f2d32;
-  --color-hairline: #263238;
-  --color-ink: #ecf2f4;
-  --color-body: #b0c8d0;
-  --color-muted: #5f7f8a;
-  --color-muted-soft: #3d5560;
-  --color-global-bg: #141b1e;
+  /* Lighter greens so accents stay legible on dark surfaces. */
+  --color-primary: #9bd06b;
+  --color-primary-dark: #7fb94e;
+  --color-primary-ink: #cde5b7;
+  --color-primary-light: #2c3d1e;
+  --color-primary-muted: #4a6b30;
+  --color-canvas: #141b13;
+  --color-surface: #1a241a;
+  --color-surface-card: #1f2c1e;
+  --color-hairline: #2a3827;
+  --color-ink: #eef3ea;
+  --color-body: #c2cdb8;
+  --color-muted: #8a9781;
+  --color-muted-soft: #54614c;
+  --color-global-bg: #141b13;
+  /* One-tone shadow for dark mode */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.32);
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 html, body {

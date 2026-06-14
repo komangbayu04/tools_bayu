@@ -25,7 +25,7 @@ export function GlowCard({
           border-radius: 22px;
           padding: 1.5px;
           overflow: hidden;
-          background: #1a0a00;
+          background: #0f1a08;
           isolation: isolate;
         }
         .glow-ring {
@@ -35,10 +35,10 @@ export function GlowCard({
           background: conic-gradient(
             from 0deg,
             transparent 0%,
-            rgba(255, 110, 0, 0.0) 8%,
-            #FF6E00 20%,
-            #FFB366 27%,
-            #FF6E00 34%,
+            rgba(78, 125, 46, 0.0) 8%,
+            #4e7d2e 20%,
+            #cde5b7 27%,
+            #6ba539 34%,
             transparent 46%,
             transparent 100%
           );
@@ -55,9 +55,9 @@ export function GlowCard({
           border-radius: 20.5px;
           height: 100%;
           background:
-            radial-gradient(120% 100% at 0% 0%, rgba(255, 110, 0, 0.28), transparent 55%),
-            radial-gradient(120% 100% at 100% 100%, rgba(122, 46, 0, 0.55), transparent 60%),
-            #1a0a00;
+            radial-gradient(120% 100% at 0% 0%, rgba(78, 125, 46, 0.28), transparent 55%),
+            radial-gradient(120% 100% at 100% 100%, rgba(46, 77, 27, 0.55), transparent 60%),
+            #0f1a08;
         }
       `}</style>
     </div>
@@ -78,9 +78,9 @@ export function GlowStat({
     <div className="flex items-center gap-3 min-w-0">
       <div
         className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ background: "rgba(255,179,102,0.14)" }}
+        style={{ background: "rgba(169,206,134,0.14)" }}
       >
-        <Icon name={icon} size={17} style={{ color: "#FFB366" }} />
+        <Icon name={icon} size={17} style={{ color: "#cde5b7" }} />
       </div>
       <div className="min-w-0">
         <p className="text-[18px] font-bold leading-none text-white truncate">{value}</p>

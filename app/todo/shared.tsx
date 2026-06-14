@@ -17,7 +17,7 @@ export const STATUS_META: Record<TaskStatus, { label: string; color: string }> =
 };
 
 export const PROJECT_PALETTE = [
-  "#FF6E00", "#6D8DF0", "#E8A55A", "#C77DD6", "#5DB872", "#D85A4A", "#4DBFC4", "#F0A07C",
+  "#4e7d2e", "#6D8DF0", "#E8A55A", "#C77DD6", "#5DB872", "#D85A4A", "#4DBFC4", "#F0A07C",
 ];
 
 /** Deadline pill — red text when overdue and not done. */

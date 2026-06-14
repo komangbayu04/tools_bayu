@@ -20,7 +20,7 @@ export function ShellChrome({ children }: { children: React.ReactNode }) {
         style={{
           background: "var(--color-surface)",
           borderTopLeftRadius: 21,
-          boxShadow: "-6px 8px 42px 0px rgba(1,135,134,0.10)",
+          boxShadow: "-6px 8px 42px 0px rgba(31,45,24,0.08)",
         }}
       >
         <div className="px-6 py-8 md:px-[52px] md:py-12 min-h-full">

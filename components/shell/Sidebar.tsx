@@ -56,6 +56,14 @@ function isNavItem(item: (typeof navItems)[number]): item is NavItem {
   return "href" in item;
 }
 
+// Is a /todo-style href active, treating /todo/notepad as a distinct route.
+function hrefActive(pathname: string, href: string) {
+  if (href === "/todo") {
+    return pathname === "/todo" || (pathname.startsWith("/todo/") && !pathname.startsWith("/todo/notepad"));
+  }
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
@@ -88,11 +96,7 @@ export function Sidebar() {
   const settingsActive = pathname === "/settings";
 
   const renderNavItem = (item: NavItem, indent = false) => {
-    const isActive = pathname === item.href || (item.href !== "/todo" && pathname.startsWith(item.href + "/"));
-    // Special case: /todo exact match or /todo/[projectId] (but not /todo/notepad)
-    const todoActive = item.href === "/todo" && (pathname === "/todo" || (pathname.startsWith("/todo/") && pathname !== "/todo/notepad" && !pathname.startsWith("/todo/notepad/")));
-    const active = item.href === "/todo" ? todoActive : isActive;
-
+    const active = hrefActive(pathname, item.href);
     return (
       <div key={item.href} className="relative group">
         <Link
@@ -100,16 +104,16 @@ export function Sidebar() {
           className={cn(
             "relative flex items-center gap-3 py-2 rounded-xl text-[13px] font-semibold",
             collapsed ? "justify-center px-0" : indent ? "pl-8 pr-3" : "px-3",
-            active ? "text-[#7A2E00]" : "hover:text-[var(--color-body)]"
+            active ? "" : "hover:text-[var(--color-body)]"
           )}
-          style={active ? undefined : { color: "var(--color-muted)" }}
+          style={active ? { color: "var(--color-primary-ink)" } : { color: "var(--color-muted)" }}
         >
           {active && <ActiveHighlight />}
           <Icon
             name={item.icon}
             size={15}
             className="relative z-10"
-            style={{ flexShrink: 0, color: active ? "#FF6E00" : "var(--color-muted-soft)" }}
+            style={{ flexShrink: 0, color: active ? "var(--color-primary)" : "var(--color-muted-soft)" }}
           />
           {!collapsed && <span className="relative z-10 whitespace-nowrap overflow-hidden">{item.label}</span>}
         </Link>
@@ -126,12 +130,8 @@ export function Sidebar() {
   };
 
   const renderGroup = (group: NavGroup) => {
-    const isAnyChildActive = group.children.some(
-      (c) => c.href === "/todo"
-        ? (pathname === "/todo" || (pathname.startsWith("/todo/") && pathname !== "/todo/notepad"))
-        : pathname === c.href || pathname.startsWith(c.href + "/")
-    );
-    const isOpen = openGroups[group.label] !== false && (openGroups[group.label] === true || isAnyChildActive);
+    const anyChildActive = group.children.some((c) => hrefActive(pathname, c.href));
+    const isOpen = openGroups[group.label] === true || (openGroups[group.label] !== false && anyChildActive);
 
     return (
       <div key={group.label}>
@@ -141,15 +141,15 @@ export function Sidebar() {
             className={cn(
               "relative flex items-center gap-3 py-2.5 rounded-xl text-[13px] font-semibold w-full transition-colors",
               collapsed ? "justify-center px-0" : "px-3",
-              isAnyChildActive ? "text-[#7A2E00]" : "hover:text-[var(--color-body)]"
+              anyChildActive ? "" : "hover:text-[var(--color-body)]"
             )}
-            style={isAnyChildActive ? undefined : { color: "var(--color-muted)" }}
+            style={anyChildActive ? { color: "var(--color-primary-ink)" } : { color: "var(--color-muted)" }}
           >
             <Icon
               name={group.icon}
               size={17}
               className="relative z-10"
-              style={{ flexShrink: 0, color: isAnyChildActive ? "#FF6E00" : "var(--color-muted-soft)" }}
+              style={{ flexShrink: 0, color: anyChildActive ? "var(--color-primary)" : "var(--color-muted-soft)" }}
             />
             {!collapsed && (
               <>
@@ -165,17 +165,59 @@ export function Sidebar() {
                 />
               </>
             )}
+            {/* Active dot on the collapsed parent icon */}
+            {collapsed && anyChildActive && (
+              <span
+                className="absolute right-1.5 top-1.5 w-1.5 h-1.5 rounded-full"
+                style={{ background: "var(--color-primary)" }}
+              />
+            )}
           </button>
+
+          {/* Collapsed: hover flyout panel listing the sub-items */}
           {collapsed && (
             <div
-              className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 z-50"
-              style={{ background: "var(--color-ink)", color: "var(--color-canvas)", transition: "opacity 120ms" }}
+              className="pointer-events-none absolute left-full top-0 ml-3 z-50 opacity-0 translate-x-[-4px] group-hover:opacity-100 group-hover:translate-x-0 group-hover:pointer-events-auto"
+              style={{ transition: "opacity 140ms ease, transform 140ms ease" }}
             >
-              {group.label}
+              <div
+                className="rounded-[14px] py-1.5 min-w-[160px]"
+                style={{
+                  background: "var(--color-surface)",
+                  border: "1px solid var(--color-hairline)",
+                  boxShadow: "var(--shadow-pop)",
+                }}
+              >
+                <p
+                  className="px-3 pt-1 pb-1.5 text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: "var(--color-muted-soft)" }}
+                >
+                  {group.label}
+                </p>
+                {group.children.map((child) => {
+                  const active = hrefActive(pathname, child.href);
+                  return (
+                    <Link
+                      key={child.href}
+                      href={child.href}
+                      className="flex items-center gap-2.5 mx-1.5 px-2.5 py-2 rounded-lg text-[13px] font-semibold transition-colors hover:bg-[var(--color-canvas)]"
+                      style={{ color: active ? "var(--color-primary-ink)" : "var(--color-body)" }}
+                    >
+                      <Icon
+                        name={child.icon}
+                        size={14}
+                        style={{ flexShrink: 0, color: active ? "var(--color-primary)" : "var(--color-muted-soft)" }}
+                      />
+                      <span className="whitespace-nowrap">{child.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
 
+        {/* Expanded: inline accordion of children */}
         <AnimatePresence initial={false}>
           {!collapsed && isOpen && (
             <motion.div
@@ -199,7 +241,7 @@ export function Sidebar() {
     <>
       {/* Desktop sidebar */}
       <aside
-        className="hidden md:flex flex-shrink-0 h-screen flex-col overflow-hidden"
+        className="hidden md:flex flex-shrink-0 h-screen flex-col overflow-visible"
         style={{
           width: collapsed ? "64px" : "200px",
           background: "var(--color-canvas)",
@@ -213,7 +255,7 @@ export function Sidebar() {
             {collapsed ? (
               <button
                 onClick={() => toggle(false)}
-                className="group relative w-9 h-9 mx-auto rounded-xl bg-[#7A2E00] flex items-center justify-center shadow-sm flex-shrink-0"
+                className="group relative w-9 h-9 mx-auto rounded-xl bg-[var(--color-primary-dark)] flex items-center justify-center shadow-sm flex-shrink-0"
                 aria-label="Expand sidebar"
               >
                 <span className="absolute inset-0 flex items-center justify-center transition-opacity duration-150 group-hover:opacity-0">
@@ -225,7 +267,7 @@ export function Sidebar() {
               </button>
             ) : (
               <>
-                <div className="w-9 h-9 rounded-xl bg-[#7A2E00] flex items-center justify-center shadow-sm flex-shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-[var(--color-primary-dark)] flex items-center justify-center shadow-sm flex-shrink-0">
                   <span className="text-white font-bold text-lg leading-none">B</span>
                 </div>
                 <span
@@ -248,8 +290,8 @@ export function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 flex flex-col gap-0.5 px-2 overflow-y-auto overflow-x-hidden">
-          {navItems.map((item, i) =>
+        <nav className="flex-1 flex flex-col gap-0.5 px-2 overflow-y-auto overflow-x-visible">
+          {navItems.map((item) =>
             isNavItem(item) ? renderNavItem(item) : renderGroup(item.group)
           )}
         </nav>
@@ -264,17 +306,16 @@ export function Sidebar() {
               href="/settings"
               className={cn(
                 "relative flex items-center gap-3 py-2.5 rounded-xl text-[13px] font-semibold",
-                collapsed ? "justify-center px-0" : "px-3",
-                settingsActive ? "text-[#7A2E00]" : ""
+                collapsed ? "justify-center px-0" : "px-3"
               )}
-              style={settingsActive ? undefined : { color: "var(--color-muted)" }}
+              style={settingsActive ? { color: "var(--color-primary-ink)" } : { color: "var(--color-muted)" }}
             >
               {settingsActive && <ActiveHighlight />}
               <Icon
                 name="settings"
                 size={17}
                 className="relative z-10"
-                style={{ flexShrink: 0, color: settingsActive ? "#FF6E00" : "var(--color-muted-soft)" }}
+                style={{ flexShrink: 0, color: settingsActive ? "var(--color-primary)" : "var(--color-muted-soft)" }}
               />
               {!collapsed && <span className="relative z-10 whitespace-nowrap overflow-hidden">Settings</span>}
             </Link>
@@ -339,7 +380,7 @@ export function Sidebar() {
               key={href}
               href={href}
               className="flex flex-col items-center p-2.5 rounded-xl transition-colors"
-              style={{ color: isActive ? "#FF6E00" : "var(--color-muted-soft)" }}
+              style={{ color: isActive ? "var(--color-primary)" : "var(--color-muted-soft)" }}
             >
               <Icon name={icon} size={22} />
             </Link>

@@ -44,7 +44,7 @@ export default function DashboardPage() {
 
   const project = (id: string) => projects.find((p) => p.id === id);
   const projectName = (id: string) => project(id)?.name ?? "—";
-  const projectColor = (id: string) => project(id)?.color ?? "#FF6E00";
+  const projectColor = (id: string) => project(id)?.color ?? "#4e7d2e";
 
   const openTasks  = tasks.filter((t) => t.status !== "done");
   const inProgress = tasks.filter((t) => t.status === "in_progress");
@@ -97,7 +97,7 @@ export default function DashboardPage() {
           <Link
             href="/todo"
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
-            style={{ background: "#FF6E00" }}
+            style={{ background: "var(--color-primary)" }}
           >
             <Icon name="plus" size={14} /> Add Task
           </Link>
@@ -124,12 +124,12 @@ export default function DashboardPage() {
       >
         <div className="flex items-center justify-between px-5 py-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(255,110,0,0.10)" }}>
-              <Icon name="list-check" size={15} style={{ color: "#FF6E00" }} />
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(78,125,46,0.10)" }}>
+              <Icon name="list-check" size={15} style={{ color: "var(--color-primary)" }} />
             </div>
             <p className="text-[15px] font-bold" style={{ color: "var(--color-ink)" }}>Task Saya</p>
           </div>
-          <Link href="/todo/all" className="text-[12px] font-semibold flex items-center gap-1 hover:opacity-70" style={{ color: "#FF6E00" }}>
+          <Link href="/todo/all" className="text-[12px] font-semibold flex items-center gap-1 hover:opacity-70" style={{ color: "var(--color-primary)" }}>
             See All <Icon name="arrow-right" size={11} />
           </Link>
         </div>
@@ -211,8 +211,8 @@ export default function DashboardPage() {
                   className="flex flex-col items-center py-2 rounded-xl transition-colors"
                   style={
                     active
-                      ? { background: "#FF6E00", color: "#fff" }
-                      : { color: isToday ? "#FF6E00" : "var(--color-muted)" }
+                      ? { background: "var(--color-primary)", color: "#fff" }
+                      : { color: isToday ? "var(--color-primary)" : "var(--color-muted)" }
                   }
                 >
                   <span className="text-[10px] font-medium uppercase">{format(d, "EEEEEE", { locale: idLocale })}</span>

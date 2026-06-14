@@ -208,7 +208,7 @@ export default function FinanceEvaluatePage() {
   const kpis: { label: string; value: string; color: string; icon: IconName }[] = [
     { label: "Total Pemasukan", value: fmtIDR(income), color: "#5DB872", icon: "trending-up" },
     { label: "Total Pengeluaran", value: fmtIDR(expense), color: "#D85A4A", icon: "trending-down" },
-    { label: "Saldo", value: fmtIDR(balance), color: balance >= 0 ? "#FF6E00" : "#D85A4A", icon: "wallet" },
+    { label: "Saldo", value: fmtIDR(balance), color: balance >= 0 ? "var(--color-primary)" : "#D85A4A", icon: "wallet" },
     { label: "Savings Rate", value: `${savingsRate}%`, color: savingsRate >= 20 ? "#5DB872" : "#E8A55A", icon: "sparkles" },
   ];
 
@@ -238,7 +238,7 @@ export default function FinanceEvaluatePage() {
             className="px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all border"
             style={
               selectedMonth === m
-                ? { background: "#FF6E00", borderColor: "#FF6E00", color: "#fff" }
+                ? { background: "var(--color-primary)", borderColor: "var(--color-primary)", color: "#fff" }
                 : { background: "var(--color-surface)", borderColor: "var(--color-hairline)", color: "var(--color-muted)" }
             }
           >
@@ -273,8 +273,8 @@ export default function FinanceEvaluatePage() {
         <Card className="rounded-[18px]">
           <CardHeader>
             <p className="text-[13px] font-semibold flex items-center gap-2.5" style={{ color: "var(--color-ink)" }}>
-              <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#FF6E001a" }}>
-                <Icon name="chart-pie" size={15} style={{ color: "#FF6E00" }} />
+              <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(78,125,46,0.1)" }}>
+                <Icon name="chart-pie" size={15} style={{ color: "var(--color-primary)" }} />
               </span>
               Komposisi Pengeluaran
             </p>
@@ -335,8 +335,8 @@ export default function FinanceEvaluatePage() {
         <Card className="rounded-[18px]">
           <CardHeader>
             <p className="text-[13px] font-semibold flex items-center gap-2.5" style={{ color: "var(--color-ink)" }}>
-              <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#FF6E001a" }}>
-                <Icon name="chart-bar" size={15} style={{ color: "#FF6E00" }} />
+              <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(78,125,46,0.1)" }}>
+                <Icon name="chart-bar" size={15} style={{ color: "var(--color-primary)" }} />
               </span>
               Pemasukan vs Pengeluaran (6 Bulan)
             </p>
@@ -380,8 +380,8 @@ export default function FinanceEvaluatePage() {
         <Card className="rounded-[18px]">
           <CardHeader>
             <p className="text-[13px] font-semibold flex items-center gap-2.5" style={{ color: "var(--color-ink)" }}>
-              <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#FF6E001a" }}>
-                <Icon name="chart-line" size={15} style={{ color: "#FF6E00" }} />
+              <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(78,125,46,0.1)" }}>
+                <Icon name="chart-line" size={15} style={{ color: "var(--color-primary)" }} />
               </span>
               Tren Saldo Bersih
             </p>
@@ -401,7 +401,7 @@ export default function FinanceEvaluatePage() {
                         {pos && (
                           <div
                             className="w-1/2 max-w-[20px] rounded-t"
-                            style={{ height: `${(m.net / maxNet) * 70}px`, background: "#FF6E00", minHeight: 3 }}
+                            style={{ height: `${(m.net / maxNet) * 70}px`, background: "var(--color-primary)", minHeight: 3 }}
                             title={fmtIDR(m.net)}
                           />
                         )}
@@ -431,8 +431,8 @@ export default function FinanceEvaluatePage() {
         <Card className="rounded-[18px]">
           <CardHeader>
             <p className="text-[13px] font-semibold flex items-center gap-2.5" style={{ color: "var(--color-ink)" }}>
-              <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#FF6E001a" }}>
-                <Icon name="list-check" size={15} style={{ color: "#FF6E00" }} />
+              <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(78,125,46,0.1)" }}>
+                <Icon name="list-check" size={15} style={{ color: "var(--color-primary)" }} />
               </span>
               Top 5 Pengeluaran
             </p>
@@ -489,8 +489,8 @@ export default function FinanceEvaluatePage() {
       <Card className="mb-4 rounded-[18px]">
         <CardHeader>
           <p className="text-[13px] font-semibold flex items-center gap-2.5" style={{ color: "var(--color-ink)" }}>
-            <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#FF6E001a" }}>
-              <Icon name="sparkles" size={15} style={{ color: "#FF6E00" }} />
+            <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(78,125,46,0.1)" }}>
+              <Icon name="sparkles" size={15} style={{ color: "var(--color-primary)" }} />
             </span>
             Analisis &amp; Saran
           </p>
@@ -503,7 +503,7 @@ export default function FinanceEvaluatePage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {insights.map((ins, i) => {
-                const color = ins.ok ? "#FF6E00" : "#E8A55A";
+                const color = ins.ok ? "var(--color-primary)" : "#E8A55A";
                 return (
                   <div
                     key={i}

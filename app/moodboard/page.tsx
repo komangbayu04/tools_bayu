@@ -118,7 +118,7 @@ export default function MoodboardPage() {
       category: newCategory,
       tags: newTags.split(",").map((t) => t.trim()).filter(Boolean),
       note: newNote,
-      color: "linear-gradient(135deg,#FF6E00,#7A2E00)",
+      color: "linear-gradient(135deg,#6ba539,#2e4d1b)",
       image_url: mediaData,
       media_type: mediaType ?? "image",
       createdAt: Date.now(),
@@ -152,7 +152,7 @@ export default function MoodboardPage() {
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] text-[13px] font-semibold transition-all border"
               style={
                 dateFilter !== "all"
-                  ? { background: "var(--color-primary-light)", color: "#7A2E00", borderColor: "#FF6E00" }
+                  ? { background: "var(--color-primary-light)", color: "var(--color-primary-ink)", borderColor: "var(--color-primary)" }
                   : { background: "var(--color-surface)", color: "var(--color-muted)", borderColor: "var(--color-hairline)" }
               }
             >
@@ -331,10 +331,10 @@ export default function MoodboardPage() {
                 onDrop={(e) => { e.preventDefault(); setDragActive(false); handleFiles(e.dataTransfer.files); }}
                 className="h-44 rounded-[10px] flex flex-col items-center justify-center gap-2 transition-colors"
                 style={{
-                  border: `2px dashed ${dragActive ? "#FF6E00" : "var(--color-hairline)"}`,
+                  border: `2px dashed ${dragActive ? "var(--color-primary)" : "var(--color-hairline)"}`,
                   background: dragActive ? "var(--color-primary-light)" : "var(--color-canvas)",
                 }}>
-                <Icon name="upload-cloud" size={26} className="text-[#FF6E00]" />
+                <Icon name="upload-cloud" size={26} className="text-[var(--color-primary)]" />
                 <p className="text-[13px] font-semibold" style={{ color: "var(--color-ink)" }}>Click to upload or drag & drop</p>
                 <p className="text-[11px]" style={{ color: "var(--color-muted)" }}>Image or video file</p>
               </button>

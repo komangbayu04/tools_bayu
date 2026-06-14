@@ -169,7 +169,7 @@ export default function InvoicePage() {
               {(["invoice", "quotation"] as DocumentType[]).map(t => (
                 <button key={t} onClick={() => setDocType(t)} className="py-2.5 rounded-[8px] text-sm font-semibold capitalize transition-all border"
                   style={docType === t
-                    ? { background: "var(--color-primary-light)", borderColor: "#FF6E00", color: "#7A2E00" }
+                    ? { background: "var(--color-primary-light)", borderColor: "var(--color-primary)", color: "var(--color-primary-ink)" }
                     : { background: "var(--color-surface)", borderColor: "var(--color-hairline)", color: "var(--color-muted)" }}>
                   {t}
                 </button>
@@ -275,7 +275,7 @@ export default function InvoicePage() {
                       <Textarea value={item.tasks} onChange={e => updateItem(item.id, "tasks", e.target.value)} rows={3} placeholder="One task per line" className="bg-[var(--color-surface-card)]" />
                     </div>
                   ))}
-                  <button onClick={addItem} className="flex items-center gap-2 text-sm font-semibold mt-1 hover:opacity-70 w-fit" style={{ color: "#FF6E00" }}>
+                  <button onClick={addItem} className="flex items-center gap-2 text-sm font-semibold mt-1 hover:opacity-70 w-fit" style={{ color: "var(--color-primary)" }}>
                     <Icon name="plus" size={14} /> Add Item
                   </button>
                 </>
@@ -311,7 +311,7 @@ export default function InvoicePage() {
                       </div>
                     </div>
                   ))}
-                  <button onClick={addQuoteItem} className="flex items-center gap-2 text-sm font-semibold mt-1 hover:opacity-70 w-fit" style={{ color: "#FF6E00" }}>
+                  <button onClick={addQuoteItem} className="flex items-center gap-2 text-sm font-semibold mt-1 hover:opacity-70 w-fit" style={{ color: "var(--color-primary)" }}>
                     <Icon name="plus" size={14} /> Add Service
                   </button>
                 </>

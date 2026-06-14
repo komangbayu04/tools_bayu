@@ -110,7 +110,7 @@ function NoteCard({ note, onClick }: { note: Note; onClick: () => void }) {
             <Icon
               name="flag"
               size={11}
-              style={{ color: note.pinned ? "#FF6E00" : "var(--color-muted-soft)" }}
+              style={{ color: note.pinned ? "var(--color-primary)" : "var(--color-muted-soft)" }}
             />
           </button>
           <button
@@ -140,7 +140,7 @@ function NoteCard({ note, onClick }: { note: Note; onClick: () => void }) {
       </p>
 
       {note.pinned && (
-        <div className="absolute top-3 left-3 w-1.5 h-1.5 rounded-full bg-[#FF6E00]" />
+        <div className="absolute top-3 left-3 w-1.5 h-1.5 rounded-full bg-[var(--color-primary)]" />
       )}
     </motion.div>
   );
@@ -225,7 +225,7 @@ function NoteEditor({
                 className="w-5 h-5 rounded-full border-2 transition-transform hover:scale-110"
                 style={{
                   background: c.bg === "var(--color-surface-card)" ? "#f9fafb" : c.bg,
-                  borderColor: color === c.bg ? "#FF6E00" : "var(--color-hairline)",
+                  borderColor: color === c.bg ? "var(--color-primary)" : "var(--color-hairline)",
                 }}
                 title={c.label}
               />
@@ -234,7 +234,7 @@ function NoteEditor({
           <button
             onClick={save}
             className="px-4 py-1.5 rounded-xl text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
-            style={{ background: "#FF6E00" }}
+            style={{ background: "var(--color-primary)" }}
           >
             Simpan
           </button>
@@ -269,7 +269,7 @@ export default function NotepadPage() {
           <button
             onClick={() => setEditing("new")}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
-            style={{ background: "#FF6E00" }}
+            style={{ background: "var(--color-primary)" }}
           >
             <Icon name="plus" size={14} />
             <span>Catatan Baru</span>
@@ -303,9 +303,9 @@ export default function NotepadPage() {
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center"
-            style={{ background: "rgba(255,110,0,0.1)" }}
+            style={{ background: "rgba(78,125,46,0.1)" }}
           >
-            <Icon name="edit" size={22} style={{ color: "#FF6E00" }} />
+            <Icon name="edit" size={22} style={{ color: "var(--color-primary)" }} />
           </div>
           <p className="text-[15px] font-semibold" style={{ color: "var(--color-ink)" }}>
             Belum ada catatan
