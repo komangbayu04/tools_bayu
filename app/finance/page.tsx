@@ -152,17 +152,10 @@ export default function FinancePage() {
       <PageHeader
         title="Finance"
         subtitle="Pencatatan keuangan bulanan"
-        actions={
-          <>
-            <Button variant="outline" onClick={() => setShowAddCat(true)}><Icon name="plus" size={15} /> Kategori</Button>
-            <Button variant="outline" onClick={() => router.push("/finance/evaluate")}><Icon name="sparkles" size={15} /> Evaluasi</Button>
-            <Button onClick={() => setShowAddTx(true)}><Icon name="plus" size={15} /> Tambah</Button>
-          </>
-        }
       />
 
-      {/* Month navigator */}
-      <div className="flex items-center gap-3 mb-7">
+      {/* Month navigator + actions (same row) */}
+      <div className="flex items-center gap-3 mb-7 flex-wrap">
         <button onClick={prevMonth} className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-canvas)]" style={{ border: "1px solid var(--color-hairline)" }}>
           <Icon name="chevron-left" size={16} style={{ color: "var(--color-muted)" }} />
         </button>
@@ -173,6 +166,13 @@ export default function FinancePage() {
         {!isCurrentMonth && (
           <button onClick={() => setCurrentMonth(monthKey(new Date()))} className="text-[12px] font-semibold hover:opacity-70" style={{ color: "#2A9D8F" }}>Kembali ke bulan ini</button>
         )}
+
+        {/* Actions pushed to the right, aligned with the navigator */}
+        <div className="flex items-center gap-2.5 ml-auto">
+          <Button variant="outline" onClick={() => setShowAddCat(true)}><Icon name="plus" size={15} /> Kategori</Button>
+          <Button variant="outline" onClick={() => router.push("/finance/evaluate")}><Icon name="sparkles" size={15} /> Evaluasi</Button>
+          <Button onClick={() => setShowAddTx(true)}><Icon name="plus" size={15} /> Tambah</Button>
+        </div>
       </div>
 
       {/* Summary cards — fintech hero row */}
@@ -332,17 +332,17 @@ export default function FinancePage() {
               {catBreakdown.length === 0 ? (
                 <p className="text-[12px] text-center py-4" style={{ color: "var(--color-muted-soft)" }}>Belum ada pengeluaran</p>
               ) : (
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3.5">
                   {catBreakdown.map(cat => (
                     <div key={cat.id}>
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-2.5 mb-1.5">
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: `${cat.color}1a` }}>
                           <Icon name={cat.icon as IconName} size={14} style={{ color: cat.color }} />
-                          <span className="text-[12px] font-semibold" style={{ color: "var(--color-ink)" }}>{cat.name}</span>
                         </div>
-                        <span className="text-[12px] font-semibold" style={{ color: "var(--color-muted)" }}>{fmtIDR(cat.total)}</span>
+                        <span className="flex-1 text-[12px] font-semibold truncate" style={{ color: "var(--color-ink)" }}>{cat.name}</span>
+                        <span className="text-[12px] font-bold" style={{ color: "var(--color-ink)" }}>{fmtIDR(cat.total)}</span>
                       </div>
-                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--color-canvas)" }}>
+                      <div className="h-2 rounded-full overflow-hidden" style={{ background: `${cat.color}1a` }}>
                         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(cat.total / maxCatTotal) * 100}%`, background: cat.color }} />
                       </div>
                     </div>
@@ -356,21 +356,28 @@ export default function FinancePage() {
           <Card className="rounded-[18px]">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <p className="text-[13px] font-semibold" style={{ color: "var(--color-ink)" }}>Kategori</p>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "#2A9D8F1F" }}>
+                    <Icon name="list-check" size={14} style={{ color: "#1C4F4F" }} />
+                  </div>
+                  <p className="text-[13px] font-semibold" style={{ color: "var(--color-ink)" }}>Kategori</p>
+                </div>
                 <button onClick={() => setShowAddCat(true)} className="text-[11px] font-semibold hover:opacity-70" style={{ color: "#1C4F4F" }}>+ Tambah</button>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-0.5">
                 {categories.map(cat => (
-                  <div key={cat.id} className="flex items-center gap-2 group py-1">
-                    <Icon name={cat.icon as IconName} size={14} style={{ color: cat.color }} />
-                    <span className="flex-1 text-[12px] font-medium" style={{ color: "var(--color-ink)" }}>{cat.name}</span>
+                  <div key={cat.id} className="flex items-center gap-2.5 group px-2 py-2 rounded-[12px] transition-colors hover:bg-[var(--color-canvas)]">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: `${cat.color}1a` }}>
+                      <Icon name={cat.icon as IconName} size={14} style={{ color: cat.color }} />
+                    </div>
+                    <span className="flex-1 text-[12px] font-medium truncate" style={{ color: "var(--color-ink)" }}>{cat.name}</span>
                     <Badge variant={cat.type === "income" ? "teal" : "gray"} className="text-[9px]">
                       {cat.type === "income" ? "masuk" : "keluar"}
                     </Badge>
                     {!["c1","c2","c3","c4","c5","c6","c7","c8"].includes(cat.id) && (
-                      <button onClick={() => deleteCategory(cat.id)} className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 transition-all" style={{ color: "#C64545" }}>
+                      <button onClick={() => deleteCategory(cat.id)} className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 transition-all flex-shrink-0" style={{ color: "#C64545" }}>
                         <Icon name="x" size={12} />
                       </button>
                     )}

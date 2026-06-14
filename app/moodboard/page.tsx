@@ -132,10 +132,9 @@ export default function MoodboardPage() {
       <PageHeader
         title="Moodboard"
         subtitle={`${items.length} references collected`}
-        actions={<Button onClick={() => setShowModal(true)}><Icon name="plus" size={15} /> Add Reference</Button>}
       />
 
-      {/* Filters: category tabs + date dropdown */}
+      {/* Filters: category tabs + date dropdown + add button */}
       <div className="mb-7 flex items-center justify-between gap-3 flex-wrap">
         <Tabs value={activeCategory} onValueChange={(v) => setActiveCategory(v as Category)}>
           <TabsList>
@@ -145,42 +144,47 @@ export default function MoodboardPage() {
           </TabsList>
         </Tabs>
 
-        {/* Date filter */}
-        <div className="relative">
-          <button
-            onClick={() => setShowDateMenu((v) => !v)}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] text-[13px] font-semibold transition-all border"
-            style={
-              dateFilter !== "all"
-                ? { background: "var(--color-primary-light)", color: "#1C4F4F", borderColor: "#2A9D8F" }
-                : { background: "var(--color-surface)", color: "var(--color-muted)", borderColor: "var(--color-hairline)" }
-            }
-          >
-            {dateLabels[dateFilter]} <Icon name="chevron-down" size={13} />
-          </button>
-          <AnimatePresence>
-            {showDateMenu && (
-              <motion.div
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.12 }}
-                className="absolute right-0 mt-1.5 z-50 rounded-[12px] overflow-hidden py-1 min-w-[150px] shadow-[0_8px_24px_rgba(16,40,48,0.12)]"
-                style={{ background: "var(--color-surface)", border: "1px solid var(--color-hairline)" }}
-              >
-                {(Object.keys(dateLabels) as DateFilter[]).map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => { setDateFilter(d); setShowDateMenu(false); }}
-                    className="w-full text-left px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--color-canvas)]"
-                    style={{ color: dateFilter === d ? "var(--color-ink)" : "var(--color-muted)" }}
-                  >
-                    {dateLabels[d]}
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+        <div className="flex items-center gap-2.5">
+          {/* Date filter */}
+          <div className="relative">
+            <button
+              onClick={() => setShowDateMenu((v) => !v)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] text-[13px] font-semibold transition-all border"
+              style={
+                dateFilter !== "all"
+                  ? { background: "var(--color-primary-light)", color: "#1C4F4F", borderColor: "#2A9D8F" }
+                  : { background: "var(--color-surface)", color: "var(--color-muted)", borderColor: "var(--color-hairline)" }
+              }
+            >
+              {dateLabels[dateFilter]} <Icon name="chevron-down" size={13} />
+            </button>
+            <AnimatePresence>
+              {showDateMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.12 }}
+                  className="absolute right-0 mt-1.5 z-50 rounded-[12px] overflow-hidden py-1 min-w-[150px] shadow-[0_8px_24px_rgba(16,40,48,0.12)]"
+                  style={{ background: "var(--color-surface)", border: "1px solid var(--color-hairline)" }}
+                >
+                  {(Object.keys(dateLabels) as DateFilter[]).map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => { setDateFilter(d); setShowDateMenu(false); }}
+                      className="w-full text-left px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--color-canvas)]"
+                      style={{ color: dateFilter === d ? "var(--color-ink)" : "var(--color-muted)" }}
+                    >
+                      {dateLabels[d]}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Add reference */}
+          <Button onClick={() => setShowModal(true)}><Icon name="plus" size={15} /> Add Reference</Button>
         </div>
       </div>
 

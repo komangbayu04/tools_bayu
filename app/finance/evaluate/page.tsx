@@ -250,17 +250,17 @@ export default function FinanceEvaluatePage() {
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         {kpis.map((k) => (
-          <Card key={k.label}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
+          <Card key={k.label} className="rounded-[18px]">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-2.5">
                 <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>
                   {k.label}
                 </p>
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: k.color + "18" }}>
-                  <Icon name={k.icon} size={14} style={{ color: k.color }} />
+                <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: k.color + "1a" }}>
+                  <Icon name={k.icon} size={16} style={{ color: k.color }} />
                 </div>
               </div>
-              <p className="text-[18px] font-bold leading-tight" style={{ color: k.color }}>
+              <p className="text-[20px] font-bold leading-tight" style={{ color: k.color }}>
                 {k.value}
               </p>
             </CardContent>
@@ -270,10 +270,13 @@ export default function FinanceEvaluatePage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start mb-6">
         {/* Donut: expense breakdown */}
-        <Card>
+        <Card className="rounded-[18px]">
           <CardHeader>
-            <p className="text-[13px] font-semibold flex items-center gap-2" style={{ color: "var(--color-ink)" }}>
-              <Icon name="chart-pie" size={14} style={{ color: "#2A9D8F" }} /> Komposisi Pengeluaran
+            <p className="text-[13px] font-semibold flex items-center gap-2.5" style={{ color: "var(--color-ink)" }}>
+              <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#2A9D8F1a" }}>
+                <Icon name="chart-pie" size={15} style={{ color: "#2A9D8F" }} />
+              </span>
+              Komposisi Pengeluaran
             </p>
           </CardHeader>
           <CardContent>
@@ -310,9 +313,12 @@ export default function FinanceEvaluatePage() {
                 <div className="flex-1 w-full flex flex-col gap-2">
                   {expByCat.map((c) => (
                     <div key={c.id} className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: c.color }} />
-                      <span className="text-[12px] font-medium flex-1 truncate flex items-center gap-1.5" style={{ color: "var(--color-ink)" }}>
-                        <Icon name={c.icon as IconName} size={14} style={{ color: c.color }} /> {c.name}
+                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: c.color }} />
+                      <span className="text-[12px] font-medium flex-1 truncate flex items-center gap-2" style={{ color: "var(--color-ink)" }}>
+                        <span className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: c.color + "1a" }}>
+                          <Icon name={c.icon as IconName} size={13} style={{ color: c.color }} />
+                        </span>
+                        {c.name}
                       </span>
                       <span className="text-[11px] font-semibold" style={{ color: "var(--color-muted)" }}>
                         {donutTotal > 0 ? Math.round((c.total / donutTotal) * 100) : 0}%
@@ -326,10 +332,13 @@ export default function FinanceEvaluatePage() {
         </Card>
 
         {/* Bar: income vs expense last 6 months */}
-        <Card>
+        <Card className="rounded-[18px]">
           <CardHeader>
-            <p className="text-[13px] font-semibold flex items-center gap-2" style={{ color: "var(--color-ink)" }}>
-              <Icon name="chart-bar" size={14} style={{ color: "#2A9D8F" }} /> Pemasukan vs Pengeluaran (6 Bulan)
+            <p className="text-[13px] font-semibold flex items-center gap-2.5" style={{ color: "var(--color-ink)" }}>
+              <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#2A9D8F1a" }}>
+                <Icon name="chart-bar" size={15} style={{ color: "#2A9D8F" }} />
+              </span>
+              Pemasukan vs Pengeluaran (6 Bulan)
             </p>
           </CardHeader>
           <CardContent>
@@ -368,10 +377,13 @@ export default function FinanceEvaluatePage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start mb-6">
         {/* Net balance trend */}
-        <Card>
+        <Card className="rounded-[18px]">
           <CardHeader>
-            <p className="text-[13px] font-semibold flex items-center gap-2" style={{ color: "var(--color-ink)" }}>
-              <Icon name="chart-line" size={14} style={{ color: "#2A9D8F" }} /> Tren Saldo Bersih
+            <p className="text-[13px] font-semibold flex items-center gap-2.5" style={{ color: "var(--color-ink)" }}>
+              <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#2A9D8F1a" }}>
+                <Icon name="chart-line" size={15} style={{ color: "#2A9D8F" }} />
+              </span>
+              Tren Saldo Bersih
             </p>
           </CardHeader>
           <CardContent>
@@ -416,10 +428,13 @@ export default function FinanceEvaluatePage() {
         </Card>
 
         {/* Top 5 expenses */}
-        <Card>
+        <Card className="rounded-[18px]">
           <CardHeader>
-            <p className="text-[13px] font-semibold flex items-center gap-2" style={{ color: "var(--color-ink)" }}>
-              <Icon name="list-check" size={14} style={{ color: "#2A9D8F" }} /> Top 5 Pengeluaran
+            <p className="text-[13px] font-semibold flex items-center gap-2.5" style={{ color: "var(--color-ink)" }}>
+              <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#2A9D8F1a" }}>
+                <Icon name="list-check" size={15} style={{ color: "#2A9D8F" }} />
+              </span>
+              Top 5 Pengeluaran
             </p>
           </CardHeader>
           <CardContent>
@@ -432,21 +447,24 @@ export default function FinanceEvaluatePage() {
                 {top5.map((c, i) => (
                   <div key={c.id} className="flex items-center gap-3">
                     <span
-                      className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-bold flex-shrink-0"
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
                       style={{ background: c.color + "22", color: c.color }}
                     >
                       {i + 1}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[12px] font-semibold truncate flex items-center gap-1.5" style={{ color: "var(--color-ink)" }}>
-                          <Icon name={c.icon as IconName} size={14} style={{ color: c.color }} /> {c.name}
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[12px] font-semibold truncate flex items-center gap-2" style={{ color: "var(--color-ink)" }}>
+                          <span className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: c.color + "1a" }}>
+                            <Icon name={c.icon as IconName} size={13} style={{ color: c.color }} />
+                          </span>
+                          {c.name}
                         </span>
                         <span className="text-[12px] font-semibold" style={{ color: "var(--color-muted)" }}>
                           {fmtIDR(c.total)}
                         </span>
                       </div>
-                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--color-canvas)" }}>
+                      <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--color-canvas)" }}>
                         <div
                           className="h-full rounded-full"
                           style={{ width: `${income > 0 ? Math.min(100, (c.total / income) * 100) : 0}%`, background: c.color }}
@@ -468,10 +486,13 @@ export default function FinanceEvaluatePage() {
       </div>
 
       {/* Analysis & suggestions */}
-      <Card className="mb-4">
+      <Card className="mb-4 rounded-[18px]">
         <CardHeader>
-          <p className="text-[13px] font-semibold flex items-center gap-2" style={{ color: "var(--color-ink)" }}>
-            <Icon name="sparkles" size={14} style={{ color: "#2A9D8F" }} /> Analisis &amp; Saran
+          <p className="text-[13px] font-semibold flex items-center gap-2.5" style={{ color: "var(--color-ink)" }}>
+            <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#2A9D8F1a" }}>
+              <Icon name="sparkles" size={15} style={{ color: "#2A9D8F" }} />
+            </span>
+            Analisis &amp; Saran
           </p>
         </CardHeader>
         <CardContent>
@@ -486,11 +507,11 @@ export default function FinanceEvaluatePage() {
                 return (
                   <div
                     key={i}
-                    className="flex gap-3 p-3 rounded-xl"
+                    className="flex gap-3 p-4 rounded-[16px]"
                     style={{ background: color + "10", border: `1px solid ${color}33` }}
                   >
                     <div
-                      className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                       style={{ background: color + "22" }}
                     >
                       <Icon name={ins.ok ? "check-circle" : "alert-triangle"} size={14} style={{ color }} />
