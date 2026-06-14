@@ -26,7 +26,7 @@ const monthLabel = (key: string) => {
   return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 };
 
-const ICON_OPTIONS = ["💼","🎯","🛠️","🍜","🚗","🏠","💊","🎬","📚","✈️","🎮","💰","🛒","💡","📱"];
+const ICON_OPTIONS: IconName[] = ["building", "flag", "settings", "receipt", "circle-dot", "sparkles", "play", "wallet", "money", "chart-pie", "chart-bar", "folder", "user", "email", "phone", "calendar", "list-check"];
 const COLOR_OPTIONS = ["#2A9D8F","#6D8DF0","#E8A55A","#C77DD6","#5DB872","#F0A07C","#4DBFC4","#D85A4A","#8C7DE8","#3A4FC4"];
 
 export default function FinancePage() {
@@ -53,7 +53,7 @@ export default function FinancePage() {
   const [catName, setCatName] = useState("");
   const [catType, setCatType] = useState<TransactionType>("expense");
   const [catColor, setCatColor] = useState(COLOR_OPTIONS[0]);
-  const [catIcon, setCatIcon] = useState("💼");
+  const [catIcon, setCatIcon] = useState<IconName>("building");
 
   // Filtered transactions for current month
   const monthTxs = useMemo(() =>
@@ -113,7 +113,7 @@ export default function FinancePage() {
   const handleAddCat = () => {
     if (!catName.trim()) return;
     addCategory({ name: catName.trim(), type: catType, color: catColor, icon: catIcon });
-    setCatName(""); setCatType("expense"); setCatColor(COLOR_OPTIONS[0]); setCatIcon("💼");
+    setCatName(""); setCatType("expense"); setCatColor(COLOR_OPTIONS[0]); setCatIcon("building");
     setShowAddCat(false);
   };
 
@@ -204,8 +204,8 @@ export default function FinancePage() {
                       style={{ borderTop: i === 0 ? "none" : "1px solid var(--color-hairline)" }}
                     >
                       {/* Icon */}
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{ background: (cat?.color || "#ccc") + "18" }}>
-                        {cat?.icon || "💰"}
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: (cat?.color || "#ccc") + "18" }}>
+                        <Icon name={(cat?.icon || "wallet") as IconName} size={14} style={{ color: cat?.color || "#ccc" }} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-semibold truncate" style={{ color: "var(--color-ink)" }}>{tx.description}</p>
@@ -250,7 +250,7 @@ export default function FinancePage() {
                     <div key={cat.id}>
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[13px]">{cat.icon}</span>
+                          <Icon name={cat.icon as IconName} size={14} style={{ color: cat.color }} />
                           <span className="text-[12px] font-semibold" style={{ color: "var(--color-ink)" }}>{cat.name}</span>
                         </div>
                         <span className="text-[12px] font-semibold" style={{ color: "var(--color-muted)" }}>{fmtIDR(cat.total)}</span>
@@ -277,7 +277,7 @@ export default function FinancePage() {
               <div className="flex flex-col gap-1.5">
                 {categories.map(cat => (
                   <div key={cat.id} className="flex items-center gap-2 group py-1">
-                    <span className="text-[14px]">{cat.icon}</span>
+                    <Icon name={cat.icon as IconName} size={14} style={{ color: cat.color }} />
                     <span className="flex-1 text-[12px] font-medium" style={{ color: "var(--color-ink)" }}>{cat.name}</span>
                     <Badge variant={cat.type === "income" ? "teal" : "gray"} className="text-[9px]">
                       {cat.type === "income" ? "masuk" : "keluar"}
@@ -372,9 +372,9 @@ export default function FinancePage() {
               <label className="block text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted)" }}>Icon</label>
               <div className="flex flex-wrap gap-2">
                 {ICON_OPTIONS.map(ic => (
-                  <button key={ic} onClick={() => setCatIcon(ic)} className="w-9 h-9 rounded-lg text-lg transition-all"
+                  <button key={ic} onClick={() => setCatIcon(ic)} className="w-9 h-9 rounded-lg flex items-center justify-center transition-all"
                     style={catIcon === ic ? { background: "var(--color-primary-light)", outline: "2px solid #2A9D8F" } : { background: "var(--color-canvas)" }}>
-                    {ic}
+                    <Icon name={ic} size={16} style={{ color: catIcon === ic ? "#2A9D8F" : "var(--color-muted)" }} />
                   </button>
                 ))}
               </div>

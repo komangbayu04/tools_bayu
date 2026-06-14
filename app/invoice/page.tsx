@@ -349,7 +349,7 @@ export default function InvoicePage() {
         </div>
 
         {/* ── RIGHT: LIVE PREVIEW ── */}
-        <div className="rounded-[14px] border overflow-hidden shadow-sm" style={{ borderColor: "var(--color-hairline)" }}>
+        <div className="rounded-[14px] border overflow-hidden shadow-sm sticky top-6" style={{ borderColor: "var(--color-hairline)", maxHeight: "calc(100vh - 48px)", overflowY: "auto" }}>
           <div className="bg-white text-[#1A1A1A] px-10 py-12">
             {docType === "invoice" ? (
               <InvoicePreview

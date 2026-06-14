@@ -73,7 +73,7 @@ export default function FinanceEvaluatePage() {
           id,
           name: cat?.name ?? "Lainnya",
           color: cat?.color ?? "#999",
-          icon: cat?.icon ?? "💰",
+          icon: cat?.icon ?? "wallet",
           total,
         };
       })
@@ -311,8 +311,8 @@ export default function FinanceEvaluatePage() {
                   {expByCat.map((c) => (
                     <div key={c.id} className="flex items-center gap-2">
                       <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: c.color }} />
-                      <span className="text-[12px] font-medium flex-1 truncate" style={{ color: "var(--color-ink)" }}>
-                        {c.icon} {c.name}
+                      <span className="text-[12px] font-medium flex-1 truncate flex items-center gap-1.5" style={{ color: "var(--color-ink)" }}>
+                        <Icon name={c.icon as IconName} size={14} style={{ color: c.color }} /> {c.name}
                       </span>
                       <span className="text-[11px] font-semibold" style={{ color: "var(--color-muted)" }}>
                         {donutTotal > 0 ? Math.round((c.total / donutTotal) * 100) : 0}%
@@ -439,8 +439,8 @@ export default function FinanceEvaluatePage() {
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[12px] font-semibold truncate" style={{ color: "var(--color-ink)" }}>
-                          {c.icon} {c.name}
+                        <span className="text-[12px] font-semibold truncate flex items-center gap-1.5" style={{ color: "var(--color-ink)" }}>
+                          <Icon name={c.icon as IconName} size={14} style={{ color: c.color }} /> {c.name}
                         </span>
                         <span className="text-[12px] font-semibold" style={{ color: "var(--color-muted)" }}>
                           {fmtIDR(c.total)}

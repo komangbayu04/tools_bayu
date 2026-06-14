@@ -209,14 +209,14 @@ interface FinanceStore {
 }
 
 const DEFAULT_CATEGORIES: FinanceCategory[] = [
-  { id: "c1", name: "Freelance", color: "#2A9D8F", type: "income", icon: "💼" },
-  { id: "c2", name: "Project Bonus", color: "#5DB872", type: "income", icon: "🎯" },
-  { id: "c3", name: "Software & Tools", color: "#6D8DF0", type: "expense", icon: "🛠️" },
-  { id: "c4", name: "Food & Beverage", color: "#E8A55A", type: "expense", icon: "🍜" },
-  { id: "c5", name: "Transport", color: "#C77DD6", type: "expense", icon: "🚗" },
-  { id: "c6", name: "Housing", color: "#F0A07C", type: "expense", icon: "🏠" },
-  { id: "c7", name: "Health", color: "#4DBFC4", type: "expense", icon: "💊" },
-  { id: "c8", name: "Entertainment", color: "#D85A4A", type: "expense", icon: "🎬" },
+  { id: "c1", name: "Freelance", color: "#2A9D8F", type: "income", icon: "building" },
+  { id: "c2", name: "Project Bonus", color: "#5DB872", type: "income", icon: "flag" },
+  { id: "c3", name: "Software & Tools", color: "#6D8DF0", type: "expense", icon: "settings" },
+  { id: "c4", name: "Food & Beverage", color: "#E8A55A", type: "expense", icon: "receipt" },
+  { id: "c5", name: "Transport", color: "#C77DD6", type: "expense", icon: "circle-dot" },
+  { id: "c6", name: "Housing", color: "#F0A07C", type: "expense", icon: "building" },
+  { id: "c7", name: "Health", color: "#4DBFC4", type: "expense", icon: "sparkles" },
+  { id: "c8", name: "Entertainment", color: "#D85A4A", type: "expense", icon: "play" },
 ]
 
 const now = new Date()
