@@ -39,7 +39,7 @@ export default function SettingsPage() {
                   className="flex flex-col items-center gap-2 py-5 rounded-[12px] border transition-all"
                   style={
                     theme === key
-                      ? { borderColor: "#2A9D8F", background: "var(--color-primary-light)", color: "#1C4F4F" }
+                      ? { borderColor: "#FF6E00", background: "var(--color-primary-light)", color: "#7A2E00" }
                       : { borderColor: "var(--color-hairline)", color: "var(--color-muted)" }
                   }
                 >

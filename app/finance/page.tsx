@@ -27,7 +27,7 @@ const monthLabel = (key: string) => {
 };
 
 const ICON_OPTIONS: IconName[] = ["building", "flag", "settings", "receipt", "circle-dot", "sparkles", "play", "wallet", "money", "chart-pie", "chart-bar", "folder", "user", "email", "phone", "calendar", "list-check"];
-const COLOR_OPTIONS = ["#2A9D8F","#6D8DF0","#E8A55A","#C77DD6","#5DB872","#F0A07C","#4DBFC4","#D85A4A","#8C7DE8","#3A4FC4"];
+const COLOR_OPTIONS = ["#FF6E00","#6D8DF0","#E8A55A","#C77DD6","#5DB872","#F0A07C","#4DBFC4","#D85A4A","#8C7DE8","#3A4FC4"];
 
 export default function FinancePage() {
   const router = useRouter();
@@ -164,7 +164,7 @@ export default function FinancePage() {
           <Icon name="chevron-right" size={16} style={{ color: "var(--color-muted)" }} />
         </button>
         {!isCurrentMonth && (
-          <button onClick={() => setCurrentMonth(monthKey(new Date()))} className="text-[12px] font-semibold hover:opacity-70" style={{ color: "#2A9D8F" }}>Kembali ke bulan ini</button>
+          <button onClick={() => setCurrentMonth(monthKey(new Date()))} className="text-[12px] font-semibold hover:opacity-70" style={{ color: "#FF6E00" }}>Kembali ke bulan ini</button>
         )}
 
         {/* Actions pushed to the right, aligned with the navigator */}
@@ -181,7 +181,7 @@ export default function FinancePage() {
         <div className="rounded-[18px] p-6 flex flex-col justify-between" style={{ background: "#1C1C1E", minHeight: 150 }}>
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.55)" }}>Saldo</p>
-            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "#C6F24E" }}>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "#FF6E00" }}>
               <Icon name={(balance >= 0 ? "wallet" : "trending-down") as IconName} size={16} style={{ color: "#1C1C1E" }} />
             </div>
           </div>
@@ -197,7 +197,7 @@ export default function FinancePage() {
         {([
           { label: "Pemasukan", value: income, color: "#2E9E5B", icon: "trending-up" as IconName },
           { label: "Pengeluaran", value: expense, color: "#D85A4A", icon: "trending-down" as IconName },
-          { label: "Savings Rate", value: savingsRate, color: savingsRate >= 20 ? "#2A9D8F" : "#E8A55A", icon: "sparkles" as IconName, isPercent: true },
+          { label: "Savings Rate", value: savingsRate, color: savingsRate >= 20 ? "#FF6E00" : "#E8A55A", icon: "sparkles" as IconName, isPercent: true },
         ]).map(({ label, value, color, icon, isPercent }) => (
           <div key={label} className="rounded-[18px] p-6 flex flex-col justify-between" style={{ background: "var(--color-surface-card)", border: "1px solid var(--color-hairline)", minHeight: 150 }}>
             <div className="flex items-center justify-between">
@@ -222,13 +222,13 @@ export default function FinancePage() {
               <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>Tren Pemasukan</p>
               <p className="text-[18px] font-bold mt-1" style={{ color: "var(--color-ink)" }}>{fmtIDR(income)}</p>
             </div>
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: incomeDelta >= 0 ? "#C6F24E" : "#F4D0C9", color: incomeDelta >= 0 ? "#1C4F1C" : "#9B2B2B" }}>
+            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: incomeDelta >= 0 ? "#FF6E00" : "#F4D0C9", color: incomeDelta >= 0 ? "#fff" : "#9B2B2B" }}>
               {incomeDelta >= 0 ? "+" : ""}{incomeDelta}%
             </span>
           </div>
           <svg viewBox={`0 0 ${sparkW} ${sparkH}`} className="w-full" style={{ height: 48 }} preserveAspectRatio="none">
-            {sparkArea && <path d={sparkArea} fill="#C6F24E" fillOpacity={0.25} />}
-            {sparkLine && <path d={sparkLine} fill="none" stroke="#2A9D8F" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
+            {sparkArea && <path d={sparkArea} fill="#FF6E00" fillOpacity={0.25} />}
+            {sparkLine && <path d={sparkLine} fill="none" stroke="#FF6E00" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
           </svg>
         </div>
 
@@ -245,7 +245,7 @@ export default function FinancePage() {
               <div key={d.key} className="flex-1 flex flex-col justify-end h-full">
                 <div className="rounded-t-md w-full transition-all duration-500" style={{
                   height: `${Math.max(4, (d.expense / trendMax) * 100)}%`,
-                  background: i === incomeTrend.length - 1 ? "#1C4F4F" : "#2A9D8F40",
+                  background: i === incomeTrend.length - 1 ? "#7A2E00" : "#FF6E0040",
                 }} />
               </div>
             ))}
@@ -272,7 +272,7 @@ export default function FinancePage() {
               <p className="text-[13px]" style={{ color: "var(--color-muted-soft)" }}>Belum ada transaksi bulan ini.</p>
             </div>
           ) : (
-            <Card className="overflow-hidden rounded-[18px]">
+            <Card className="overflow-hidden rounded-[18px]" style={{ background: "var(--color-surface-card)" }}>
               <AnimatePresence initial={false}>
                 {displayTxs.map((tx, i) => {
                   const cat = getCat(tx.categoryId);
@@ -319,11 +319,11 @@ export default function FinancePage() {
 
         {/* Category breakdown */}
         <div className="flex flex-col gap-4">
-          <Card className="rounded-[18px]">
+          <Card className="rounded-[18px]" style={{ background: "var(--color-surface-card)" }}>
             <CardHeader>
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "#C6F24E" }}>
-                  <Icon name="chart-pie" size={14} style={{ color: "#1C4F4F" }} />
+                <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "#FF6E00" }}>
+                  <Icon name="chart-pie" size={14} style={{ color: "#fff" }} />
                 </div>
                 <p className="text-[13px] font-semibold" style={{ color: "var(--color-ink)" }}>Pengeluaran per Kategori</p>
               </div>
@@ -353,16 +353,16 @@ export default function FinancePage() {
           </Card>
 
           {/* Categories list */}
-          <Card className="rounded-[18px]">
+          <Card className="rounded-[18px]" style={{ background: "var(--color-surface-card)" }}>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "#2A9D8F1F" }}>
-                    <Icon name="list-check" size={14} style={{ color: "#1C4F4F" }} />
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "#FF6E001F" }}>
+                    <Icon name="list-check" size={14} style={{ color: "#7A2E00" }} />
                   </div>
                   <p className="text-[13px] font-semibold" style={{ color: "var(--color-ink)" }}>Kategori</p>
                 </div>
-                <button onClick={() => setShowAddCat(true)} className="text-[11px] font-semibold hover:opacity-70" style={{ color: "#1C4F4F" }}>+ Tambah</button>
+                <button onClick={() => setShowAddCat(true)} className="text-[11px] font-semibold hover:opacity-70" style={{ color: "#7A2E00" }}>+ Tambah</button>
               </div>
             </CardHeader>
             <CardContent>
@@ -455,7 +455,7 @@ export default function FinancePage() {
               {(["income", "expense"] as TransactionType[]).map(t => (
                 <button key={t} onClick={() => setCatType(t)} className="py-2.5 rounded-[8px] text-[13px] font-semibold transition-all border"
                   style={catType === t
-                    ? { background: "var(--color-primary-light)", borderColor: "#2A9D8F", color: "#1C4F4F" }
+                    ? { background: "var(--color-primary-light)", borderColor: "#FF6E00", color: "#7A2E00" }
                     : { background: "var(--color-surface)", borderColor: "var(--color-hairline)", color: "var(--color-muted)" }}>
                   {t === "income" ? "Pemasukan" : "Pengeluaran"}
                 </button>
@@ -470,8 +470,8 @@ export default function FinancePage() {
               <div className="flex flex-wrap gap-2">
                 {ICON_OPTIONS.map(ic => (
                   <button key={ic} onClick={() => setCatIcon(ic)} className="w-9 h-9 rounded-lg flex items-center justify-center transition-all"
-                    style={catIcon === ic ? { background: "var(--color-primary-light)", outline: "2px solid #2A9D8F" } : { background: "var(--color-canvas)" }}>
-                    <Icon name={ic} size={16} style={{ color: catIcon === ic ? "#2A9D8F" : "var(--color-muted)" }} />
+                    style={catIcon === ic ? { background: "var(--color-primary-light)", outline: "2px solid #FF6E00" } : { background: "var(--color-canvas)" }}>
+                    <Icon name={ic} size={16} style={{ color: catIcon === ic ? "#FF6E00" : "var(--color-muted)" }} />
                   </button>
                 ))}
               </div>

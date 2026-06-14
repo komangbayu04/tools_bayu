@@ -30,9 +30,9 @@ export const TabsTrigger = forwardRef<
     className={cn(
       "inline-flex items-center justify-center whitespace-nowrap rounded-[8px] px-3.5 py-1.5 text-[13px] font-semibold transition-all duration-150 outline-none",
       "text-[var(--color-muted)] hover:text-[var(--color-body)]",
-      "data-[state=active]:bg-[var(--color-primary-light)] data-[state=active]:text-[#1C4F4F] data-[state=active]:shadow-[0_1px_2px_rgba(16,40,48,0.06)]",
-      "dark:data-[state=active]:text-[#7FE0D2]",
-      "focus-visible:ring-2 focus-visible:ring-[#2A9D8F]/30",
+      "data-[state=active]:bg-[var(--color-primary-light)] data-[state=active]:text-[#7A2E00] data-[state=active]:shadow-[0_1px_2px_rgba(16,40,48,0.06)]",
+      "dark:data-[state=active]:text-[#FFB366]",
+      "focus-visible:ring-2 focus-visible:ring-[#FF6E00]/30",
       className
     )}
     {...props}

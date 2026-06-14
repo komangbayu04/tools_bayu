@@ -3,7 +3,7 @@ import { twMerge } from "tailwind-merge"
 export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)) }
 
 const GRADIENTS = [
-  "linear-gradient(135deg,#2A9D8F,#1C4F4F)",
+  "linear-gradient(135deg,#FF6E00,#7A2E00)",
   "linear-gradient(135deg,#6D8DF0,#3A4FC4)",
   "linear-gradient(135deg,#E8A55A,#C16A2E)",
   "linear-gradient(135deg,#C77DD6,#7C4D9E)",

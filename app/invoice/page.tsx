@@ -39,13 +39,13 @@ const newLineItem = (): LineItem => ({ id: crypto.randomUUID(), date: "", title:
 const newQuoteItem = (): QuoteItem => ({ id: crypto.randomUUID(), service: "", description: "", packageItems: "", includes: "", price: 0, qty: 1 });
 
 const SAMPLE_ITEMS: LineItem[] = [
-  { id: "1", date: "2026-04-26", title: "Refine & Created UX flow", tasks: "Bathing (desktop & mobile)\nDining & Packages (desktop & mobile)\nGift cards (Desktop)", project: "Zora Springs", hours: 6 },
-  { id: "2", date: "2026-04-27", title: "", tasks: "Create mobile version for gift cards & check out\nNavbar refinement\nHero page option + first section", project: "Zora Springs", hours: 6 },
-  { id: "3", date: "2026-04-30", title: "", tasks: "Refine ux booking flow\nSitemap design", project: "Zora Springs", hours: 2 },
-  { id: "4", date: "2026-05-02", title: "", tasks: "Local pass flow & guest pass flow", project: "Zora Springs", hours: 5 },
-  { id: "5", date: "2026-05-09", title: "", tasks: "Content structure, UX Copy + Wireframe", project: "Zora Springs", hours: 6 },
-  { id: "6", date: "2026-06-09", title: "", tasks: "Nex Healthcare GTM create V1 clinic receptionist & super admin", project: "Nex Healthcare", hours: 3 },
-  { id: "7", date: "2026-06-13", title: "", tasks: "Nex Healthcare GTM, Mapping design & refinement\nCreate for owner view", project: "Nex Healthcare", hours: 5 },
+  { id: "1", date: "2026-04-26", title: "Refine & Created UX flow", tasks: "Bathing (desktop & mobile)\nDining & Packages (desktop & mobile)\nGift cards (Desktop)", project: "Velo Studio", hours: 6 },
+  { id: "2", date: "2026-04-27", title: "", tasks: "Create mobile version for gift cards & check out\nNavbar refinement\nHero page option + first section", project: "Velo Studio", hours: 6 },
+  { id: "3", date: "2026-04-30", title: "", tasks: "Refine ux booking flow\nSitemap design", project: "Velo Studio", hours: 2 },
+  { id: "4", date: "2026-05-02", title: "", tasks: "Local pass flow & guest pass flow", project: "Velo Studio", hours: 5 },
+  { id: "5", date: "2026-05-09", title: "", tasks: "Content structure, UX Copy + Wireframe", project: "Velo Studio", hours: 6 },
+  { id: "6", date: "2026-06-09", title: "", tasks: "Mira Health GTM create V1 clinic receptionist & super admin", project: "Mira Health", hours: 3 },
+  { id: "7", date: "2026-06-13", title: "", tasks: "Mira Health GTM, Mapping design & refinement\nCreate for owner view", project: "Mira Health", hours: 5 },
 ];
 
 const SAMPLE_QUOTE_ITEMS: QuoteItem[] = [
@@ -74,7 +74,7 @@ export default function InvoicePage() {
   // Shared fields
   const [fromName, setFromName] = useState("Bayu Krisnayana");
   const [fromAddress, setFromAddress] = useState("Jln. Dewi Sartika No.19, Semarapura Kaja, Klungkung\nBali, Indonesia, 80711");
-  const [clientName, setClientName] = useState("Exo Digital");
+  const [clientName, setClientName] = useState("Artivo Studio");
   const [dateIssued, setDateIssued] = useState("2026-06-15");
 
   // Invoice-only
@@ -84,7 +84,7 @@ export default function InvoicePage() {
   const [items, setItems] = useState<LineItem[]>(SAMPLE_ITEMS);
 
   // Quotation-only
-  const [companyName, setCompanyName] = useState("Nex Digital");
+  const [companyName, setCompanyName] = useState("Lumina Co.");
   const [projectName, setProjectName] = useState("Website Design & Development");
   const [docNo, setDocNo] = useState("BK/Q/2026/0001");
   const [quoteItems, setQuoteItems] = useState<QuoteItem[]>(SAMPLE_QUOTE_ITEMS);
@@ -169,7 +169,7 @@ export default function InvoicePage() {
               {(["invoice", "quotation"] as DocumentType[]).map(t => (
                 <button key={t} onClick={() => setDocType(t)} className="py-2.5 rounded-[8px] text-sm font-semibold capitalize transition-all border"
                   style={docType === t
-                    ? { background: "var(--color-primary-light)", borderColor: "#2A9D8F", color: "#1C4F4F" }
+                    ? { background: "var(--color-primary-light)", borderColor: "#FF6E00", color: "#7A2E00" }
                     : { background: "var(--color-surface)", borderColor: "var(--color-hairline)", color: "var(--color-muted)" }}>
                   {t}
                 </button>
@@ -275,7 +275,7 @@ export default function InvoicePage() {
                       <Textarea value={item.tasks} onChange={e => updateItem(item.id, "tasks", e.target.value)} rows={3} placeholder="One task per line" className="bg-[var(--color-surface-card)]" />
                     </div>
                   ))}
-                  <button onClick={addItem} className="flex items-center gap-2 text-sm font-semibold mt-1 hover:opacity-70 w-fit" style={{ color: "#2A9D8F" }}>
+                  <button onClick={addItem} className="flex items-center gap-2 text-sm font-semibold mt-1 hover:opacity-70 w-fit" style={{ color: "#FF6E00" }}>
                     <Icon name="plus" size={14} /> Add Item
                   </button>
                 </>
@@ -311,7 +311,7 @@ export default function InvoicePage() {
                       </div>
                     </div>
                   ))}
-                  <button onClick={addQuoteItem} className="flex items-center gap-2 text-sm font-semibold mt-1 hover:opacity-70 w-fit" style={{ color: "#2A9D8F" }}>
+                  <button onClick={addQuoteItem} className="flex items-center gap-2 text-sm font-semibold mt-1 hover:opacity-70 w-fit" style={{ color: "#FF6E00" }}>
                     <Icon name="plus" size={14} /> Add Service
                   </button>
                 </>

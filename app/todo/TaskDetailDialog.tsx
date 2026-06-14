@@ -127,7 +127,7 @@ export function TaskDetailDialog({ taskId, onClose }: { taskId: string | null; o
                 onClick={() => patch({ invoiceLinked: !draft.invoiceLinked })}
                 className="flex items-center justify-between rounded-[10px] border px-3.5 py-3 transition-colors text-left"
                 style={{
-                  borderColor: draft.invoiceLinked ? "#2A9D8F" : "var(--color-hairline)",
+                  borderColor: draft.invoiceLinked ? "#FF6E00" : "var(--color-hairline)",
                   background: draft.invoiceLinked ? "var(--color-primary-light)" : "var(--color-surface)",
                 }}
               >
@@ -137,7 +137,7 @@ export function TaskDetailDialog({ taskId, onClose }: { taskId: string | null; o
                 </span>
                 <span
                   className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
-                  style={{ background: draft.invoiceLinked ? "#2A9D8F" : "var(--color-hairline)" }}
+                  style={{ background: draft.invoiceLinked ? "#FF6E00" : "var(--color-hairline)" }}
                 >
                   <span
                     className="inline-block h-4 w-4 rounded-full bg-white transition-transform"

@@ -5,7 +5,7 @@ import { Icon, type IconName } from "@/components/ui/icon";
 /**
  * Brand-colored glowing highlight card. Use sparingly — only for the single
  * most important highlight on a page. A slow conic-gradient ring sweeps behind
- * a dark teal surface, leaving a glowing animated border.
+ * a dark orange surface, leaving a glowing animated border.
  */
 export function GlowCard({
   children,
@@ -25,7 +25,7 @@ export function GlowCard({
           border-radius: 22px;
           padding: 1.5px;
           overflow: hidden;
-          background: #0c2725;
+          background: #1a0a00;
           isolation: isolate;
         }
         .glow-ring {
@@ -35,10 +35,10 @@ export function GlowCard({
           background: conic-gradient(
             from 0deg,
             transparent 0%,
-            rgba(42, 157, 143, 0.0) 8%,
-            #2a9d8f 20%,
-            #6fe3d2 27%,
-            #2a9d8f 34%,
+            rgba(255, 110, 0, 0.0) 8%,
+            #FF6E00 20%,
+            #FFB366 27%,
+            #FF6E00 34%,
             transparent 46%,
             transparent 100%
           );
@@ -55,9 +55,9 @@ export function GlowCard({
           border-radius: 20.5px;
           height: 100%;
           background:
-            radial-gradient(120% 100% at 0% 0%, rgba(42, 157, 143, 0.28), transparent 55%),
-            radial-gradient(120% 100% at 100% 100%, rgba(28, 79, 79, 0.55), transparent 60%),
-            #0c2725;
+            radial-gradient(120% 100% at 0% 0%, rgba(255, 110, 0, 0.28), transparent 55%),
+            radial-gradient(120% 100% at 100% 100%, rgba(122, 46, 0, 0.55), transparent 60%),
+            #1a0a00;
         }
       `}</style>
     </div>
@@ -78,9 +78,9 @@ export function GlowStat({
     <div className="flex items-center gap-3 min-w-0">
       <div
         className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ background: "rgba(111,227,210,0.14)" }}
+        style={{ background: "rgba(255,179,102,0.14)" }}
       >
-        <Icon name={icon} size={17} style={{ color: "#6fe3d2" }} />
+        <Icon name={icon} size={17} style={{ color: "#FFB366" }} />
       </div>
       <div className="min-w-0">
         <p className="text-[18px] font-bold leading-none text-white truncate">{value}</p>

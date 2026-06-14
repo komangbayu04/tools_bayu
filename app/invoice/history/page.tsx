@@ -39,7 +39,7 @@ export default function InvoiceHistoryPage() {
 
   const chip = (active: boolean) =>
     active
-      ? { background: "var(--color-primary-light)", borderColor: "#2A9D8F", color: "#1C4F4F" }
+      ? { background: "var(--color-primary-light)", borderColor: "#FF6E00", color: "#7A2E00" }
       : { background: "var(--color-surface)", borderColor: "var(--color-hairline)", color: "var(--color-muted)" };
 
   return (
@@ -109,7 +109,7 @@ export default function InvoiceHistoryPage() {
                   </span>
                 </div>
               </div>
-              <p className="text-[15px] font-semibold flex-shrink-0" style={{ color: "#2A9D8F" }}>
+              <p className="text-[15px] font-semibold flex-shrink-0" style={{ color: "#FF6E00" }}>
                 {fmtIDR(doc.total)}
               </p>
               <button
