@@ -255,20 +255,20 @@ export function Sidebar() {
             {collapsed ? (
               <button
                 onClick={() => toggle(false)}
-                className="group relative w-9 h-9 mx-auto rounded-xl bg-[var(--color-primary-dark)] flex items-center justify-center shadow-sm flex-shrink-0"
+                className="group relative w-9 h-9 mx-auto rounded-xl bg-[var(--color-primary)] flex items-center justify-center shadow-sm flex-shrink-0"
                 aria-label="Expand sidebar"
               >
                 <span className="absolute inset-0 flex items-center justify-center transition-opacity duration-150 group-hover:opacity-0">
-                  <span className="text-white font-bold text-lg leading-none">B</span>
+                  <span className="text-[var(--color-on-primary)] font-bold text-lg leading-none">B</span>
                 </span>
                 <span className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                  <Icon name="chevron-right" size={16} className="text-white" />
+                  <Icon name="chevron-right" size={16} className="text-[var(--color-on-primary)]" />
                 </span>
               </button>
             ) : (
               <>
-                <div className="w-9 h-9 rounded-xl bg-[var(--color-primary-dark)] flex items-center justify-center shadow-sm flex-shrink-0">
-                  <span className="text-white font-bold text-lg leading-none">B</span>
+                <div className="w-9 h-9 rounded-xl bg-[var(--color-primary)] flex items-center justify-center shadow-sm flex-shrink-0">
+                  <span className="text-[var(--color-on-primary)] font-bold text-lg leading-none">B</span>
                 </div>
                 <span
                   className="font-bold text-[15px] tracking-tight whitespace-nowrap flex-1 min-w-0 overflow-hidden"

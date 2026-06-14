@@ -182,7 +182,7 @@ export default function FinancePage() {
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.55)" }}>Saldo</p>
             <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "var(--color-primary)" }}>
-              <Icon name={(balance >= 0 ? "wallet" : "trending-down") as IconName} size={16} style={{ color: "#1C1C1E" }} />
+              <Icon name={(balance >= 0 ? "wallet" : "trending-down") as IconName} size={16} style={{ color: "var(--color-on-primary)" }} />
             </div>
           </div>
           <div>
@@ -323,7 +323,7 @@ export default function FinancePage() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "var(--color-primary)" }}>
-                  <Icon name="chart-pie" size={14} style={{ color: "#fff" }} />
+                  <Icon name="chart-pie" size={14} style={{ color: "var(--color-on-primary)" }} />
                 </div>
                 <p className="text-[13px] font-semibold" style={{ color: "var(--color-ink)" }}>Pengeluaran per Kategori</p>
               </div>

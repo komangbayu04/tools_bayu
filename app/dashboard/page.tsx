@@ -96,7 +96,7 @@ export default function DashboardPage() {
           </Link>
           <Link
             href="/todo"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-90"
             style={{ background: "var(--color-primary)" }}
           >
             <Icon name="plus" size={14} /> Add Task
@@ -211,7 +211,7 @@ export default function DashboardPage() {
                   className="flex flex-col items-center py-2 rounded-xl transition-colors"
                   style={
                     active
-                      ? { background: "var(--color-primary)", color: "#fff" }
+                      ? { background: "var(--color-primary)", color: "var(--color-on-primary)" }
                       : { color: isToday ? "var(--color-primary)" : "var(--color-muted)" }
                   }
                 >

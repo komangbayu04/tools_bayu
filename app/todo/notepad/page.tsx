@@ -233,7 +233,7 @@ function NoteEditor({
           </div>
           <button
             onClick={save}
-            className="px-4 py-1.5 rounded-xl text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+            className="px-4 py-1.5 rounded-xl text-[13px] font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-90"
             style={{ background: "var(--color-primary)" }}
           >
             Simpan
@@ -268,7 +268,7 @@ export default function NotepadPage() {
         actions={
           <button
             onClick={() => setEditing("new")}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold text-[var(--color-on-primary)] transition-opacity hover:opacity-90"
             style={{ background: "var(--color-primary)" }}
           >
             <Icon name="plus" size={14} />

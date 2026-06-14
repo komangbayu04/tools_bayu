@@ -238,7 +238,7 @@ export default function FinanceEvaluatePage() {
             className="px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all border"
             style={
               selectedMonth === m
-                ? { background: "var(--color-primary)", borderColor: "var(--color-primary)", color: "#fff" }
+                ? { background: "var(--color-primary)", borderColor: "var(--color-primary)", color: "var(--color-on-primary)" }
                 : { background: "var(--color-surface)", borderColor: "var(--color-hairline)", color: "var(--color-muted)" }
             }
           >

@@ -22,6 +22,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${urbanist.variable} h-full`} suppressHydrationWarning>
+      <head>
+        {/* Apply the saved UI palette before paint to avoid a flash. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var p=localStorage.getItem('ui-palette');if(p){document.documentElement.setAttribute('data-palette',p);}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className="h-full font-[family-name:var(--font-urbanist)] antialiased">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="kamarupa-theme">
           <ShellChrome>{children}</ShellChrome>

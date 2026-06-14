@@ -8,6 +8,7 @@
   --color-primary-ink: #2e4d1b;    /* accent text / headings (high contrast) */
   --color-primary-light: #cde5b7;  /* the brand sage — soft active backgrounds */
   --color-primary-muted: #a9ce86;  /* borders / secondary fills */
+  --color-on-primary: #ffffff;     /* readable text/icon on primary fills */
   --color-canvas: #f3f6f0;
   --color-surface: #ffffff;
   --color-surface-card: #f7faf3;
@@ -32,6 +33,7 @@
   --color-primary-ink: #cde5b7;
   --color-primary-light: #2c3d1e;
   --color-primary-muted: #4a6b30;
+  --color-on-primary: #16240e;
   --color-canvas: #141b13;
   --color-surface: #1a241a;
   --color-surface-card: #1f2c1e;
@@ -44,6 +46,142 @@
   /* One-tone shadow for dark mode */
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.32);
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   Selectable UI palettes. Default (no data-palette) = Sage, defined above.
+   Each palette overrides the brand scale + neutrals for both light & dark.
+   ───────────────────────────────────────────────────────────────────── */
+
+/* Sage (explicit selection — same as defaults) */
+[data-palette="sage"] { /* inherits :root */ }
+
+/* ── Teal (the original green) ───────────────────────────────────────── */
+[data-palette="teal"] {
+  --color-primary: #2a9d8f;
+  --color-primary-dark: #1e7268;
+  --color-primary-ink: #1c4f4f;
+  --color-primary-light: #e6f4f2;
+  --color-primary-muted: #b2ddd9;
+  --color-on-primary: #ffffff;
+  --color-canvas: #f4f6f7;
+  --color-surface: #ffffff;
+  --color-surface-card: #f9fafb;
+  --color-hairline: #e5e9eb;
+  --color-ink: #1a2b32;
+  --color-body: #3d5159;
+  --color-muted: #7a9099;
+  --color-muted-soft: #a8bdc3;
+  --color-success: #5db872;
+  --color-warning: #e8a55a;
+  --color-global-bg: #f4f6f7;
+  --shadow-card: 0 1px 3px rgba(16, 40, 48, 0.07);
+  --shadow-pop: 0 8px 24px rgba(16, 40, 48, 0.12);
+}
+.dark[data-palette="teal"] {
+  --color-primary: #4cc2b2;
+  --color-primary-dark: #2a9d8f;
+  --color-primary-ink: #8fe3d8;
+  --color-primary-light: #0d2e2c;
+  --color-primary-muted: #1e5650;
+  --color-on-primary: #06231f;
+  --color-canvas: #141b1e;
+  --color-surface: #1a2428;
+  --color-surface-card: #1f2d32;
+  --color-hairline: #263238;
+  --color-ink: #ecf2f4;
+  --color-body: #b0c8d0;
+  --color-muted: #7c95a0;
+  --color-muted-soft: #3d5560;
+  --color-global-bg: #141b1e;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.32);
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* ── Orange ──────────────────────────────────────────────────────────── */
+[data-palette="orange"] {
+  --color-primary: #ff6e00;
+  --color-primary-dark: #cc5800;
+  --color-primary-ink: #8a3a00;
+  --color-primary-light: #fff0e6;
+  --color-primary-muted: #ffc99a;
+  --color-on-primary: #ffffff;
+  --color-canvas: #f8f6f3;
+  --color-surface: #ffffff;
+  --color-surface-card: #faf8f5;
+  --color-hairline: #ece7e1;
+  --color-ink: #2a201a;
+  --color-body: #574b41;
+  --color-muted: #94857a;
+  --color-muted-soft: #c2b4a7;
+  --color-success: #5db872;
+  --color-warning: #e8a55a;
+  --color-global-bg: #f8f6f3;
+  --shadow-card: 0 1px 3px rgba(60, 40, 20, 0.07);
+  --shadow-pop: 0 8px 24px rgba(60, 40, 20, 0.12);
+}
+.dark[data-palette="orange"] {
+  --color-primary: #ff8c3a;
+  --color-primary-dark: #ff6e00;
+  --color-primary-ink: #ffb37a;
+  --color-primary-light: #2e1500;
+  --color-primary-muted: #7a3d12;
+  --color-on-primary: #3a1800;
+  --color-canvas: #1a1613;
+  --color-surface: #221d18;
+  --color-surface-card: #2a231d;
+  --color-hairline: #352d25;
+  --color-ink: #f4efe9;
+  --color-body: #d4c7bb;
+  --color-muted: #9c8b7c;
+  --color-muted-soft: #5f5347;
+  --color-global-bg: #1a1613;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.32);
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* ── Black & White (monochrome) ──────────────────────────────────────── */
+[data-palette="mono"] {
+  --color-primary: #1a1a1a;
+  --color-primary-dark: #000000;
+  --color-primary-ink: #1a1a1a;
+  --color-primary-light: #ededed;
+  --color-primary-muted: #c9c9c9;
+  --color-on-primary: #ffffff;
+  --color-canvas: #f4f4f4;
+  --color-surface: #ffffff;
+  --color-surface-card: #fafafa;
+  --color-hairline: #e3e3e3;
+  --color-ink: #0f0f0f;
+  --color-body: #3d3d3d;
+  --color-muted: #767676;
+  --color-muted-soft: #a8a8a8;
+  --color-success: #2f2f2f;
+  --color-warning: #5c5c5c;
+  --color-global-bg: #f4f4f4;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+.dark[data-palette="mono"] {
+  --color-primary: #f0f0f0;
+  --color-primary-dark: #ffffff;
+  --color-primary-ink: #f0f0f0;
+  --color-primary-light: #2a2a2a;
+  --color-primary-muted: #4a4a4a;
+  --color-on-primary: #111111;
+  --color-canvas: #121212;
+  --color-surface: #1b1b1b;
+  --color-surface-card: #222222;
+  --color-hairline: #303030;
+  --color-ink: #f5f5f5;
+  --color-body: #c4c4c4;
+  --color-muted: #8a8a8a;
+  --color-muted-soft: #5a5a5a;
+  --color-success: #e0e0e0;
+  --color-warning: #9a9a9a;
+  --color-global-bg: #121212;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 html, body {
