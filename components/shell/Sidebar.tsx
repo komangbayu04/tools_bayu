@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
+import { motion } from "framer-motion";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 const navItems: { label: string; href: string; icon: IconName }[] = [
   { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
@@ -17,23 +18,43 @@ const navItems: { label: string; href: string; icon: IconName }[] = [
 
 const STORAGE_KEY = "sidebar-collapsed";
 
+// Module-level cache so the collapsed value is read once and survives any
+// component re-init without a flash of the wrong width.
+let collapsedCache: boolean | null = null;
+const readCollapsed = () => {
+  if (collapsedCache !== null) return collapsedCache;
+  if (typeof window !== "undefined") {
+    collapsedCache = localStorage.getItem(STORAGE_KEY) === "true";
+    return collapsedCache;
+  }
+  return false;
+};
+
+// Shared sliding highlight for the active item. Only one renders at a time,
+// so framer-motion animates it from the old position to the new one.
+function ActiveHighlight() {
+  return (
+    <motion.span
+      layoutId="sidebar-active"
+      className="absolute inset-0 rounded-xl"
+      style={{ background: "var(--color-primary-light)" }}
+      transition={{ type: "spring", stiffness: 500, damping: 40 }}
+    />
+  );
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  // Persist collapse state in localStorage
-  useEffect(() => {
-    setMounted(true);
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved !== null) setCollapsed(saved === "true");
-  }, []);
+  const [collapsed, setCollapsed] = useState<boolean>(readCollapsed);
 
   const toggle = (next: boolean) => {
     setCollapsed(next);
-    localStorage.setItem(STORAGE_KEY, String(next));
+    collapsedCache = next;
+    if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY, String(next));
   };
+
+  const settingsActive = pathname === "/settings";
 
   return (
     <>
@@ -50,12 +71,10 @@ export function Sidebar() {
         {/* Logo + collapse toggle */}
         <div className="pt-7 pb-8 px-3 flex-shrink-0">
           <div className="flex items-center gap-2.5">
-            {/* Logo icon — hover shows expand arrow only when collapsed */}
             {collapsed ? (
               <button
                 onClick={() => toggle(false)}
                 className="group relative w-9 h-9 mx-auto rounded-xl bg-[#1C4F4F] flex items-center justify-center shadow-sm flex-shrink-0"
-                style={{ transition: "background 150ms" }}
                 aria-label="Expand sidebar"
               >
                 <span className="absolute inset-0 flex items-center justify-center transition-opacity duration-150 group-hover:opacity-0">
@@ -72,11 +91,7 @@ export function Sidebar() {
                 </div>
                 <span
                   className="font-bold text-[15px] tracking-tight whitespace-nowrap flex-1 min-w-0 overflow-hidden"
-                  style={{
-                    color: "var(--color-primary-ink)",
-                    opacity: mounted ? 1 : 0,
-                    transition: "opacity 180ms 60ms",
-                  }}
+                  style={{ color: "var(--color-primary-ink)" }}
                 >
                   Layla
                 </span>
@@ -102,42 +117,25 @@ export function Sidebar() {
                 <Link
                   href={href}
                   className={cn(
-                    "flex items-center gap-3 py-2.5 rounded-xl text-[13px] font-semibold transition-colors duration-150",
+                    "relative flex items-center gap-3 py-2.5 rounded-xl text-[13px] font-semibold",
                     collapsed ? "justify-center px-0" : "px-3",
                     isActive ? "text-[#1C4F4F]" : "hover:text-[var(--color-body)]"
                   )}
-                  style={
-                    isActive
-                      ? { background: "var(--color-primary-light)" }
-                      : { color: "var(--color-muted)" }
-                  }
+                  style={isActive ? undefined : { color: "var(--color-muted)" }}
                 >
+                  {isActive && <ActiveHighlight />}
                   <Icon
                     name={icon}
                     size={17}
+                    className="relative z-10"
                     style={{ flexShrink: 0, color: isActive ? "#2A9D8F" : "var(--color-muted-soft)" }}
                   />
-                  {!collapsed && (
-                    <span
-                      className="whitespace-nowrap overflow-hidden"
-                      style={{
-                        opacity: mounted ? 1 : 0,
-                        transition: "opacity 150ms 50ms",
-                      }}
-                    >
-                      {label}
-                    </span>
-                  )}
+                  {!collapsed && <span className="relative z-10 whitespace-nowrap overflow-hidden">{label}</span>}
                 </Link>
-                {/* Tooltip when collapsed */}
                 {collapsed && (
                   <div
                     className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 z-50"
-                    style={{
-                      background: "var(--color-ink)",
-                      color: "var(--color-canvas)",
-                      transition: "opacity 120ms",
-                    }}
+                    style={{ background: "var(--color-ink)", color: "var(--color-canvas)", transition: "opacity 120ms" }}
                   >
                     {label}
                   </div>
@@ -156,26 +154,20 @@ export function Sidebar() {
             <Link
               href="/settings"
               className={cn(
-                "flex items-center gap-3 py-2.5 rounded-xl text-[13px] font-semibold transition-colors duration-150",
+                "relative flex items-center gap-3 py-2.5 rounded-xl text-[13px] font-semibold",
                 collapsed ? "justify-center px-0" : "px-3",
-                pathname === "/settings" ? "text-[#1C4F4F]" : ""
+                settingsActive ? "text-[#1C4F4F]" : ""
               )}
-              style={
-                pathname === "/settings"
-                  ? { background: "var(--color-primary-light)" }
-                  : { color: "var(--color-muted)" }
-              }
+              style={settingsActive ? undefined : { color: "var(--color-muted)" }}
             >
+              {settingsActive && <ActiveHighlight />}
               <Icon
                 name="settings"
                 size={17}
-                style={{ flexShrink: 0, color: pathname === "/settings" ? "#2A9D8F" : "var(--color-muted-soft)" }}
+                className="relative z-10"
+                style={{ flexShrink: 0, color: settingsActive ? "#2A9D8F" : "var(--color-muted-soft)" }}
               />
-              {!collapsed && (
-                <span className="whitespace-nowrap overflow-hidden" style={{ opacity: mounted ? 1 : 0, transition: "opacity 150ms 50ms" }}>
-                  Settings
-                </span>
-              )}
+              {!collapsed && <span className="relative z-10 whitespace-nowrap overflow-hidden">Settings</span>}
             </Link>
             {collapsed && (
               <div
@@ -203,7 +195,7 @@ export function Sidebar() {
                 <Icon name="moon" size={17} style={{ flexShrink: 0, color: "var(--color-muted-soft)" }} />
               )}
               {!collapsed && (
-                <span className="whitespace-nowrap overflow-hidden" style={{ opacity: mounted ? 1 : 0, transition: "opacity 150ms 50ms" }}>
+                <span className="whitespace-nowrap overflow-hidden">
                   {theme === "dark" ? "Light Mode" : "Dark Mode"}
                 </span>
               )}

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Urbanist } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { ShellChrome } from "@/components/shell/ShellChrome";
 
 const urbanist = Urbanist({
   subsets: ["latin"],
@@ -23,7 +24,7 @@ export default function RootLayout({
     <html lang="en" className={`${urbanist.variable} h-full`} suppressHydrationWarning>
       <body className="h-full font-[family-name:var(--font-urbanist)] antialiased">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="kamarupa-theme">
-          {children}
+          <ShellChrome>{children}</ShellChrome>
         </ThemeProvider>
       </body>
     </html>
