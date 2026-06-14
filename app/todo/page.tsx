@@ -59,6 +59,27 @@ export default function TodoPage() {
   const [extracting, setExtracting] = useState(false);
   const [extracted, setExtracted] = useState<ExtractedItem[] | null>(null);
 
+  // Quick create task dialog
+  const [showTask, setShowTask] = useState(false);
+  const [tTitle, setTTitle] = useState("");
+  const [tProject, setTProject] = useState(projects[0]?.id ?? "");
+  const [tPriority, setTPriority] = useState<Priority>("medium");
+
+  const resetTask = () => { setTTitle(""); setTPriority("medium"); setTProject(projects[0]?.id ?? ""); };
+
+  const handleCreateTask = () => {
+    if (!tTitle.trim() || !tProject) return;
+    addTask({
+      title: tTitle.trim(),
+      projectId: tProject,
+      priority: tPriority,
+      status: "todo",
+      source: "manual",
+    });
+    resetTask();
+    setShowTask(false);
+  };
+
   const allCounts = {
     todo: tasks.filter((t) => t.status === "todo").length,
     in_progress: tasks.filter((t) => t.status === "in_progress").length,
@@ -198,9 +219,18 @@ export default function TodoPage() {
             <StatRow label="Done" value={allCounts.done} dot="#5DB872" />
           </div>
           <div className="h-px my-4" style={{ background: "var(--color-hairline)" }} />
-          <Button variant="secondary" className="w-full" onClick={() => router.push("/todo/all")}>
-            <Icon name="list-check" size={15} /> Lihat Semua Task
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" className="flex-1" onClick={() => router.push("/todo/all")}>
+              <Icon name="list-check" size={15} /> Lihat Semua Task
+            </Button>
+            <Button
+              className="flex-shrink-0"
+              onClick={() => { setTProject(projects[0]?.id ?? ""); setShowTask(true); }}
+              disabled={projects.length === 0}
+            >
+              <Icon name="plus" size={15} /> Buat Task
+            </Button>
+          </div>
         </Card>
       </div>
 
@@ -250,6 +280,42 @@ export default function TodoPage() {
             <div className="flex justify-end gap-2 pt-1">
               <Button variant="ghost" onClick={() => { setShowProject(false); resetProject(); }}>Cancel</Button>
               <Button onClick={handleCreateProject} disabled={!pName.trim()}>Create Project</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Create Task Dialog */}
+      <Dialog open={showTask} onOpenChange={(o) => { if (!o) { setShowTask(false); resetTask(); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Buat Task</DialogTitle>
+            <DialogDescription>Tambahkan task baru ke salah satu project</DialogDescription>
+          </DialogHeader>
+          <div className="p-6 flex flex-col gap-4">
+            <div>
+              <FieldLabel>Task</FieldLabel>
+              <Input autoFocus value={tTitle} onChange={(e) => setTTitle(e.target.value)} placeholder="Apa yang perlu dikerjakan?" onKeyDown={(e) => { if (e.key === "Enter") handleCreateTask(); }} />
+            </div>
+            <div>
+              <FieldLabel>Project</FieldLabel>
+              <Select value={tProject} onChange={(e) => setTProject(e.target.value)}>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name} · {p.client}</option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <FieldLabel>Priority</FieldLabel>
+              <Select value={tPriority} onChange={(e) => setTPriority(e.target.value as Priority)}>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="ghost" onClick={() => { setShowTask(false); resetTask(); }}>Cancel</Button>
+              <Button onClick={handleCreateTask} disabled={!tTitle.trim() || !tProject}>Buat Task</Button>
             </div>
           </div>
         </DialogContent>

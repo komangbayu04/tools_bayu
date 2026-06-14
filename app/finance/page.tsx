@@ -82,6 +82,34 @@ export default function FinancePage() {
 
   const maxCatTotal = catBreakdown[0]?.total || 1;
 
+  // Income trend (last 6 months) for sparkline
+  const incomeTrend = useMemo(() => {
+    const [cy, cm] = currentMonth.split("-").map(Number);
+    const keys: string[] = [];
+    for (let i = 5; i >= 0; i--) keys.push(monthKey(new Date(cy, cm - 1 - i, 1)));
+    return keys.map(k => ({
+      key: k,
+      income: transactions.filter(t => t.month === k && t.type === "income").reduce((s, t) => s + t.amount, 0),
+      expense: transactions.filter(t => t.month === k && t.type === "expense").reduce((s, t) => s + t.amount, 0),
+    }));
+  }, [transactions, currentMonth]);
+
+  const trendMax = Math.max(1, ...incomeTrend.map(d => Math.max(d.income, d.expense)));
+  const prevIncome = incomeTrend[incomeTrend.length - 2]?.income || 0;
+  const incomeDelta = prevIncome > 0 ? Math.round(((income - prevIncome) / prevIncome) * 100) : 0;
+
+  // Sparkline path (income over last 6 months)
+  const sparkW = 220, sparkH = 48;
+  const sparkPoints = incomeTrend.map((d, i) => {
+    const x = incomeTrend.length > 1 ? (i / (incomeTrend.length - 1)) * sparkW : 0;
+    const y = sparkH - (d.income / trendMax) * (sparkH - 6) - 3;
+    return { x, y };
+  });
+  const sparkLine = sparkPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const sparkArea = sparkPoints.length
+    ? `${sparkLine} L${sparkW},${sparkH} L0,${sparkH} Z`
+    : "";
+
   // Navigate months
   const prevMonth = () => {
     const [y, m] = currentMonth.split("-").map(Number);
@@ -147,28 +175,82 @@ export default function FinancePage() {
         )}
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-7">
+      {/* Summary cards — fintech hero row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+        {/* Saldo — dark hero card */}
+        <div className="rounded-[18px] p-6 flex flex-col justify-between" style={{ background: "#1C1C1E", minHeight: 150 }}>
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.55)" }}>Saldo</p>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: "#C6F24E" }}>
+              <Icon name={(balance >= 0 ? "wallet" : "trending-down") as IconName} size={16} style={{ color: "#1C1C1E" }} />
+            </div>
+          </div>
+          <div>
+            <p className="text-[26px] font-bold leading-tight text-white">
+              {balance < 0 ? "-" : ""}{fmtIDR(Math.abs(balance))}
+            </p>
+            <p className="text-[11px] mt-1" style={{ color: "rgba(255,255,255,0.45)" }}>{monthLabel(currentMonth)}</p>
+          </div>
+        </div>
+
+        {/* Light cards */}
         {([
-          { label: "Pemasukan", value: income, color: "#5DB872", icon: "trending-up" as IconName },
+          { label: "Pemasukan", value: income, color: "#2E9E5B", icon: "trending-up" as IconName },
           { label: "Pengeluaran", value: expense, color: "#D85A4A", icon: "trending-down" as IconName },
-          { label: "Saldo", value: balance, color: balance >= 0 ? "#2A9D8F" : "#D85A4A", icon: (balance >= 0 ? "trending-up" : "trending-down") as IconName },
-          { label: "Savings Rate", value: savingsRate, color: savingsRate >= 20 ? "#5DB872" : "#E8A55A", icon: "sparkles" as IconName, isPercent: true },
+          { label: "Savings Rate", value: savingsRate, color: savingsRate >= 20 ? "#2A9D8F" : "#E8A55A", icon: "sparkles" as IconName, isPercent: true },
         ]).map(({ label, value, color, icon, isPercent }) => (
-          <Card key={label}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>{label}</p>
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: color + "18" }}>
-                  <Icon name={icon} size={14} style={{ color }} />
-                </div>
+          <div key={label} className="rounded-[18px] p-6 flex flex-col justify-between" style={{ background: "var(--color-surface-card)", border: "1px solid var(--color-hairline)", minHeight: 150 }}>
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>{label}</p>
+              <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: color + "1F" }}>
+                <Icon name={icon} size={16} style={{ color }} />
               </div>
-              <p className="text-[18px] font-bold leading-tight" style={{ color }}>
-                {isPercent ? `${value}%` : fmtIDR(Math.abs(value))}
-              </p>
-            </CardContent>
-          </Card>
+            </div>
+            <p className="text-[22px] font-bold leading-tight" style={{ color: "var(--color-ink)" }}>
+              {isPercent ? `${value}%` : fmtIDR(Math.abs(value))}
+            </p>
+          </div>
         ))}
+      </div>
+
+      {/* Mini charts row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-7">
+        {/* Income trend sparkline */}
+        <div className="rounded-[18px] p-5" style={{ background: "var(--color-surface-card)", border: "1px solid var(--color-hairline)" }}>
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>Tren Pemasukan</p>
+              <p className="text-[18px] font-bold mt-1" style={{ color: "var(--color-ink)" }}>{fmtIDR(income)}</p>
+            </div>
+            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ background: incomeDelta >= 0 ? "#C6F24E" : "#F4D0C9", color: incomeDelta >= 0 ? "#1C4F1C" : "#9B2B2B" }}>
+              {incomeDelta >= 0 ? "+" : ""}{incomeDelta}%
+            </span>
+          </div>
+          <svg viewBox={`0 0 ${sparkW} ${sparkH}`} className="w-full" style={{ height: 48 }} preserveAspectRatio="none">
+            {sparkArea && <path d={sparkArea} fill="#C6F24E" fillOpacity={0.25} />}
+            {sparkLine && <path d={sparkLine} fill="none" stroke="#2A9D8F" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
+          </svg>
+        </div>
+
+        {/* Expense bars */}
+        <div className="rounded-[18px] p-5" style={{ background: "var(--color-surface-card)", border: "1px solid var(--color-hairline)" }}>
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>Pengeluaran (6 bln)</p>
+              <p className="text-[18px] font-bold mt-1" style={{ color: "var(--color-ink)" }}>{fmtIDR(expense)}</p>
+            </div>
+          </div>
+          <div className="flex items-end gap-2" style={{ height: 48 }}>
+            {incomeTrend.map((d, i) => (
+              <div key={d.key} className="flex-1 flex flex-col justify-end h-full">
+                <div className="rounded-t-md w-full transition-all duration-500" style={{
+                  height: `${Math.max(4, (d.expense / trendMax) * 100)}%`,
+                  background: i === incomeTrend.length - 1 ? "#1C4F4F" : "#2A9D8F40",
+                }} />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 items-start">
@@ -190,7 +272,7 @@ export default function FinancePage() {
               <p className="text-[13px]" style={{ color: "var(--color-muted-soft)" }}>Belum ada transaksi bulan ini.</p>
             </div>
           ) : (
-            <Card className="overflow-hidden">
+            <Card className="overflow-hidden rounded-[18px]">
               <AnimatePresence initial={false}>
                 {displayTxs.map((tx, i) => {
                   const cat = getCat(tx.categoryId);
@@ -203,9 +285,9 @@ export default function FinancePage() {
                       className="flex items-center gap-3 px-4 py-3 group"
                       style={{ borderTop: i === 0 ? "none" : "1px solid var(--color-hairline)" }}
                     >
-                      {/* Icon */}
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: (cat?.color || "#ccc") + "18" }}>
-                        <Icon name={(cat?.icon || "wallet") as IconName} size={14} style={{ color: cat?.color || "#ccc" }} />
+                      {/* Avatar */}
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: (cat?.color || "#ccc") + "22" }}>
+                        <Icon name={(cat?.icon || "wallet") as IconName} size={15} style={{ color: cat?.color || "#ccc" }} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-semibold truncate" style={{ color: "var(--color-ink)" }}>{tx.description}</p>
@@ -217,7 +299,7 @@ export default function FinancePage() {
                           </span>
                         </div>
                       </div>
-                      <p className="text-[14px] font-bold flex-shrink-0" style={{ color: tx.type === "income" ? "#5DB872" : "#D85A4A" }}>
+                      <p className="text-[14px] font-bold flex-shrink-0" style={{ color: tx.type === "income" ? "#2E9E5B" : "#D85A4A" }}>
                         {tx.type === "income" ? "+" : "-"}{fmtIDR(tx.amount)}
                       </p>
                       <button
@@ -237,9 +319,14 @@ export default function FinancePage() {
 
         {/* Category breakdown */}
         <div className="flex flex-col gap-4">
-          <Card>
+          <Card className="rounded-[18px]">
             <CardHeader>
-              <p className="text-[13px] font-semibold" style={{ color: "var(--color-ink)" }}>Pengeluaran per Kategori</p>
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: "#C6F24E" }}>
+                  <Icon name="chart-pie" size={14} style={{ color: "#1C4F4F" }} />
+                </div>
+                <p className="text-[13px] font-semibold" style={{ color: "var(--color-ink)" }}>Pengeluaran per Kategori</p>
+              </div>
             </CardHeader>
             <CardContent>
               {catBreakdown.length === 0 ? (
@@ -266,11 +353,11 @@ export default function FinancePage() {
           </Card>
 
           {/* Categories list */}
-          <Card>
+          <Card className="rounded-[18px]">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <p className="text-[13px] font-semibold" style={{ color: "var(--color-ink)" }}>Kategori</p>
-                <button onClick={() => setShowAddCat(true)} className="text-[11px] font-semibold hover:opacity-70" style={{ color: "#2A9D8F" }}>+ Tambah</button>
+                <button onClick={() => setShowAddCat(true)} className="text-[11px] font-semibold hover:opacity-70" style={{ color: "#1C4F4F" }}>+ Tambah</button>
               </div>
             </CardHeader>
             <CardContent>
@@ -312,7 +399,10 @@ export default function FinancePage() {
                       ? { background: "#5DB87218", borderColor: "#5DB872", color: "#2E7D4F" }
                       : { background: "#D85A4A18", borderColor: "#D85A4A", color: "#9B2B2B" }
                     : { background: "var(--color-surface)", borderColor: "var(--color-hairline)", color: "var(--color-muted)" }}>
-                  {t === "income" ? "💰 Pemasukan" : "💸 Pengeluaran"}
+                  <span className="inline-flex items-center justify-center gap-1.5">
+                    <Icon name={t === "income" ? "trending-up" : "trending-down"} size={14} />
+                    {t === "income" ? "Pemasukan" : "Pengeluaran"}
+                  </span>
                 </button>
               ))}
             </div>
@@ -326,7 +416,7 @@ export default function FinancePage() {
               <Select value={txCatId} onChange={e => setTxCatId(e.target.value)}>
                 <option value="">Pilih kategori...</option>
                 {categories.filter(c => c.type === txType).map(c => (
-                  <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </Select>
             </div>
