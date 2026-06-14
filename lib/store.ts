@@ -59,6 +59,8 @@ export const useTaskStore = create<TaskStore>()(
 // --- Moodboard store ---
 export type MoodCategory = "graphic_design" | "product_design" | "3d" | "motion"
 
+export type MediaType = "image" | "video"
+
 export interface MoodItem {
   id: string
   url: string
@@ -69,6 +71,7 @@ export interface MoodItem {
   note?: string
   color: string
   image_url?: string
+  media_type?: MediaType
 }
 
 interface MoodStore {

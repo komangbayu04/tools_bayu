@@ -2,10 +2,10 @@
 
 import { ShellLayout } from "@/components/shell/Layout";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { useState } from "react";
-import { Plus, ExternalLink, Trash2, Loader2 } from "lucide-react";
-import { useMoodStore, type MoodCategory } from "@/lib/store";
-import { resolveCover, randomGradient } from "@/lib/utils";
+import { useRef, useState } from "react";
+import { Plus, ExternalLink, Trash2, UploadCloud, X, Play } from "lucide-react";
+import { useMoodStore, type MoodCategory, type MediaType } from "@/lib/store";
+import { resolveCover } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -38,73 +38,64 @@ const categoryBadge: Record<MoodCategory, "teal" | "purple" | "gray"> = {
 // Varying heights for mosaic feel
 const mosaicHeights = [220, 300, 260, 340, 200, 280, 320, 240, 180, 310, 260, 200];
 
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
 export default function MoodboardPage() {
   const { items, addItem, deleteItem } = useMoodStore();
   const [activeCategory, setActiveCategory] = useState<Category>("all");
   const [showModal, setShowModal] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
   const [newUrl, setNewUrl] = useState("");
   const [newCategory, setNewCategory] = useState<MoodCategory>("graphic_design");
   const [newTags, setNewTags] = useState("");
   const [newNote, setNewNote] = useState("");
-  const [preview, setPreview] = useState<{ title?: string; domain?: string; image_url?: string } | null>(null);
-  const [fetchingPreview, setFetchingPreview] = useState(false);
+  const [mediaData, setMediaData] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<MediaType | null>(null);
+  const [mediaName, setMediaName] = useState<string>("");
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = activeCategory === "all" ? items : items.filter((i) => i.category === activeCategory);
   const categories: Category[] = ["all", "graphic_design", "product_design", "3d", "motion"];
 
-  type PreviewData = { title?: string; domain?: string; image_url?: string };
-
-  // Fetch OG metadata + image via Microlink. Returns the resolved preview.
-  const fetchPreview = async (url: string): Promise<PreviewData> => {
-    let domain = url;
-    try { domain = new URL(url).hostname.replace("www.", ""); } catch {}
-    const fallbackTitle = domain.split(".")[0].charAt(0).toUpperCase() + domain.split(".")[0].slice(1) + " — Reference";
-    try {
-      const res = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(url)}&palette=false&audio=false&video=false`);
-      const json = await res.json();
-      // Prefer the page OG image; fall back to a Microlink-proxied screenshot.
-      let image_url: string | undefined = json?.data?.image?.url || json?.data?.logo?.url;
-      if (!image_url && json?.status === "success") {
-        // Proxy a screenshot through Microlink so even hotlink-protected pages render.
-        image_url = `https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=true&embed=screenshot.url`;
-      }
-      return { title: json?.data?.title || fallbackTitle, domain, image_url };
-    } catch {
-      return { title: fallbackTitle, domain };
-    }
-  };
-
-  const handleUrlBlur = async () => {
-    if (!newUrl.trim()) return;
-    setFetchingPreview(true);
-    setPreview(await fetchPreview(newUrl));
-    setFetchingPreview(false);
+  const handleFiles = async (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    const isVideo = file.type.startsWith("video/");
+    const isImage = file.type.startsWith("image/");
+    if (!isVideo && !isImage) return;
+    const dataUrl = await readFileAsDataUrl(file);
+    setMediaData(dataUrl);
+    setMediaType(isVideo ? "video" : "image");
+    setMediaName(file.name);
+    if (!newTitle) setNewTitle(file.name.replace(/\.[^.]+$/, ""));
   };
 
   const resetForm = () => {
-    setNewUrl(""); setNewCategory("graphic_design"); setNewTags(""); setNewNote(""); setPreview(null);
+    setNewTitle(""); setNewUrl(""); setNewCategory("graphic_design");
+    setNewTags(""); setNewNote(""); setMediaData(null); setMediaType(null); setMediaName("");
   };
 
-  const handleAddItem = async () => {
-    if (!newUrl.trim()) return;
-    // Ensure we have the image even if the user clicked Add before blur finished.
-    let data = preview;
-    if (!data || !data.image_url) {
-      setFetchingPreview(true);
-      data = await fetchPreview(newUrl);
-      setFetchingPreview(false);
-    }
-    let domain = newUrl;
-    try { domain = new URL(newUrl).hostname.replace("www.", ""); } catch {}
+  const handleAddItem = () => {
+    if (!mediaData) return;
+    let domain = "";
+    if (newUrl) { try { domain = new URL(newUrl).hostname.replace("www.", ""); } catch { domain = newUrl; } }
     addItem({
       url: newUrl,
-      title: data?.title || `Reference from ${domain}`,
-      source_domain: data?.domain || domain,
+      title: newTitle.trim() || "Untitled reference",
+      source_domain: domain,
       category: newCategory,
       tags: newTags.split(",").map((t) => t.trim()).filter(Boolean),
       note: newNote,
-      color: randomGradient(),
-      image_url: data?.image_url,
+      color: "linear-gradient(135deg,#2A9D8F,#1C4F4F)",
+      image_url: mediaData,
+      media_type: mediaType ?? "image",
     });
     setShowModal(false);
     resetForm();
@@ -149,25 +140,39 @@ export default function MoodboardPage() {
                   className="break-inside-avoid mb-4 rounded-[14px] overflow-hidden group relative"
                   style={{ height }}
                 >
-                  {/* Image or gradient background */}
-                  {item.image_url ? (
+                  {/* Media: image, video, or gradient fallback */}
+                  {item.image_url && item.media_type === "video" ? (
+                    <video
+                      src={item.image_url}
+                      muted
+                      loop
+                      playsInline
+                      onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
+                      onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      style={{ background: resolveCover(item.color, item.id) }}
+                    />
+                  ) : item.image_url ? (
                     <img
                       src={item.image_url}
                       alt={item.title}
                       loading="lazy"
-                      referrerPolicy="no-referrer"
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       style={{ background: resolveCover(item.color, item.id) }}
-                      onError={(e) => {
-                        // Hide broken image; gradient background shows through.
-                        e.currentTarget.style.visibility = "hidden";
-                      }}
+                      onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
                     />
                   ) : (
                     <div
                       className="w-full h-full transition-transform duration-500 group-hover:scale-105"
                       style={{ background: resolveCover(item.color, item.id) }}
                     />
+                  )}
+
+                  {/* Video indicator */}
+                  {item.media_type === "video" && (
+                    <div className="absolute top-2.5 left-2.5 w-7 h-7 bg-black/55 backdrop-blur-sm rounded-lg flex items-center justify-center opacity-80 group-hover:opacity-0 transition-opacity">
+                      <Play size={12} className="text-white fill-white" />
+                    </div>
                   )}
 
                   {/* Hover overlay with info */}
@@ -177,16 +182,18 @@ export default function MoodboardPage() {
                     <div className="p-3 pb-3.5">
                       <p className="text-[13px] font-semibold leading-tight text-white line-clamp-2 mb-1">{item.title}</p>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] text-white/70 truncate">{item.source_domain}</span>
+                        <span className="text-[11px] text-white/70 truncate">{item.source_domain || (item.media_type === "video" ? "Video" : "Image")}</span>
                         <Badge variant={categoryBadge[item.category]}>{categoryShort[item.category]}</Badge>
                       </div>
                     </div>
 
                     {/* Action buttons */}
                     <div className="absolute top-2.5 right-2.5 flex gap-1.5">
-                      <a href={item.url} target="_blank" rel="noopener noreferrer" className="w-7 h-7 bg-white/95 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-white shadow-sm transition-colors">
-                        <ExternalLink size={12} className="text-[#3D5159]" />
-                      </a>
+                      {item.url && (
+                        <a href={item.url} target="_blank" rel="noopener noreferrer" className="w-7 h-7 bg-white/95 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-white shadow-sm transition-colors">
+                          <ExternalLink size={12} className="text-[#3D5159]" />
+                        </a>
+                      )}
                       <button onClick={() => deleteItem(item.id)} className="w-7 h-7 bg-white/95 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-red-50 shadow-sm transition-colors">
                         <Trash2 size={12} className="text-[#C64545]" />
                       </button>
@@ -204,34 +211,58 @@ export default function MoodboardPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Reference</DialogTitle>
-            <DialogDescription>Paste a URL to add to your board</DialogDescription>
+            <DialogDescription>Upload an image or video for your board</DialogDescription>
           </DialogHeader>
           <div className="p-6 flex flex-col gap-5">
-            {/* Image preview */}
-            {(fetchingPreview || preview) && (
-              <div
-                className="h-40 rounded-[10px] overflow-hidden flex items-center justify-center"
-                style={{ background: "var(--color-canvas)", border: "1px solid var(--color-hairline)" }}
-              >
-                {fetchingPreview ? (
-                  <div className="flex items-center gap-2">
-                    <Loader2 size={16} className="text-[#2A9D8F] animate-spin" />
-                    <span className="text-xs" style={{ color: "var(--color-muted)" }}>Fetching preview…</span>
-                  </div>
-                ) : preview?.image_url ? (
-                  <img src={preview.image_url} alt={preview.title} className="w-full h-full object-cover" />
+            {/* Upload / preview area */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*"
+              className="hidden"
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+            {mediaData ? (
+              <div className="relative h-48 rounded-[10px] overflow-hidden" style={{ border: "1px solid var(--color-hairline)" }}>
+                {mediaType === "video" ? (
+                  <video src={mediaData} controls className="w-full h-full object-cover" />
                 ) : (
-                  <div className="text-center">
-                    <p className="text-[13px] font-semibold" style={{ color: "var(--color-ink)" }}>{preview?.title}</p>
-                    <p className="text-[11px] mt-0.5" style={{ color: "var(--color-muted)" }}>{preview?.domain}</p>
-                  </div>
+                  <img src={mediaData} alt={mediaName} className="w-full h-full object-cover" />
                 )}
+                <button
+                  onClick={() => { setMediaData(null); setMediaType(null); setMediaName(""); }}
+                  className="absolute top-2 right-2 w-7 h-7 bg-black/55 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-black/75 transition-colors"
+                >
+                  <X size={14} className="text-white" />
+                </button>
               </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                onDragLeave={() => setDragActive(false)}
+                onDrop={(e) => { e.preventDefault(); setDragActive(false); handleFiles(e.dataTransfer.files); }}
+                className="h-48 rounded-[10px] flex flex-col items-center justify-center gap-2 transition-colors"
+                style={{
+                  border: `2px dashed ${dragActive ? "#2A9D8F" : "var(--color-hairline)"}`,
+                  background: dragActive ? "var(--color-primary-light)" : "var(--color-canvas)",
+                }}
+              >
+                <UploadCloud size={26} className="text-[#2A9D8F]" />
+                <p className="text-[13px] font-semibold" style={{ color: "var(--color-ink)" }}>Click to upload or drag & drop</p>
+                <p className="text-[11px]" style={{ color: "var(--color-muted)" }}>Image or video file</p>
+              </button>
             )}
 
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Link URL</label>
-              <Input value={newUrl} onChange={(e) => setNewUrl(e.target.value)} onBlur={handleUrlBlur} placeholder="https://dribbble.com/shots/..." />
+              <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Title</label>
+              <Input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Reference title" />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Source link (optional)</label>
+              <Input value={newUrl} onChange={(e) => setNewUrl(e.target.value)} placeholder="https://dribbble.com/shots/..." />
             </div>
 
             <div>
@@ -256,7 +287,7 @@ export default function MoodboardPage() {
 
             <div className="flex gap-3 pt-1">
               <Button variant="outline" className="flex-1" onClick={() => { setShowModal(false); resetForm(); }}>Cancel</Button>
-              <Button className="flex-1" onClick={handleAddItem}>Add to Board</Button>
+              <Button className="flex-1" onClick={handleAddItem} disabled={!mediaData}>Add to Board</Button>
             </div>
           </div>
         </DialogContent>
