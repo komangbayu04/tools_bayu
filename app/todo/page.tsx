@@ -18,7 +18,7 @@ import {
   useTaskStore, useProjectStore,
   type Priority, type ProjectStatus,
 } from "@/lib/store";
-import { PROJECT_PALETTE, progressOf } from "./shared";
+import { PROJECT_PALETTE, progressOf, isProjectComplete } from "./shared";
 
 interface ExtractedItem {
   task: string;
@@ -96,6 +96,15 @@ export default function TodoPage() {
     done: tasks.filter((t) => t.status === "done").length,
   };
 
+  // Top summary stats
+  const tasksCompleted = allCounts.done;
+  const hoursWorked = tasks
+    .filter((t) => t.status === "done")
+    .reduce((s, t) => s + (t.hours || 0), 0);
+  const projectsCompleted = projects.filter((p) =>
+    isProjectComplete(tasks.filter((t) => t.projectId === p.id))
+  ).length;
+
   const resetProject = () => {
     setPName(""); setPClient(""); setPDesc(""); setPColor(PROJECT_PALETTE[0]); setPStatus("active");
   };
@@ -162,6 +171,31 @@ export default function TodoPage() {
         }
       />
 
+      {/* Summary stat cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <SummaryCard
+          icon="check-circle"
+          tint="#5DB872"
+          value={String(tasksCompleted)}
+          label="Task selesai"
+          hint={`dari ${tasks.length} total task`}
+        />
+        <SummaryCard
+          icon="clock"
+          tint="var(--color-primary)"
+          value={`${hoursWorked % 1 === 0 ? hoursWorked : hoursWorked.toFixed(1)}h`}
+          label="Jam kerja"
+          hint="dari task yang selesai"
+        />
+        <SummaryCard
+          icon="folder-open"
+          tint="#6D8DF0"
+          value={String(projectsCompleted)}
+          label="Project selesai"
+          hint={`dari ${projects.length} project`}
+        />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
         {/* LEFT: project list */}
         <div className="flex flex-col gap-3">
@@ -176,6 +210,7 @@ export default function TodoPage() {
             const pTasks = tasks.filter((t) => t.projectId === project.id);
             const { done, total, pct } = progressOf(pTasks);
             const hours = pTasks.reduce((s, t) => s + (t.hours || 0), 0);
+            const complete = isProjectComplete(pTasks);
             return (
               <Card
                 key={project.id}
@@ -196,7 +231,14 @@ export default function TodoPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="text-[15px] font-semibold truncate" style={{ color: "var(--color-ink)" }}>{project.name}</h3>
-                      {project.status !== "active" && (
+                      {complete ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                          style={{ background: "color-mix(in srgb, #5DB872 16%, transparent)", color: "#3d8a52" }}
+                        >
+                          <Icon name="check-circle" size={10} /> Selesai
+                        </span>
+                      ) : project.status !== "active" && (
                         <Badge variant="gray" className="capitalize">{project.status}</Badge>
                       )}
                     </div>
@@ -421,6 +463,32 @@ export default function TodoPage() {
         </DialogContent>
       </Dialog>
     </ShellLayout>
+  );
+}
+
+function SummaryCard({
+  icon, tint, value, label, hint,
+}: {
+  icon: Parameters<typeof Icon>[0]["name"];
+  tint: string;
+  value: string;
+  label: string;
+  hint: string;
+}) {
+  return (
+    <Card className="p-5 flex items-center gap-4">
+      <div
+        className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+        style={{ background: `color-mix(in srgb, ${tint} 16%, transparent)` }}
+      >
+        <Icon name={icon} size={22} style={{ color: tint }} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[26px] font-bold leading-none tracking-tight" style={{ color: "var(--color-ink)" }}>{value}</p>
+        <p className="text-[13px] font-semibold mt-1.5" style={{ color: "var(--color-body)" }}>{label}</p>
+        <p className="text-[11px] mt-0.5" style={{ color: "var(--color-muted-soft)" }}>{hint}</p>
+      </div>
+    </Card>
   );
 }
 

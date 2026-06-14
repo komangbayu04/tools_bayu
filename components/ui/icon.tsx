@@ -14,7 +14,8 @@ import {
   faArrowLeft, faArrowRight, faChartPie, faChartLine, faChartColumn, faEllipsisVertical,
   faCircleDot, faListCheck, faFlag, faLink, faPen, faFilter, faCircle,
   faMoneyBillTrendUp, faReceipt, faBuilding, faUser, faEnvelope, faPhone,
-  faDesktop,
+  faDesktop, faRobot, faFlask, faCopy, faDatabase, faPenRuler,
+  faDiagramProject, faLayerGroup, faLightbulb, faStar, faClone,
 } from "@fortawesome/free-solid-svg-icons";
 
 // Prevent Font Awesome from adding its CSS since we import it manually (SSR-safe)
@@ -30,7 +31,8 @@ library.add(
   faArrowLeft, faArrowRight, faChartPie, faChartLine, faChartColumn, faEllipsisVertical,
   faCircleDot, faListCheck, faFlag, faLink, faPen, faFilter, faCircle,
   faMoneyBillTrendUp, faReceipt, faBuilding, faUser, faEnvelope, faPhone,
-  faDesktop,
+  faDesktop, faRobot, faFlask, faCopy, faDatabase, faPenRuler,
+  faDiagramProject, faLayerGroup, faLightbulb, faStar, faClone,
 );
 
 // Map friendly names → Font Awesome icon definitions.
@@ -90,6 +92,16 @@ const REGISTRY: Record<string, IconProp> = {
   email: faEnvelope,
   phone: faPhone,
   monitor: faDesktop,
+  robot: faRobot,
+  flask: faFlask,
+  copy: faCopy,
+  database: faDatabase,
+  "pen-ruler": faPenRuler,
+  workflow: faDiagramProject,
+  layers: faLayerGroup,
+  lightbulb: faLightbulb,
+  star: faStar,
+  clone: faClone,
 };
 
 export type IconName = keyof typeof REGISTRY;

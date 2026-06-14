@@ -26,6 +26,22 @@ const navItems: (NavItem | { group: NavGroup })[] = [
   },
   { label: "Finance", href: "/finance", icon: "wallet" },
   { label: "Moodboard", href: "/moodboard", icon: "image" },
+  {
+    group: {
+      label: "AI Studio",
+      icon: "robot",
+      children: [
+        { label: "AI Tools Database", href: "/ai-studio/tools-database", icon: "database" },
+        { label: "Prompt Library", href: "/ai-studio/prompts", icon: "file-text" },
+        { label: "Creative Generator", href: "/ai-studio/creative", icon: "lightbulb" },
+        { label: "Template Generator", href: "/ai-studio/templates", icon: "clone" },
+        { label: "Design Assistant", href: "/ai-studio/design-assistant", icon: "pen-ruler" },
+        { label: "AI Workflow Builder", href: "/ai-studio/workflows", icon: "workflow" },
+        { label: "AI Experiments", href: "/ai-studio/experiments", icon: "flask" },
+        { label: "AI Assets Library", href: "/ai-studio/assets", icon: "layers" },
+      ],
+    },
+  },
 ];
 
 const STORAGE_KEY = "sidebar-collapsed";

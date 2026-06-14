@@ -41,3 +41,8 @@ export function progressOf(tasks: Task[]) {
   const done = tasks.filter((t) => t.status === "done").length;
   return { total, done, pct: total ? Math.round((done / total) * 100) : 0 };
 }
+
+/** A project counts as complete once it has tasks and every one of them is done. */
+export function isProjectComplete(tasks: Task[]) {
+  return tasks.length > 0 && tasks.every((t) => t.status === "done");
+}
