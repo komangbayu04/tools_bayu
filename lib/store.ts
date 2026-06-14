@@ -68,6 +68,7 @@ export interface MoodItem {
   tags: string[]
   note?: string
   color: string
+  image_url?: string
 }
 
 interface MoodStore {

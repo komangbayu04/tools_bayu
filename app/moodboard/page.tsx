@@ -35,6 +35,9 @@ const categoryBadge: Record<MoodCategory, "teal" | "purple" | "gray"> = {
   graphic_design: "teal", product_design: "purple", "3d": "gray", motion: "gray",
 };
 
+// Varying heights for mosaic feel
+const mosaicHeights = [220, 300, 260, 340, 200, 280, 320, 240, 180, 310, 260, 200];
+
 export default function MoodboardPage() {
   const { items, addItem, deleteItem } = useMoodStore();
   const [activeCategory, setActiveCategory] = useState<Category>("all");
@@ -43,7 +46,7 @@ export default function MoodboardPage() {
   const [newCategory, setNewCategory] = useState<MoodCategory>("graphic_design");
   const [newTags, setNewTags] = useState("");
   const [newNote, setNewNote] = useState("");
-  const [preview, setPreview] = useState<{ title?: string; domain?: string } | null>(null);
+  const [preview, setPreview] = useState<{ title?: string; domain?: string; image_url?: string } | null>(null);
   const [fetchingPreview, setFetchingPreview] = useState(false);
 
   const filtered = activeCategory === "all" ? items : items.filter((i) => i.category === activeCategory);
@@ -52,12 +55,21 @@ export default function MoodboardPage() {
   const handleUrlBlur = async () => {
     if (!newUrl) return;
     setFetchingPreview(true);
-    await new Promise((r) => setTimeout(r, 700));
     try {
+      const res = await fetch(`https://api.microlink.io?url=${encodeURIComponent(newUrl)}`);
+      const json = await res.json();
       const domain = new URL(newUrl).hostname.replace("www.", "");
-      const name = domain.split(".")[0];
-      setPreview({ title: name.charAt(0).toUpperCase() + name.slice(1) + " — Reference", domain });
-    } catch { setPreview(null); }
+      setPreview({
+        title: json.data?.title || (domain.split(".")[0].charAt(0).toUpperCase() + domain.split(".")[0].slice(1) + " — Reference"),
+        domain,
+        image_url: json.data?.image?.url || json.data?.screenshot?.url || undefined,
+      });
+    } catch {
+      try {
+        const domain = new URL(newUrl).hostname.replace("www.", "");
+        setPreview({ title: domain.split(".")[0].charAt(0).toUpperCase() + domain.split(".")[0].slice(1) + " — Reference", domain });
+      } catch { setPreview(null); }
+    }
     setFetchingPreview(false);
   };
 
@@ -77,6 +89,7 @@ export default function MoodboardPage() {
       tags: newTags.split(",").map((t) => t.trim()).filter(Boolean),
       note: newNote,
       color: randomGradient(),
+      image_url: preview?.image_url,
     });
     setShowModal(false);
     resetForm();
@@ -101,56 +114,65 @@ export default function MoodboardPage() {
         </Tabs>
       </div>
 
-      {/* Masonry grid */}
+      {/* Mosaic 3-column grid */}
       {filtered.length === 0 ? (
         <div className="text-center py-24">
           <p className="text-sm font-medium" style={{ color: "var(--color-muted-soft)" }}>No references in this category yet.</p>
         </div>
       ) : (
-        <div className="columns-2 md:columns-3 lg:columns-4 gap-4">
+        <div className="columns-1 sm:columns-2 md:columns-3 gap-4">
           <AnimatePresence>
-            {filtered.map((item, idx) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.96 }}
-                transition={{ duration: 0.18, delay: idx * 0.03 }}
-                className="break-inside-avoid mb-4 rounded-[14px] overflow-hidden group relative border"
-                style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface)" }}
-              >
-                <div className="relative overflow-hidden">
-                  <div
-                    className="w-full transition-transform duration-300 group-hover:scale-105"
-                    style={{ minHeight: 150 + (idx % 3) * 50, background: resolveCover(item.color, item.id) }}
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-all duration-200" />
-                  <div className="absolute top-2.5 right-2.5 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0">
-                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="w-7 h-7 bg-white/95 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-white shadow-sm transition-colors">
-                      <ExternalLink size={12} className="text-[#3D5159]" />
-                    </a>
-                    <button onClick={() => deleteItem(item.id)} className="w-7 h-7 bg-white/95 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-red-50 shadow-sm transition-colors">
-                      <Trash2 size={12} className="text-[#C64545]" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="p-3">
-                  <p className="text-[13px] font-semibold leading-tight mb-1 line-clamp-1" style={{ color: "var(--color-ink)" }}>{item.title}</p>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] truncate" style={{ color: "var(--color-muted)" }}>{item.source_domain}</span>
-                    <Badge variant={categoryBadge[item.category]}>{categoryShort[item.category]}</Badge>
-                  </div>
-                  {item.tags.length > 0 && (
-                    <div className="flex gap-1 mt-2 flex-wrap">
-                      {item.tags.slice(0, 2).map((tag) => (
-                        <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: "var(--color-canvas)", color: "var(--color-muted)" }}>{tag}</span>
-                      ))}
-                    </div>
+            {filtered.map((item, idx) => {
+              const height = mosaicHeights[idx % mosaicHeights.length];
+              return (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  transition={{ duration: 0.18, delay: idx * 0.03 }}
+                  className="break-inside-avoid mb-4 rounded-[14px] overflow-hidden group relative"
+                  style={{ height }}
+                >
+                  {/* Image or gradient background */}
+                  {item.image_url ? (
+                    <img
+                      src={item.image_url}
+                      alt={item.title}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div
+                      className="w-full h-full transition-transform duration-500 group-hover:scale-105"
+                      style={{ background: resolveCover(item.color, item.id) }}
+                    />
                   )}
-                </div>
-              </motion.div>
-            ))}
+
+                  {/* Hover overlay with info */}
+                  <div className="absolute inset-0 flex flex-col justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                    style={{ background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.3) 50%, transparent 100%)" }}
+                  >
+                    <div className="p-3 pb-3.5">
+                      <p className="text-[13px] font-semibold leading-tight text-white line-clamp-2 mb-1">{item.title}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-white/70 truncate">{item.source_domain}</span>
+                        <Badge variant={categoryBadge[item.category]}>{categoryShort[item.category]}</Badge>
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="absolute top-2.5 right-2.5 flex gap-1.5">
+                      <a href={item.url} target="_blank" rel="noopener noreferrer" className="w-7 h-7 bg-white/95 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-white shadow-sm transition-colors">
+                        <ExternalLink size={12} className="text-[#3D5159]" />
+                      </a>
+                      <button onClick={() => deleteItem(item.id)} className="w-7 h-7 bg-white/95 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-red-50 shadow-sm transition-colors">
+                        <Trash2 size={12} className="text-[#C64545]" />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </div>
       )}
@@ -163,13 +185,19 @@ export default function MoodboardPage() {
             <DialogDescription>Paste a URL to add to your board</DialogDescription>
           </DialogHeader>
           <div className="p-6 flex flex-col gap-5">
+            {/* Image preview */}
             {(fetchingPreview || preview) && (
-              <div className="h-16 rounded-[10px] flex items-center justify-center" style={{ background: "var(--color-canvas)", border: "1px solid var(--color-hairline)" }}>
+              <div
+                className="h-40 rounded-[10px] overflow-hidden flex items-center justify-center"
+                style={{ background: "var(--color-canvas)", border: "1px solid var(--color-hairline)" }}
+              >
                 {fetchingPreview ? (
                   <div className="flex items-center gap-2">
                     <Loader2 size={16} className="text-[#2A9D8F] animate-spin" />
                     <span className="text-xs" style={{ color: "var(--color-muted)" }}>Fetching preview…</span>
                   </div>
+                ) : preview?.image_url ? (
+                  <img src={preview.image_url} alt={preview.title} className="w-full h-full object-cover" />
                 ) : (
                   <div className="text-center">
                     <p className="text-[13px] font-semibold" style={{ color: "var(--color-ink)" }}>{preview?.title}</p>
