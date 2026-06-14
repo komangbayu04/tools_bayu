@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 
-// --- Task store ---
+// ─── Task store ───────────────────────────────────────────────────
 export type Priority = "high" | "medium" | "low"
 export type TaskStatus = "todo" | "done"
 
@@ -14,6 +14,8 @@ export interface Task {
   due?: string
   source: "manual" | "transcript"
   order: number
+  hours?: number
+  invoiceLinked?: boolean
 }
 
 interface TaskStore {
@@ -21,6 +23,7 @@ interface TaskStore {
   addTask: (task: Omit<Task, "id" | "order">) => void
   toggleDone: (id: string) => void
   deleteTask: (id: string) => void
+  updateTask: (id: string, patch: Partial<Task>) => void
   reorderTasks: (priority: Priority, activeId: string, overId: string) => void
 }
 
@@ -28,18 +31,19 @@ export const useTaskStore = create<TaskStore>()(
   persist(
     (set) => ({
       tasks: [
-        { id: "1", title: "Revisi cover slide deck Overclock ke light mode", project: "Overclock", priority: "high", status: "todo", due: "16 Jun", source: "transcript", order: 0 },
-        { id: "2", title: "Build reusable email template Bedford", project: "Bedford", priority: "high", status: "todo", due: "18 Jun", source: "manual", order: 1 },
-        { id: "3", title: 'Finalize "The Current" newsletter revision', project: "Bedford", priority: "medium", status: "todo", source: "transcript", order: 0 },
-        { id: "4", title: "Update brand deck transition slides", project: "Overclock", priority: "medium", status: "todo", source: "transcript", order: 1 },
-        { id: "5", title: "Research competitor moodboards for Q3", project: "Internal", priority: "low", status: "todo", source: "manual", order: 0 },
-        { id: "6", title: "Send revised deck to Ahmed", project: "Overclock", priority: "high", status: "done", source: "transcript", order: 2 },
+        { id: "1", title: "Revisi cover slide deck Overclock ke light mode", project: "Overclock", priority: "high", status: "todo", due: "16 Jun", source: "transcript", order: 0, hours: 2 },
+        { id: "2", title: "Build reusable email template Bedford", project: "Bedford", priority: "high", status: "todo", due: "18 Jun", source: "manual", order: 1, hours: 4 },
+        { id: "3", title: 'Finalize "The Current" newsletter revision', project: "Bedford", priority: "medium", status: "todo", source: "transcript", order: 0, hours: 1.5 },
+        { id: "4", title: "Update brand deck transition slides", project: "Overclock", priority: "medium", status: "todo", source: "transcript", order: 1, hours: 3 },
+        { id: "5", title: "Research competitor moodboards for Q3", project: "Internal", priority: "low", status: "todo", source: "manual", order: 0, hours: 2 },
+        { id: "6", title: "Send revised deck to Ahmed", project: "Overclock", priority: "high", status: "done", source: "transcript", order: 2, hours: 1 },
       ],
       addTask: (task) => set((s) => ({
         tasks: [...s.tasks, { ...task, id: crypto.randomUUID(), order: s.tasks.filter(t => t.priority === task.priority).length }]
       })),
       toggleDone: (id) => set((s) => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, status: t.status === "done" ? "todo" : "done" } : t) })),
       deleteTask: (id) => set((s) => ({ tasks: s.tasks.filter(t => t.id !== id) })),
+      updateTask: (id, patch) => set((s) => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...patch } : t) })),
       reorderTasks: (priority, activeId, overId) => set((s) => {
         const group = s.tasks.filter(t => t.priority === priority && t.status === "todo")
         const others = s.tasks.filter(t => !(t.priority === priority && t.status === "todo"))
@@ -56,9 +60,75 @@ export const useTaskStore = create<TaskStore>()(
   )
 )
 
-// --- Moodboard store ---
-export type MoodCategory = "graphic_design" | "product_design" | "3d" | "motion"
+// ─── Project store ────────────────────────────────────────────────
+export type ProjectStatus = "active" | "completed" | "paused"
 
+export interface Project {
+  id: string
+  name: string
+  client: string
+  color: string
+  status: ProjectStatus
+  createdAt: number
+}
+
+interface ProjectStore {
+  projects: Project[]
+  addProject: (p: Omit<Project, "id" | "createdAt">) => void
+  updateProject: (id: string, patch: Partial<Project>) => void
+  deleteProject: (id: string) => void
+}
+
+export const useProjectStore = create<ProjectStore>()(
+  persist(
+    (set) => ({
+      projects: [
+        { id: "p1", name: "Overclock", client: "Exo Digital", color: "#2A9D8F", status: "active", createdAt: Date.now() - 14 * 86400000 },
+        { id: "p2", name: "Bedford", client: "Bedford Co.", color: "#6D8DF0", status: "active", createdAt: Date.now() - 7 * 86400000 },
+        { id: "p3", name: "Internal", client: "Kamarupa", color: "#E8A55A", status: "active", createdAt: Date.now() - 3 * 86400000 },
+      ],
+      addProject: (p) => set((s) => ({ projects: [{ ...p, id: crypto.randomUUID(), createdAt: Date.now() }, ...s.projects] })),
+      updateProject: (id, patch) => set((s) => ({ projects: s.projects.map(p => p.id === id ? { ...p, ...patch } : p) })),
+      deleteProject: (id) => set((s) => ({ projects: s.projects.filter(p => p.id !== id) })),
+    }),
+    { name: "projects-storage" }
+  )
+)
+
+// ─── Invoice History store ────────────────────────────────────────
+export interface SavedDoc {
+  id: string
+  type: "invoice" | "quotation"
+  clientName: string
+  dateIssued: string
+  total: number
+  savedAt: number
+  snapshot: unknown
+}
+
+interface InvoiceHistoryStore {
+  history: SavedDoc[]
+  saveDoc: (doc: Omit<SavedDoc, "id" | "savedAt">) => string
+  deleteDoc: (id: string) => void
+}
+
+export const useInvoiceHistoryStore = create<InvoiceHistoryStore>()(
+  persist(
+    (set) => ({
+      history: [],
+      saveDoc: (doc) => {
+        const id = crypto.randomUUID()
+        set((s) => ({ history: [{ ...doc, id, savedAt: Date.now() }, ...s.history] }))
+        return id
+      },
+      deleteDoc: (id) => set((s) => ({ history: s.history.filter(d => d.id !== id) })),
+    }),
+    { name: "invoice-history-storage" }
+  )
+)
+
+// ─── Moodboard store ──────────────────────────────────────────────
+export type MoodCategory = "graphic_design" | "product_design" | "3d" | "motion"
 export type MediaType = "image" | "video"
 
 export interface MoodItem {
@@ -98,5 +168,78 @@ export const useMoodStore = create<MoodStore>()(
       deleteItem: (id) => set((s) => ({ items: s.items.filter(i => i.id !== id) })),
     }),
     { name: "moodboard-storage" }
+  )
+)
+
+// ─── Finance store ────────────────────────────────────────────────
+export type TransactionType = "income" | "expense"
+
+export interface FinanceCategory {
+  id: string
+  name: string
+  color: string
+  type: TransactionType
+  icon: string
+}
+
+export interface Transaction {
+  id: string
+  amount: number
+  type: TransactionType
+  categoryId: string
+  description: string
+  date: string   // "2026-06-14"
+  month: string  // "2026-06"
+  note?: string
+}
+
+interface FinanceStore {
+  transactions: Transaction[]
+  categories: FinanceCategory[]
+  addTransaction: (t: Omit<Transaction, "id">) => void
+  deleteTransaction: (id: string) => void
+  addCategory: (c: Omit<FinanceCategory, "id">) => void
+  deleteCategory: (id: string) => void
+}
+
+const DEFAULT_CATEGORIES: FinanceCategory[] = [
+  { id: "c1", name: "Freelance", color: "#2A9D8F", type: "income", icon: "💼" },
+  { id: "c2", name: "Project Bonus", color: "#5DB872", type: "income", icon: "🎯" },
+  { id: "c3", name: "Software & Tools", color: "#6D8DF0", type: "expense", icon: "🛠️" },
+  { id: "c4", name: "Food & Beverage", color: "#E8A55A", type: "expense", icon: "🍜" },
+  { id: "c5", name: "Transport", color: "#C77DD6", type: "expense", icon: "🚗" },
+  { id: "c6", name: "Housing", color: "#F0A07C", type: "expense", icon: "🏠" },
+  { id: "c7", name: "Health", color: "#4DBFC4", type: "expense", icon: "💊" },
+  { id: "c8", name: "Entertainment", color: "#D85A4A", type: "expense", icon: "🎬" },
+]
+
+const now = new Date()
+const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+const lastMonth = `${now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()}-${String(now.getMonth() === 0 ? 12 : now.getMonth()).padStart(2, "0")}`
+
+const SAMPLE_TRANSACTIONS: Transaction[] = [
+  { id: "t1", amount: 4500000, type: "income", categoryId: "c1", description: "Invoice Zora Springs", date: `${thisMonth}-05`, month: thisMonth, note: "UI/UX project" },
+  { id: "t2", amount: 3200000, type: "income", categoryId: "c1", description: "Invoice Nex Healthcare", date: `${thisMonth}-10`, month: thisMonth },
+  { id: "t3", amount: 250000, type: "expense", categoryId: "c3", description: "Figma Pro", date: `${thisMonth}-01`, month: thisMonth },
+  { id: "t4", amount: 180000, type: "expense", categoryId: "c4", description: "Makan siang meeting", date: `${thisMonth}-06`, month: thisMonth },
+  { id: "t5", amount: 450000, type: "expense", categoryId: "c5", description: "Ojek & Grab bulan ini", date: `${thisMonth}-08`, month: thisMonth },
+  { id: "t6", amount: 1500000, type: "expense", categoryId: "c6", description: "Sewa kos", date: `${thisMonth}-01`, month: thisMonth },
+  { id: "t7", amount: 120000, type: "expense", categoryId: "c8", description: "Netflix + Spotify", date: `${thisMonth}-03`, month: thisMonth },
+  { id: "t8", amount: 3800000, type: "income", categoryId: "c1", description: "Invoice Overclock", date: `${lastMonth}-25`, month: lastMonth },
+  { id: "t9", amount: 350000, type: "expense", categoryId: "c3", description: "Adobe CC", date: `${lastMonth}-01`, month: lastMonth },
+  { id: "t10", amount: 1500000, type: "expense", categoryId: "c6", description: "Sewa kos", date: `${lastMonth}-01`, month: lastMonth },
+]
+
+export const useFinanceStore = create<FinanceStore>()(
+  persist(
+    (set) => ({
+      transactions: SAMPLE_TRANSACTIONS,
+      categories: DEFAULT_CATEGORIES,
+      addTransaction: (t) => set((s) => ({ transactions: [{ ...t, id: crypto.randomUUID() }, ...s.transactions] })),
+      deleteTransaction: (id) => set((s) => ({ transactions: s.transactions.filter(t => t.id !== id) })),
+      addCategory: (c) => set((s) => ({ categories: [...s.categories, { ...c, id: crypto.randomUUID() }] })),
+      deleteCategory: (id) => set((s) => ({ categories: s.categories.filter(c => c.id !== id) })),
+    }),
+    { name: "finance-storage" }
   )
 )

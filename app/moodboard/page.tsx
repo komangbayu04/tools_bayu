@@ -64,6 +64,7 @@ export default function MoodboardPage() {
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [showDateMenu, setShowDateMenu] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [lightbox, setLightbox] = useState<typeof items[0] | null>(null);
 
   // Form state
   const [newTitle, setNewTitle] = useState("");
@@ -204,8 +205,9 @@ export default function MoodboardPage() {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.2, delay: idx * 0.02 }}
-                  className="break-inside-avoid mb-2.5 group relative overflow-hidden rounded-[12px]"
+                  className="break-inside-avoid mb-2.5 group relative overflow-hidden rounded-[12px] cursor-zoom-in"
                   style={{ border: "1px solid var(--color-hairline)" }}
+                  onClick={() => setLightbox(item)}
                 >
                   {/* Media — natural aspect ratio */}
                   {item.image_url && item.media_type === "video" ? (
@@ -253,7 +255,7 @@ export default function MoodboardPage() {
                     </div>
 
                     {/* Action buttons */}
-                    <div className="absolute top-2.5 right-2.5 flex gap-1.5">
+                    <div className="absolute top-2.5 right-2.5 flex gap-1.5" onClick={e => e.stopPropagation()}>
                       {item.url && (
                         <a href={item.url} target="_blank" rel="noopener noreferrer" className="w-7 h-7 bg-white/95 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-white shadow-sm transition-colors">
                           <ExternalLink size={12} className="text-[#3D5159]" />
@@ -270,6 +272,31 @@ export default function MoodboardPage() {
           </div>
         </>
       )}
+
+      {/* Lightbox */}
+      <Dialog open={!!lightbox} onOpenChange={(o) => { if (!o) setLightbox(null); }}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>{lightbox?.title}</DialogTitle>
+            <DialogDescription>{lightbox?.source_domain}</DialogDescription>
+          </DialogHeader>
+          {lightbox && (
+            <div className="relative bg-black">
+              {lightbox.image_url && lightbox.media_type === "video" ? (
+                <video src={lightbox.image_url} controls autoPlay className="w-full max-h-[80vh] object-contain" />
+              ) : lightbox.image_url ? (
+                <img src={lightbox.image_url} alt={lightbox.title} className="w-full max-h-[80vh] object-contain" />
+              ) : (
+                <div className="w-full h-64" style={{ background: resolveCover(lightbox.color, lightbox.id) }} />
+              )}
+              <div className="absolute bottom-0 inset-x-0 px-5 py-4" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.75), transparent)" }}>
+                <p className="text-white font-semibold text-[15px]">{lightbox.title}</p>
+                <p className="text-white/60 text-[12px] mt-0.5">{lightbox.source_domain || new Date(lightbox.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Add Reference Dialog */}
       <Dialog open={showModal} onOpenChange={(o) => { setShowModal(o); if (!o) resetForm(); }}>

@@ -3,7 +3,7 @@
 import { ShellLayout } from "@/components/shell/Layout";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { useState } from "react";
-import { Plus, Upload, Search, X, Loader2, GripVertical, Check } from "lucide-react";
+import { Plus, Upload, Search, X, Loader2, GripVertical, Check, Clock } from "lucide-react";
 import { useTaskStore, type Priority, type Task } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { AnimatePresence, motion } from "framer-motion";
 
-type FilterTab = "all" | Priority | "done";
+type FilterTab = "all" | Priority | "done" | "project";
 
 const priorityMeta: Record<Priority, { label: string; dot: string; badge: "high" | "medium" | "low" }> = {
   high: { label: "High priority", dot: "#C64545", badge: "high" },
@@ -75,6 +75,14 @@ function SortableTask({ task, onToggle }: { task: Task; onToggle: (id: string) =
               <span className="text-[11px] flex-shrink-0" style={{ color: "var(--color-muted-soft)" }}>Due {task.due}</span>
             </>
           )}
+          {task.hours && task.hours > 0 && (
+            <>
+              <span style={{ color: "var(--color-hairline)" }}>·</span>
+              <span className="text-[11px] flex-shrink-0 flex items-center gap-0.5" style={{ color: "var(--color-muted-soft)" }}>
+                <Clock size={10} /> {task.hours}h
+              </span>
+            </>
+          )}
           {task.source === "transcript" && (
             <>
               <span style={{ color: "var(--color-hairline)" }}>·</span>
@@ -99,6 +107,7 @@ export default function TodoPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newProject, setNewProject] = useState("");
   const [newPriority, setNewPriority] = useState<Priority>("medium");
+  const [newHours, setNewHours] = useState(0);
   const [showImport, setShowImport] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [clientTag, setClientTag] = useState("Overclock");
@@ -109,8 +118,8 @@ export default function TodoPage() {
 
   const handleAddTask = () => {
     if (!newTitle.trim()) return;
-    addTask({ title: newTitle.trim(), project: newProject.trim() || "General", priority: newPriority, status: "todo", source: "manual" });
-    setNewTitle(""); setNewProject(""); setNewPriority("medium"); setShowAddForm(false);
+    addTask({ title: newTitle.trim(), project: newProject.trim() || "General", priority: newPriority, status: "todo", source: "manual", hours: newHours || undefined });
+    setNewTitle(""); setNewProject(""); setNewPriority("medium"); setNewHours(0); setShowAddForm(false);
   };
 
   const matchesSearch = (t: Task) => !search || t.title.toLowerCase().includes(search.toLowerCase()) || t.project.toLowerCase().includes(search.toLowerCase());
@@ -174,8 +183,8 @@ export default function TodoPage() {
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterTab)}>
           <TabsList>
-            {(["all", "high", "medium", "low", "done"] as FilterTab[]).map((key) => (
-              <TabsTrigger key={key} value={key} className="capitalize">{key}</TabsTrigger>
+            {(["all", "high", "medium", "low", "done", "project"] as FilterTab[]).map((key) => (
+              <TabsTrigger key={key} value={key} className="capitalize">{key === "project" ? "By Project" : key}</TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
@@ -214,6 +223,10 @@ export default function TodoPage() {
                   <option value="medium">Medium</option>
                   <option value="low">Low</option>
                 </Select>
+              </div>
+              <div className="sm:w-28">
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--color-muted)" }}>Hours</label>
+                <Input type="number" value={newHours} onChange={(e) => setNewHours(Number(e.target.value))} placeholder="0" className="bg-[var(--color-surface)]" />
               </div>
               <Button onClick={handleAddTask}>Save</Button>
               <Button variant="ghost" size="icon" onClick={() => setShowAddForm(false)}><X size={16} /></Button>
@@ -279,7 +292,11 @@ export default function TodoPage() {
           )
         )}
 
-        {filter !== "done" && groupedByPriority.length === 0 && <EmptyState text="No tasks here — add one to get started" />}
+        {filter !== "done" && filter !== "project" && groupedByPriority.length === 0 && <EmptyState text="No tasks here — add one to get started" />}
+
+        {filter === "project" && (
+          <ProjectView tasks={tasks} />
+        )}
       </div>
 
       {/* Import Transcript Dialog */}
@@ -344,6 +361,45 @@ export default function TodoPage() {
         </DialogContent>
       </Dialog>
     </ShellLayout>
+  );
+}
+
+function ProjectView({ tasks }: { tasks: Task[] }) {
+  const projectNames = [...new Set(tasks.map(t => t.project))].sort();
+  return (
+    <div className="flex flex-col gap-7">
+      {projectNames.map(projectName => {
+        const projectTasks = tasks.filter(t => t.project === projectName);
+        const done = projectTasks.filter(t => t.status === "done").length;
+        const total = projectTasks.length;
+        const hours = projectTasks.reduce((s, t) => s + (t.hours || 0), 0);
+        return (
+          <div key={projectName}>
+            <div className="flex items-center gap-3 mb-2.5 px-1">
+              <span className="text-[11px] font-bold tracking-wider uppercase" style={{ color: "var(--color-muted)" }}>{projectName}</span>
+              <span className="text-[11px] font-semibold rounded-full px-2 py-0.5" style={{ background: "var(--color-canvas)", color: "var(--color-muted)" }}>{total} tasks</span>
+              {hours > 0 && <span className="text-[11px] font-semibold" style={{ color: "var(--color-muted-soft)" }}>{hours}h total</span>}
+              <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--color-canvas)", maxWidth: 120 }}>
+                <div className="h-full rounded-full bg-[#2A9D8F] transition-all" style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }} />
+              </div>
+              <span className="text-[11px]" style={{ color: "var(--color-muted-soft)" }}>{done}/{total} done</span>
+            </div>
+            <Card className="overflow-hidden divide-y" style={{ borderColor: "var(--color-hairline)" }}>
+              {projectTasks.map((task, i) => (
+                <div key={task.id} className="flex items-center gap-3 px-4 py-3" style={{ borderColor: "var(--color-hairline)" }}>
+                  <div className={`w-[18px] h-[18px] rounded-md flex-shrink-0 flex items-center justify-center ${task.status === "done" ? "bg-[#2A9D8F] border-2 border-[#2A9D8F]" : "border-2"}`} style={task.status !== "done" ? { borderColor: "var(--color-hairline)" } : {}}>
+                    {task.status === "done" && <Check size={11} className="text-white" strokeWidth={3} />}
+                  </div>
+                  <p className={`flex-1 text-[13px] font-medium truncate ${task.status === "done" ? "line-through" : ""}`} style={{ color: task.status === "done" ? "var(--color-muted-soft)" : "var(--color-ink)" }}>{task.title}</p>
+                  {task.hours && task.hours > 0 && <span className="text-[11px] flex-shrink-0" style={{ color: "var(--color-muted-soft)" }}>{task.hours}h</span>}
+                  <Badge variant={task.priority === "high" ? "high" : task.priority === "medium" ? "medium" : "low"} className="capitalize flex-shrink-0">{task.priority}</Badge>
+                </div>
+              ))}
+            </Card>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

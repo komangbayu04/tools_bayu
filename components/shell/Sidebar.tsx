@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
-import { LayoutDashboard, FileText, CheckSquare, Image, Settings, Moon, Sun } from "lucide-react";
+import { LayoutDashboard, FileText, CheckSquare, Image, Wallet, Settings, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Template Invoice", href: "/invoice", icon: FileText },
   { label: "To do list", href: "/todo", icon: CheckSquare },
+  { label: "Finance", href: "/finance", icon: Wallet },
   { label: "Moodboard", href: "/moodboard", icon: Image },
 ];
 

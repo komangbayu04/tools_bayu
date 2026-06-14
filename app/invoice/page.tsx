@@ -3,64 +3,92 @@
 import { ShellLayout } from "@/components/shell/Layout";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { useState } from "react";
-import { Plus, Trash2, Download, Save } from "lucide-react";
+import { Plus, Trash2, Download, Save, History, X, Clock, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useInvoiceHistoryStore } from "@/lib/store";
 import { format } from "date-fns";
 
 type DocumentType = "invoice" | "quotation";
 
+// ─── Invoice types ─────────────────────────────────────────────────
 interface LineItem {
   id: string;
-  date: string;        // ISO date
-  title: string;       // optional heading
-  tasks: string;       // newline-separated bullets
+  date: string;
+  title: string;
+  tasks: string;
   project: string;
   hours: number;
 }
 
-const newItem = (): LineItem => ({
-  id: crypto.randomUUID(), date: "", title: "", tasks: "", project: "", hours: 0,
-});
+// ─── Quotation types ──────────────────────────────────────────────
+interface QuoteItem {
+  id: string;
+  service: string;
+  description: string;
+  packageItems: string;
+  includes: string;
+  price: number;
+  qty: number;
+}
+
+const newLineItem = (): LineItem => ({ id: crypto.randomUUID(), date: "", title: "", tasks: "", project: "", hours: 0 });
+const newQuoteItem = (): QuoteItem => ({ id: crypto.randomUUID(), service: "", description: "", packageItems: "", includes: "", price: 0, qty: 1 });
 
 const SAMPLE_ITEMS: LineItem[] = [
-  { id: "1", date: "2026-04-26", title: "Refine & Created UX flow", tasks: "Bathing (dekstop & mobile)\nDining & Packages (dekstop & mobile)\nGift cards (Dekstop)", project: "Zora Springs", hours: 6 },
-  { id: "2", date: "2026-04-27", title: "", tasks: "Create mobile version for gift cards & check out\nNavbar refinement\nHero page option + first section (to get right visual direction)", project: "Zora Springs", hours: 6 },
+  { id: "1", date: "2026-04-26", title: "Refine & Created UX flow", tasks: "Bathing (desktop & mobile)\nDining & Packages (desktop & mobile)\nGift cards (Desktop)", project: "Zora Springs", hours: 6 },
+  { id: "2", date: "2026-04-27", title: "", tasks: "Create mobile version for gift cards & check out\nNavbar refinement\nHero page option + first section", project: "Zora Springs", hours: 6 },
   { id: "3", date: "2026-04-30", title: "", tasks: "Refine ux booking flow\nSitemap design", project: "Zora Springs", hours: 2 },
   { id: "4", date: "2026-05-02", title: "", tasks: "Local pass flow & guest pass flow", project: "Zora Springs", hours: 5 },
   { id: "5", date: "2026-05-09", title: "", tasks: "Content structure, UX Copy + Wireframe", project: "Zora Springs", hours: 6 },
-  { id: "6", date: "2026-05-11", title: "", tasks: "Complate Content structure, UX Copy + Wireframe", project: "Zora Springs", hours: 1 },
-  { id: "7", date: "2026-05-23", title: "", tasks: "Competitive WA UI Reference Board & WhatsApp Interaction Layout Spec", project: "Nex Healthcare", hours: 3 },
-  { id: "8", date: "2026-05-26", title: "", tasks: "Zora Spring mockup lifeguard & tradie, & refinement foto", project: "Nex Healthcare", hours: 4 },
-  { id: "9", date: "2026-05-28", title: "", tasks: "Nex Healthcare & Nex Life review & feedback", project: "Nex Healthcare", hours: 3 },
-  { id: "10", date: "2026-06-09", title: "", tasks: "Nex Healthcare GTM create V1 clinic receptionist & super admin", project: "Nex Healthcare", hours: 3 },
-  { id: "11", date: "2026-06-13", title: "", tasks: "Nex Healthcare GTM, Mapping design & refinement (figjam) according new IA\nCreate for owner view", project: "Nex Healthcare", hours: 5 },
+  { id: "6", date: "2026-06-09", title: "", tasks: "Nex Healthcare GTM create V1 clinic receptionist & super admin", project: "Nex Healthcare", hours: 3 },
+  { id: "7", date: "2026-06-13", title: "", tasks: "Nex Healthcare GTM, Mapping design & refinement\nCreate for owner view", project: "Nex Healthcare", hours: 5 },
 ];
 
-const fmtIDR = (n: number) => "IDR" + new Intl.NumberFormat("en-US").format(n);
-const bullets = (tasks: string) => tasks.split("\n").map((t) => t.trim()).filter(Boolean);
+const SAMPLE_QUOTE_ITEMS: QuoteItem[] = [
+  {
+    id: "q1",
+    service: "Website",
+    description: "Velo Website – Design & Webflow Dev",
+    packageItems: "Homepage Refinement\nResponsive Homepage\nSolution Page Template\nResponsive Solution Template\nServices Template\nResponsive Service Template\nAbout Page + Responsive\nContact + Responsive\nArticle + Responsive\nGallery + Responsive\nPopup Card",
+    includes: "Interaction & animation setup\nCross-device responsive QA\nRevision included (no additional charge)",
+    price: 4000000,
+    qty: 1,
+  },
+];
 
+const fmtIDR = (n: number) => "IDR " + new Intl.NumberFormat("en-US").format(n);
+const bullets = (text: string) => text.split("\n").map(t => t.trim()).filter(Boolean);
 const FIELD_LABEL = "block text-[11px] font-semibold uppercase tracking-wider mb-1.5";
 const labelStyle = { color: "var(--color-muted)" };
 const divider = { borderTop: "1px solid var(--color-hairline)" };
 
 export default function InvoicePage() {
+  const { history, saveDoc, deleteDoc } = useInvoiceHistoryStore();
   const [docType, setDocType] = useState<DocumentType>("invoice");
+  const [showHistory, setShowHistory] = useState(false);
 
-  // Sender
+  // Shared fields
   const [fromName, setFromName] = useState("Bayu Krisnayana");
   const [fromAddress, setFromAddress] = useState("Jln. Dewi Sartika No.19, Semarapura Kaja, Klungkung\nBali, Indonesia, 80711");
-
-  // Meta
   const [clientName, setClientName] = useState("Exo Digital");
   const [dateIssued, setDateIssued] = useState("2026-06-15");
+
+  // Invoice-only
   const [paymentStatus, setPaymentStatus] = useState("Waiting for payment");
   const [rate, setRate] = useState(100000);
   const [totalTasks, setTotalTasks] = useState(28);
-
   const [items, setItems] = useState<LineItem[]>(SAMPLE_ITEMS);
+
+  // Quotation-only
+  const [companyName, setCompanyName] = useState("Nex Digital");
+  const [projectName, setProjectName] = useState("Website Design & Development");
+  const [docNo, setDocNo] = useState("BK/Q/2026/0001");
+  const [quoteItems, setQuoteItems] = useState<QuoteItem[]>(SAMPLE_QUOTE_ITEMS);
 
   // Payment info
   const [bankName, setBankName] = useState("BCA (Bank Central Asia)");
@@ -72,61 +100,80 @@ export default function InvoicePage() {
   const [swift, setSwift] = useState("CENAIDJA");
   const [bankCode, setBankCode] = useState("014");
   const [branchCode, setBranchCode] = useState("0395");
-
-  // Questions / contact
   const [contactName, setContactName] = useState("Bayu Krisnayana");
   const [contactEmail, setContactEmail] = useState("bayuajoes321@gmail.com");
   const [contactPhone, setContactPhone] = useState("+6285 792 352 806");
 
-  const addItem = () => setItems((p) => [...p, newItem()]);
-  const removeItem = (id: string) => setItems((p) => p.filter((i) => i.id !== id));
+  // Line item actions – invoice
+  const addItem = () => setItems(p => [...p, newLineItem()]);
+  const removeItem = (id: string) => setItems(p => p.filter(i => i.id !== id));
   const updateItem = (id: string, field: keyof LineItem, value: string | number) =>
-    setItems((p) => p.map((i) => (i.id === id ? { ...i, [field]: value } : i)));
+    setItems(p => p.map(i => i.id === id ? { ...i, [field]: value } : i));
 
-  const subtotalOf = (item: LineItem) => item.hours * rate;
-  const total = items.reduce((s, i) => s + subtotalOf(i), 0);
+  // Line item actions – quote
+  const addQuoteItem = () => setQuoteItems(p => [...p, newQuoteItem()]);
+  const removeQuoteItem = (id: string) => setQuoteItems(p => p.filter(i => i.id !== id));
+  const updateQuoteItem = (id: string, field: keyof QuoteItem, value: string | number) =>
+    setQuoteItems(p => p.map(i => i.id === id ? { ...i, [field]: value } : i));
+
+  const invoiceSubtotal = (item: LineItem) => item.hours * rate;
+  const invoiceTotal = items.reduce((s, i) => s + invoiceSubtotal(i), 0);
+  const quoteTotal = quoteItems.reduce((s, i) => s + i.price * i.qty, 0);
+  const total = docType === "invoice" ? invoiceTotal : quoteTotal;
 
   const paymentRows: [string, string][] = [
-    ["Bank Name", bankName],
-    ["Bank Address", bankAddress],
-    ["Bank Country of Origin", bankCountry],
-    ["Account Holder Name", accHolder],
-    ["Account Holder Address", accAddress],
-    ["Bank Account No", accNo],
-    ["Bank Swift Code", swift],
-    ["Bank Code", bankCode],
-    ["Branch Code", branchCode],
+    ["Bank Name", bankName], ["Bank Address", bankAddress],
+    ["Bank Country of Origin", bankCountry], ["Account Holder Name", accHolder],
+    ["Account Holder Address", accAddress], ["Bank Account No", accNo],
+    ["Bank Swift Code", swift], ["Bank Code", bankCode], ["Branch Code", branchCode],
   ];
+
+  const handleSave = () => {
+    saveDoc({
+      type: docType,
+      clientName: docType === "quotation" ? companyName : clientName,
+      dateIssued,
+      total,
+      snapshot: {
+        docType, fromName, fromAddress, clientName, dateIssued, paymentStatus, rate, totalTasks,
+        items, companyName, projectName, docNo, quoteItems,
+        bankName, bankAddress, bankCountry, accHolder, accAddress, accNo, swift, bankCode, branchCode,
+        contactName, contactEmail, contactPhone,
+      },
+    });
+  };
 
   return (
     <ShellLayout>
       <PageHeader
         title="Template Invoice"
-        subtitle="Time-tracked invoice with live preview"
+        subtitle="Invoice & Quotation builder"
         actions={
           <>
-            <Button variant="outline"><Save size={15} /> Save</Button>
+            <Button variant="outline" onClick={() => setShowHistory(true)}>
+              <History size={15} /> History
+            </Button>
+            <Button variant="outline" onClick={handleSave}><Save size={15} /> Save</Button>
             <Button><Download size={15} /> Export PDF</Button>
           </>
         }
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] gap-5 items-start">
-        {/* ---------- LEFT: FORM ---------- */}
+        {/* ── LEFT: FORM ── */}
         <div className="rounded-[14px] border p-6 flex flex-col gap-5" style={{ background: "var(--color-surface-card)", borderColor: "var(--color-hairline)" }}>
+
           {/* Document type */}
           <div>
             <label className={FIELD_LABEL} style={labelStyle}>Document Type</label>
             <div className="grid grid-cols-2 gap-2.5">
-              {(["invoice", "quotation"] as DocumentType[]).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setDocType(t)}
-                  className="py-2.5 rounded-[8px] text-sm font-semibold capitalize transition-all border"
+              {(["invoice", "quotation"] as DocumentType[]).map(t => (
+                <button key={t} onClick={() => setDocType(t)} className="py-2.5 rounded-[8px] text-sm font-semibold capitalize transition-all border"
                   style={docType === t
                     ? { background: "var(--color-primary-light)", borderColor: "#2A9D8F", color: "#1C4F4F" }
-                    : { background: "var(--color-surface)", borderColor: "var(--color-hairline)", color: "var(--color-muted)" }}
-                >{t}</button>
+                    : { background: "var(--color-surface)", borderColor: "var(--color-hairline)", color: "var(--color-muted)" }}>
+                  {t}
+                </button>
               ))}
             </div>
           </div>
@@ -135,70 +182,141 @@ export default function InvoicePage() {
           <div className="pt-5" style={divider}>
             <label className={FIELD_LABEL} style={labelStyle}>From</label>
             <div className="flex flex-col gap-2">
-              <Input value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="Your name" className="bg-[var(--color-surface)]" />
-              <Textarea value={fromAddress} onChange={(e) => setFromAddress(e.target.value)} rows={2} placeholder="Address" className="bg-[var(--color-surface)]" />
+              <Input value={fromName} onChange={e => setFromName(e.target.value)} placeholder="Your name" className="bg-[var(--color-surface)]" />
+              <Textarea value={fromAddress} onChange={e => setFromAddress(e.target.value)} rows={2} placeholder="Address" className="bg-[var(--color-surface)]" />
             </div>
           </div>
 
           {/* Meta */}
           <div className="pt-5" style={divider}>
             <div className="flex flex-col gap-3">
-              <div>
-                <label className={FIELD_LABEL} style={labelStyle}>Bill To (Client)</label>
-                <Input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Client name" className="bg-[var(--color-surface)]" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={FIELD_LABEL} style={labelStyle}>Date Issued</label>
-                  <Input type="date" value={dateIssued} onChange={(e) => setDateIssued(e.target.value)} className="bg-[var(--color-surface)]" />
-                </div>
-                <div>
-                  <label className={FIELD_LABEL} style={labelStyle}>Payment Status</label>
-                  <Select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)} className="bg-[var(--color-surface)]">
-                    <option>Waiting for payment</option>
-                    <option>Paid</option>
-                    <option>Overdue</option>
-                    <option>Partially paid</option>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={FIELD_LABEL} style={labelStyle}>Rate / Hour (IDR)</label>
-                  <Input type="number" value={rate} onChange={(e) => setRate(Number(e.target.value))} className="bg-[var(--color-surface)]" />
-                </div>
-                <div>
-                  <label className={FIELD_LABEL} style={labelStyle}>Total Tasks</label>
-                  <Input type="number" value={totalTasks} onChange={(e) => setTotalTasks(Number(e.target.value))} className="bg-[var(--color-surface)]" />
-                </div>
-              </div>
+              {docType === "quotation" ? (
+                <>
+                  <div>
+                    <label className={FIELD_LABEL} style={labelStyle}>To (Recipient)</label>
+                    <Input value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Recipient name" className="bg-[var(--color-surface)]" />
+                  </div>
+                  <div>
+                    <label className={FIELD_LABEL} style={labelStyle}>Company</label>
+                    <Input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="Company name" className="bg-[var(--color-surface)]" />
+                  </div>
+                  <div>
+                    <label className={FIELD_LABEL} style={labelStyle}>Project</label>
+                    <Input value={projectName} onChange={e => setProjectName(e.target.value)} placeholder="Project name" className="bg-[var(--color-surface)]" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={FIELD_LABEL} style={labelStyle}>Document No.</label>
+                      <Input value={docNo} onChange={e => setDocNo(e.target.value)} placeholder="BK/Q/2026/0001" className="bg-[var(--color-surface)]" />
+                    </div>
+                    <div>
+                      <label className={FIELD_LABEL} style={labelStyle}>Date</label>
+                      <Input type="date" value={dateIssued} onChange={e => setDateIssued(e.target.value)} className="bg-[var(--color-surface)]" />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className={FIELD_LABEL} style={labelStyle}>Bill To (Client)</label>
+                    <Input value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Client name" className="bg-[var(--color-surface)]" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={FIELD_LABEL} style={labelStyle}>Date Issued</label>
+                      <Input type="date" value={dateIssued} onChange={e => setDateIssued(e.target.value)} className="bg-[var(--color-surface)]" />
+                    </div>
+                    <div>
+                      <label className={FIELD_LABEL} style={labelStyle}>Payment Status</label>
+                      <Select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)} className="bg-[var(--color-surface)]">
+                        <option>Waiting for payment</option>
+                        <option>Paid</option>
+                        <option>Overdue</option>
+                        <option>Partially paid</option>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={FIELD_LABEL} style={labelStyle}>Rate / Hour (IDR)</label>
+                      <Input type="number" value={rate} onChange={e => setRate(Number(e.target.value))} className="bg-[var(--color-surface)]" />
+                    </div>
+                    <div>
+                      <label className={FIELD_LABEL} style={labelStyle}>Total Tasks</label>
+                      <Input type="number" value={totalTasks} onChange={e => setTotalTasks(Number(e.target.value))} className="bg-[var(--color-surface)]" />
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
           {/* Line items */}
           <div className="pt-5" style={divider}>
-            <label className={FIELD_LABEL} style={labelStyle}>Line Items</label>
+            <label className={FIELD_LABEL} style={labelStyle}>
+              {docType === "quotation" ? "Services / Items" : "Line Items"}
+            </label>
             <div className="flex flex-col gap-3">
-              {items.map((item, idx) => (
-                <div key={item.id} className="rounded-[10px] border p-3 flex flex-col gap-2" style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface)" }}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold" style={{ color: "var(--color-muted)" }}>Item {idx + 1}</span>
-                    {items.length > 1 && (
-                      <button onClick={() => removeItem(item.id)} className="p-1 rounded hover:bg-red-50 transition-colors" style={{ color: "#C64545" }}><Trash2 size={13} /></button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input type="date" value={item.date} onChange={(e) => updateItem(item.id, "date", e.target.value)} className="bg-[var(--color-surface-card)]" />
-                    <Input type="number" value={item.hours || ""} onChange={(e) => updateItem(item.id, "hours", Number(e.target.value))} placeholder="Hours" className="bg-[var(--color-surface-card)]" />
-                  </div>
-                  <Input value={item.project} onChange={(e) => updateItem(item.id, "project", e.target.value)} placeholder="Project name" className="bg-[var(--color-surface-card)]" />
-                  <Input value={item.title} onChange={(e) => updateItem(item.id, "title", e.target.value)} placeholder="Heading (optional)" className="bg-[var(--color-surface-card)]" />
-                  <Textarea value={item.tasks} onChange={(e) => updateItem(item.id, "tasks", e.target.value)} rows={3} placeholder="One task per line (each becomes a bullet)" className="bg-[var(--color-surface-card)]" />
-                </div>
-              ))}
-              <button onClick={addItem} className="flex items-center gap-2 text-sm font-semibold mt-1 hover:opacity-70 transition-opacity w-fit" style={{ color: "#2A9D8F" }}>
-                <Plus size={14} /> Add Item
-              </button>
+              {docType === "invoice" ? (
+                <>
+                  {items.map((item, idx) => (
+                    <div key={item.id} className="rounded-[10px] border p-3 flex flex-col gap-2" style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface)" }}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-semibold" style={{ color: "var(--color-muted)" }}>Item {idx + 1}</span>
+                        {items.length > 1 && (
+                          <button onClick={() => removeItem(item.id)} className="p-1 rounded hover:bg-red-50" style={{ color: "#C64545" }}><Trash2 size={13} /></button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input type="date" value={item.date} onChange={e => updateItem(item.id, "date", e.target.value)} className="bg-[var(--color-surface-card)]" />
+                        <Input type="number" value={item.hours || ""} onChange={e => updateItem(item.id, "hours", Number(e.target.value))} placeholder="Hours" className="bg-[var(--color-surface-card)]" />
+                      </div>
+                      <Input value={item.project} onChange={e => updateItem(item.id, "project", e.target.value)} placeholder="Project name" className="bg-[var(--color-surface-card)]" />
+                      <Input value={item.title} onChange={e => updateItem(item.id, "title", e.target.value)} placeholder="Heading (optional)" className="bg-[var(--color-surface-card)]" />
+                      <Textarea value={item.tasks} onChange={e => updateItem(item.id, "tasks", e.target.value)} rows={3} placeholder="One task per line" className="bg-[var(--color-surface-card)]" />
+                    </div>
+                  ))}
+                  <button onClick={addItem} className="flex items-center gap-2 text-sm font-semibold mt-1 hover:opacity-70 w-fit" style={{ color: "#2A9D8F" }}>
+                    <Plus size={14} /> Add Item
+                  </button>
+                </>
+              ) : (
+                <>
+                  {quoteItems.map((item, idx) => (
+                    <div key={item.id} className="rounded-[10px] border p-3 flex flex-col gap-2" style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface)" }}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-semibold" style={{ color: "var(--color-muted)" }}>Item {idx + 1}</span>
+                        {quoteItems.length > 1 && (
+                          <button onClick={() => removeQuoteItem(item.id)} className="p-1 rounded hover:bg-red-50" style={{ color: "#C64545" }}><Trash2 size={13} /></button>
+                        )}
+                      </div>
+                      <Input value={item.service} onChange={e => updateQuoteItem(item.id, "service", e.target.value)} placeholder="Service (e.g. Website)" className="bg-[var(--color-surface-card)]" />
+                      <Input value={item.description} onChange={e => updateQuoteItem(item.id, "description", e.target.value)} placeholder="Description / title" className="bg-[var(--color-surface-card)]" />
+                      <div>
+                        <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--color-muted)" }}>Package items (one per line)</label>
+                        <Textarea value={item.packageItems} onChange={e => updateQuoteItem(item.id, "packageItems", e.target.value)} rows={4} placeholder="Homepage Refinement&#10;Responsive Homepage&#10;..." className="bg-[var(--color-surface-card)]" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--color-muted)" }}>Includes (one per line)</label>
+                        <Textarea value={item.includes} onChange={e => updateQuoteItem(item.id, "includes", e.target.value)} rows={2} placeholder="Interaction & animation setup&#10;..." className="bg-[var(--color-surface-card)]" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--color-muted)" }}>Price (IDR)</label>
+                          <Input type="number" value={item.price || ""} onChange={e => updateQuoteItem(item.id, "price", Number(e.target.value))} placeholder="4000000" className="bg-[var(--color-surface-card)]" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--color-muted)" }}>Qty</label>
+                          <Input type="number" value={item.qty || ""} onChange={e => updateQuoteItem(item.id, "qty", Number(e.target.value))} placeholder="1" className="bg-[var(--color-surface-card)]" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <button onClick={addQuoteItem} className="flex items-center gap-2 text-sm font-semibold mt-1 hover:opacity-70 w-fit" style={{ color: "#2A9D8F" }}>
+                    <Plus size={14} /> Add Service
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -206,132 +324,285 @@ export default function InvoicePage() {
           <div className="pt-5" style={divider}>
             <label className={FIELD_LABEL} style={labelStyle}>Payment Information</label>
             <div className="flex flex-col gap-2">
-              <Input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Bank name" className="bg-[var(--color-surface)]" />
-              <Textarea value={bankAddress} onChange={(e) => setBankAddress(e.target.value)} rows={2} placeholder="Bank address" className="bg-[var(--color-surface)]" />
-              <Input value={bankCountry} onChange={(e) => setBankCountry(e.target.value)} placeholder="Country of origin" className="bg-[var(--color-surface)]" />
-              <Input value={accHolder} onChange={(e) => setAccHolder(e.target.value)} placeholder="Account holder name" className="bg-[var(--color-surface)]" />
-              <Input value={accAddress} onChange={(e) => setAccAddress(e.target.value)} placeholder="Account holder address" className="bg-[var(--color-surface)]" />
+              <Input value={bankName} onChange={e => setBankName(e.target.value)} placeholder="Bank name" className="bg-[var(--color-surface)]" />
+              <Textarea value={bankAddress} onChange={e => setBankAddress(e.target.value)} rows={2} className="bg-[var(--color-surface)]" />
+              <Input value={bankCountry} onChange={e => setBankCountry(e.target.value)} className="bg-[var(--color-surface)]" />
+              <Input value={accHolder} onChange={e => setAccHolder(e.target.value)} className="bg-[var(--color-surface)]" />
+              <Input value={accAddress} onChange={e => setAccAddress(e.target.value)} className="bg-[var(--color-surface)]" />
               <div className="grid grid-cols-2 gap-2">
-                <Input value={accNo} onChange={(e) => setAccNo(e.target.value)} placeholder="Account no" className="bg-[var(--color-surface)]" />
-                <Input value={swift} onChange={(e) => setSwift(e.target.value)} placeholder="Swift code" className="bg-[var(--color-surface)]" />
-                <Input value={bankCode} onChange={(e) => setBankCode(e.target.value)} placeholder="Bank code" className="bg-[var(--color-surface)]" />
-                <Input value={branchCode} onChange={(e) => setBranchCode(e.target.value)} placeholder="Branch code" className="bg-[var(--color-surface)]" />
+                <Input value={accNo} onChange={e => setAccNo(e.target.value)} className="bg-[var(--color-surface)]" />
+                <Input value={swift} onChange={e => setSwift(e.target.value)} className="bg-[var(--color-surface)]" />
+                <Input value={bankCode} onChange={e => setBankCode(e.target.value)} className="bg-[var(--color-surface)]" />
+                <Input value={branchCode} onChange={e => setBranchCode(e.target.value)} className="bg-[var(--color-surface)]" />
               </div>
             </div>
           </div>
 
-          {/* Questions */}
+          {/* Contact */}
           <div className="pt-5" style={divider}>
             <label className={FIELD_LABEL} style={labelStyle}>Questions / Contact</label>
             <div className="flex flex-col gap-2">
-              <Input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Name" className="bg-[var(--color-surface)]" />
-              <Input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="Email" className="bg-[var(--color-surface)]" />
-              <Input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="Phone" className="bg-[var(--color-surface)]" />
+              <Input value={contactName} onChange={e => setContactName(e.target.value)} className="bg-[var(--color-surface)]" />
+              <Input value={contactEmail} onChange={e => setContactEmail(e.target.value)} className="bg-[var(--color-surface)]" />
+              <Input value={contactPhone} onChange={e => setContactPhone(e.target.value)} className="bg-[var(--color-surface)]" />
             </div>
           </div>
         </div>
 
-        {/* ---------- RIGHT: LIVE PREVIEW (paper) ---------- */}
+        {/* ── RIGHT: LIVE PREVIEW ── */}
         <div className="rounded-[14px] border overflow-hidden shadow-sm" style={{ borderColor: "var(--color-hairline)" }}>
-          <div className="bg-white text-[#1A1A1A] px-10 py-12" style={{ fontFeatureSettings: "'tnum'" }}>
-            {/* Header */}
-            <div className="flex items-start justify-between mb-10">
-              <div>
-                <p className="text-[14px] font-semibold mb-1">{fromName || "Your Name"}</p>
-                {fromAddress.split("\n").map((line, i) => (
-                  <p key={i} className="text-[13px] text-[#555]">{line}</p>
-                ))}
-              </div>
-              <p className="text-[34px] font-semibold tracking-tight capitalize">{docType}</p>
-            </div>
-
-            <div className="border-t border-[#E5E5E5] mb-7" />
-
-            {/* Meta row */}
-            <div className="grid grid-cols-3 gap-6 mb-7">
-              <div>
-                <p className="text-[13px] font-semibold mb-1">Bill To:</p>
-                <p className="text-[17px] font-bold">{clientName || "Client"}</p>
-              </div>
-              <div>
-                <p className="text-[13px] font-semibold mb-1">Date Issued:</p>
-                {dateIssued && (
-                  <>
-                    <p className="text-[14px]">{format(new Date(dateIssued), "EEEE,")}</p>
-                    <p className="text-[14px]">{format(new Date(dateIssued), "d MMMM yyyy")}</p>
-                  </>
-                )}
-              </div>
-              <div>
-                <p className="text-[13px] font-semibold mb-1">Payment Status:</p>
-                <p className="text-[14px]">{paymentStatus}</p>
-              </div>
-            </div>
-
-            <div className="border-t border-[#E5E5E5] mb-5" />
-
-            {/* Table header */}
-            <div className="flex items-start gap-4 pb-4">
-              <p className="flex-1 text-[14px] font-semibold">Total task: {totalTasks}</p>
-              <p className="w-[120px] text-[14px] font-semibold">Project Name</p>
-              <p className="w-[90px] text-[14px] font-semibold">Total Hours</p>
-              <p className="w-[120px] text-[14px] font-semibold text-right">Sub Total (IDR)</p>
-            </div>
-
-            {/* Line items */}
-            <div>
-              {items.map((item) => (
-                <div key={item.id} className="flex items-start gap-4 py-4 border-t border-[#EFEFEF]">
-                  <div className="flex-1 min-w-0">
-                    {item.date && <p className="text-[12px] text-[#888] mb-1.5">{format(new Date(item.date), "d MMMM yyyy")}</p>}
-                    {item.title && <p className="text-[14px] mb-1">{item.title}</p>}
-                    <ul className="flex flex-col gap-0.5">
-                      {bullets(item.tasks).map((b, i) => (
-                        <li key={i} className="text-[14px] flex gap-2">
-                          <span className="text-[#888] flex-shrink-0">•</span>
-                          <span>{b}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <p className="w-[120px] text-[14px]">{item.project}</p>
-                  <p className="w-[90px] text-[14px]">{item.hours} Hours</p>
-                  <p className="w-[120px] text-[14px] text-right">{fmtIDR(subtotalOf(item))}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Total */}
-            <div className="flex items-center justify-between border-t border-[#E5E5E5] pt-5 mt-1">
-              <p className="text-[15px] font-semibold">Total</p>
-              <p className="text-[15px] font-semibold">{fmtIDR(total)}</p>
-            </div>
-
-            <div className="border-t border-[#E5E5E5] mt-5 mb-8" />
-
-            {/* Payments info + Questions */}
-            <div className="flex items-end justify-between gap-8">
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold mb-2.5">Payments Information:</p>
-                <div className="flex flex-col gap-1">
-                  {paymentRows.map(([label, value]) => (
-                    <div key={label} className="flex text-[13px] text-[#888]">
-                      <span className="w-[170px] flex-shrink-0">{label}</span>
-                      <span className="flex-1">: {value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-[13px] font-semibold mb-1.5">Questions</p>
-                <p className="text-[13px] text-[#555]">{contactName}</p>
-                <p className="text-[13px] text-[#555]">{contactEmail}</p>
-                <p className="text-[13px] text-[#555]">{contactPhone}</p>
-              </div>
-            </div>
+          <div className="bg-white text-[#1A1A1A] px-10 py-12">
+            {docType === "invoice" ? (
+              <InvoicePreview
+                fromName={fromName} fromAddress={fromAddress} clientName={clientName}
+                dateIssued={dateIssued} paymentStatus={paymentStatus} totalTasks={totalTasks}
+                items={items} rate={rate} total={invoiceTotal}
+                paymentRows={paymentRows} contactName={contactName} contactEmail={contactEmail} contactPhone={contactPhone}
+              />
+            ) : (
+              <QuotationPreview
+                fromName={fromName} clientName={clientName} companyName={companyName}
+                projectName={projectName} docNo={docNo} dateIssued={dateIssued}
+                quoteItems={quoteItems} total={quoteTotal}
+                paymentRows={paymentRows} contactName={contactName} contactEmail={contactEmail} contactPhone={contactPhone}
+              />
+            )}
           </div>
         </div>
       </div>
+
+      {/* History Drawer */}
+      <Dialog open={showHistory} onOpenChange={setShowHistory}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Document History</DialogTitle>
+            <DialogDescription>{history.length} saved documents</DialogDescription>
+          </DialogHeader>
+          <div className="p-6">
+            {history.length === 0 ? (
+              <div className="text-center py-12">
+                <FileText size={32} className="mx-auto mb-3" style={{ color: "var(--color-muted-soft)" }} />
+                <p className="text-[13px]" style={{ color: "var(--color-muted)" }}>No saved documents yet.</p>
+                <p className="text-[11px] mt-1" style={{ color: "var(--color-muted-soft)" }}>Click "Save" to store your current document.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 max-h-96 overflow-auto">
+                {history.map(doc => (
+                  <div key={doc.id} className="flex items-center gap-3 p-3 rounded-[10px] border" style={{ borderColor: "var(--color-hairline)", background: "var(--color-canvas)" }}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <Badge variant={doc.type === "invoice" ? "teal" : "purple"} className="text-[10px]">{doc.type}</Badge>
+                        <p className="text-[13px] font-semibold truncate" style={{ color: "var(--color-ink)" }}>{doc.clientName}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px]" style={{ color: "var(--color-muted)" }}>
+                          {new Date(doc.savedAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                        </span>
+                        <span style={{ color: "var(--color-hairline)" }}>·</span>
+                        <span className="text-[11px] font-semibold" style={{ color: "#2A9D8F" }}>{fmtIDR(doc.total)}</span>
+                      </div>
+                    </div>
+                    <button onClick={() => deleteDoc(doc.id)} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors flex-shrink-0" style={{ color: "#C64545" }}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </ShellLayout>
+  );
+}
+
+// ─── Invoice preview component ────────────────────────────────────
+function InvoicePreview({ fromName, fromAddress, clientName, dateIssued, paymentStatus, totalTasks, items, rate, total, paymentRows, contactName, contactEmail, contactPhone }: {
+  fromName: string; fromAddress: string; clientName: string; dateIssued: string; paymentStatus: string;
+  totalTasks: number; items: LineItem[]; rate: number; total: number;
+  paymentRows: [string, string][]; contactName: string; contactEmail: string; contactPhone: string;
+}) {
+  const subtotalOf = (item: LineItem) => item.hours * rate;
+  const bullets = (t: string) => t.split("\n").map(s => s.trim()).filter(Boolean);
+
+  return (
+    <>
+      <div className="flex items-start justify-between mb-10">
+        <div>
+          <p className="text-[14px] font-semibold mb-1">{fromName || "Your Name"}</p>
+          {fromAddress.split("\n").map((line, i) => <p key={i} className="text-[13px] text-[#555]">{line}</p>)}
+        </div>
+        <p className="text-[34px] font-semibold tracking-tight text-[#555]">Invoice</p>
+      </div>
+      <div className="border-t border-[#E5E5E5] mb-7" />
+      <div className="grid grid-cols-3 gap-6 mb-7">
+        <div>
+          <p className="text-[13px] font-semibold mb-1">Bill To:</p>
+          <p className="text-[17px] font-bold">{clientName || "Client"}</p>
+        </div>
+        <div>
+          <p className="text-[13px] font-semibold mb-1">Date Issued:</p>
+          {dateIssued && <>
+            <p className="text-[14px]">{format(new Date(dateIssued), "EEEE,")}</p>
+            <p className="text-[14px]">{format(new Date(dateIssued), "d MMMM yyyy")}</p>
+          </>}
+        </div>
+        <div>
+          <p className="text-[13px] font-semibold mb-1">Payment Status:</p>
+          <p className="text-[14px]">{paymentStatus}</p>
+        </div>
+      </div>
+      <div className="border-t border-[#E5E5E5] mb-5" />
+      <div className="flex items-start gap-4 pb-4">
+        <p className="flex-1 text-[14px] font-semibold">Total task: {totalTasks}</p>
+        <p className="w-[120px] text-[14px] font-semibold">Project Name</p>
+        <p className="w-[90px] text-[14px] font-semibold">Total Hours</p>
+        <p className="w-[120px] text-[14px] font-semibold text-right">Sub Total (IDR)</p>
+      </div>
+      {items.map(item => (
+        <div key={item.id} className="flex items-start gap-4 py-4 border-t border-[#EFEFEF]">
+          <div className="flex-1 min-w-0">
+            {item.date && <p className="text-[12px] text-[#888] mb-1.5">{format(new Date(item.date), "d MMMM yyyy")}</p>}
+            {item.title && <p className="text-[14px] mb-1">{item.title}</p>}
+            <ul className="flex flex-col gap-0.5">
+              {bullets(item.tasks).map((b, i) => (
+                <li key={i} className="text-[14px] flex gap-2"><span className="text-[#888] flex-shrink-0">•</span><span>{b}</span></li>
+              ))}
+            </ul>
+          </div>
+          <p className="w-[120px] text-[14px]">{item.project}</p>
+          <p className="w-[90px] text-[14px]">{item.hours} Hours</p>
+          <p className="w-[120px] text-[14px] text-right">{fmtIDR(subtotalOf(item))}</p>
+        </div>
+      ))}
+      <div className="flex items-center justify-between border-t border-[#E5E5E5] pt-5 mt-1">
+        <p className="text-[15px] font-semibold">Total</p>
+        <p className="text-[15px] font-semibold">{fmtIDR(total)}</p>
+      </div>
+      <div className="border-t border-[#E5E5E5] mt-5 mb-8" />
+      <div className="flex items-end justify-between gap-8">
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-semibold mb-2.5">Payments Information:</p>
+          <div className="flex flex-col gap-1">
+            {paymentRows.map(([label, value]) => (
+              <div key={label} className="flex text-[13px] text-[#888]">
+                <span className="w-[170px] flex-shrink-0">{label}</span>
+                <span className="flex-1">: {value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="text-right flex-shrink-0">
+          <p className="text-[13px] font-semibold mb-1.5">Questions</p>
+          <p className="text-[13px] text-[#555]">{contactName}</p>
+          <p className="text-[13px] text-[#555]">{contactEmail}</p>
+          <p className="text-[13px] text-[#555]">{contactPhone}</p>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Quotation preview component ──────────────────────────────────
+function QuotationPreview({ fromName, clientName, companyName, projectName, docNo, dateIssued, quoteItems, total, paymentRows, contactName, contactEmail, contactPhone }: {
+  fromName: string; clientName: string; companyName: string; projectName: string;
+  docNo: string; dateIssued: string; quoteItems: QuoteItem[]; total: number;
+  paymentRows: [string, string][]; contactName: string; contactEmail: string; contactPhone: string;
+}) {
+  return (
+    <>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-8">
+        <div />
+        <p className="text-[40px] font-bold tracking-widest uppercase" style={{ color: "#444", letterSpacing: "0.12em" }}>QUOTATION</p>
+      </div>
+
+      <div className="border-t border-[#E0E0E0] mb-6" />
+
+      {/* Meta grid */}
+      <div className="grid grid-cols-2 gap-4 mb-8">
+        <div className="flex flex-col gap-1.5">
+          {[["To", clientName || "Recipient"], ["Company", companyName || "Company"], ["Project", projectName || "Project"]].map(([k, v]) => (
+            <div key={k} className="flex gap-3 text-[13px]">
+              <span className="font-bold w-20 flex-shrink-0">{k}</span>
+              <span style={{ color: "#555" }}>{v}</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-col gap-1.5 text-right">
+          {[["No.", docNo], ["Date", dateIssued ? format(new Date(dateIssued), "d MMM yyyy") : ""]].map(([k, v]) => (
+            <div key={k} className="flex gap-3 text-[13px] justify-end">
+              <span className="font-bold">{k}</span>
+              <span style={{ color: "#555" }}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Table header */}
+      <div className="grid grid-cols-[36px_100px_1fr_130px_50px_110px] gap-2 py-2.5 px-3 text-[11px] font-bold uppercase tracking-wider" style={{ background: "#F5F5F5", borderRadius: 4 }}>
+        <span>NO.</span>
+        <span>SERVICE</span>
+        <span>DESCRIPTION</span>
+        <span>PRICE</span>
+        <span>QTY</span>
+        <span className="text-right">TOTAL</span>
+      </div>
+
+      {/* Quote items */}
+      {quoteItems.map((item, idx) => (
+        <div key={item.id} className="grid grid-cols-[36px_100px_1fr_130px_50px_110px] gap-2 py-4 px-3 border-b border-[#EFEFEF] items-start">
+          <span className="text-[13px]">{idx + 1}</span>
+          <span className="text-[13px]">{item.service}</span>
+          <div className="text-[13px]">
+            <p className="font-bold mb-2">{item.description}</p>
+            {bullets(item.packageItems).length > 0 && (
+              <>
+                <p className="font-bold text-[12px] mb-1">Package:</p>
+                {bullets(item.packageItems).map((b, i) => <p key={i} className="text-[#555] text-[12px]">- {b}</p>)}
+              </>
+            )}
+            {bullets(item.includes).length > 0 && (
+              <div className="mt-2">
+                <p className="font-bold text-[12px] mb-1">Includes:</p>
+                {bullets(item.includes).map((b, i) => <p key={i} className="text-[#555] text-[12px]">- {b}</p>)}
+              </div>
+            )}
+          </div>
+          <span className="text-[13px]">{fmtIDR(item.price)}</span>
+          <span className="text-[13px]">{item.qty}</span>
+          <span className="text-[13px] text-right">{fmtIDR(item.price * item.qty)}</span>
+        </div>
+      ))}
+
+      {/* Total */}
+      <div className="border-t-2 border-[#E0E0E0] mt-2" />
+      <div className="grid grid-cols-[36px_100px_1fr_130px_50px_110px] gap-2 py-3.5 px-3 font-bold text-[14px]" style={{ background: "#F5F5F5" }}>
+        <span /><span /><span />
+        <span>TOTAL</span>
+        <span>IDR</span>
+        <span className="text-right">{new Intl.NumberFormat("en-US").format(total)}</span>
+      </div>
+
+      {/* Payment + Contact */}
+      <div className="border-t border-[#E5E5E5] mt-8 mb-6" />
+      <div className="flex items-start justify-between gap-8">
+        <div className="flex-1">
+          <p className="text-[13px] font-semibold mb-2">Payments Information:</p>
+          {paymentRows.map(([label, value]) => (
+            <div key={label} className="flex text-[12px] text-[#888]">
+              <span className="w-[170px] flex-shrink-0">{label}</span>
+              <span>: {value}</span>
+            </div>
+          ))}
+        </div>
+        <div className="text-right flex-shrink-0">
+          <p className="text-[13px] font-semibold mb-1">Questions</p>
+          <p className="text-[12px] text-[#555]">{contactName}</p>
+          <p className="text-[12px] text-[#555]">{contactEmail}</p>
+          <p className="text-[12px] text-[#555]">{contactPhone}</p>
+        </div>
+      </div>
+    </>
   );
 }
