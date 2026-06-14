@@ -62,18 +62,28 @@ export default function TodoPage() {
   // Quick create task dialog
   const [showTask, setShowTask] = useState(false);
   const [tTitle, setTTitle] = useState("");
+  const [tDesc, setTDesc] = useState("");
   const [tProject, setTProject] = useState(projects[0]?.id ?? "");
   const [tPriority, setTPriority] = useState<Priority>("medium");
+  const [tStatus, setTStatus] = useState<"todo" | "in_progress" | "done">("todo");
+  const [tDeadline, setTDeadline] = useState("");
+  const [tHours, setTHours] = useState("");
 
-  const resetTask = () => { setTTitle(""); setTPriority("medium"); setTProject(projects[0]?.id ?? ""); };
+  const resetTask = () => {
+    setTTitle(""); setTDesc(""); setTPriority("medium"); setTStatus("todo");
+    setTDeadline(""); setTHours(""); setTProject(projects[0]?.id ?? "");
+  };
 
   const handleCreateTask = () => {
     if (!tTitle.trim() || !tProject) return;
     addTask({
       title: tTitle.trim(),
+      description: tDesc.trim() || undefined,
       projectId: tProject,
       priority: tPriority,
-      status: "todo",
+      status: tStatus,
+      deadline: tDeadline || undefined,
+      hours: tHours ? Number(tHours) : undefined,
       source: "manual",
     });
     resetTask();
@@ -287,7 +297,7 @@ export default function TodoPage() {
 
       {/* Quick Create Task Dialog */}
       <Dialog open={showTask} onOpenChange={(o) => { if (!o) { setShowTask(false); resetTask(); } }}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Buat Task</DialogTitle>
             <DialogDescription>Tambahkan task baru ke salah satu project</DialogDescription>
@@ -295,7 +305,11 @@ export default function TodoPage() {
           <div className="p-6 flex flex-col gap-4">
             <div>
               <FieldLabel>Task</FieldLabel>
-              <Input autoFocus value={tTitle} onChange={(e) => setTTitle(e.target.value)} placeholder="Apa yang perlu dikerjakan?" onKeyDown={(e) => { if (e.key === "Enter") handleCreateTask(); }} />
+              <Input autoFocus value={tTitle} onChange={(e) => setTTitle(e.target.value)} placeholder="Apa yang perlu dikerjakan?" />
+            </div>
+            <div>
+              <FieldLabel>Description</FieldLabel>
+              <Textarea rows={2} value={tDesc} onChange={(e) => setTDesc(e.target.value)} placeholder="Detail tambahan (opsional)…" />
             </div>
             <div>
               <FieldLabel>Project</FieldLabel>
@@ -305,13 +319,33 @@ export default function TodoPage() {
                 ))}
               </Select>
             </div>
-            <div>
-              <FieldLabel>Priority</FieldLabel>
-              <Select value={tPriority} onChange={(e) => setTPriority(e.target.value as Priority)}>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FieldLabel>Priority</FieldLabel>
+                <Select value={tPriority} onChange={(e) => setTPriority(e.target.value as Priority)}>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </Select>
+              </div>
+              <div>
+                <FieldLabel>Status</FieldLabel>
+                <Select value={tStatus} onChange={(e) => setTStatus(e.target.value as "todo" | "in_progress" | "done")}>
+                  <option value="todo">To Do</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="done">Done</option>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FieldLabel>Deadline</FieldLabel>
+                <Input type="date" value={tDeadline} onChange={(e) => setTDeadline(e.target.value)} />
+              </div>
+              <div>
+                <FieldLabel>Estimasi Jam</FieldLabel>
+                <Input type="number" min={0} step={0.5} value={tHours} onChange={(e) => setTHours(e.target.value)} placeholder="0" />
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-1">
               <Button variant="ghost" onClick={() => { setShowTask(false); resetTask(); }}>Cancel</Button>

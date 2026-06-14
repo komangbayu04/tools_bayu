@@ -1,6 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import {
+  DndContext, DragOverlay,
+  PointerSensor, useSensor, useSensors,
+  useDraggable, useDroppable,
+  type DragStartEvent, type DragEndEvent,
+} from "@dnd-kit/core";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ShellLayout } from "@/components/shell/Layout";
@@ -41,6 +47,23 @@ export default function ProjectDetailPage() {
   const project = useProjectStore((s) => s.projects.find((p) => p.id === projectId));
 
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveTaskId(String(event.active.id));
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setStatus(String(active.id), over.id as TaskStatus);
+    }
+    setActiveTaskId(null);
+  };
+
+  const activeTask = activeTaskId ? tasks.find((t) => t.id === activeTaskId) : null;
 
   // Add task dialog
   const [showAdd, setShowAdd] = useState(false);
@@ -120,35 +143,49 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* Kanban board */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-        {COLUMNS.map((col) => {
-          const colTasks = projectTasks
-            .filter((t) => t.status === col)
-            .sort((a, b) => a.order - b.order);
-          const meta = STATUS_META[col];
-          return (
-            <Card key={col} className="p-3">
-              <div className="flex items-center justify-between px-1.5 py-1 mb-2">
-                <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>
-                  <span className="w-2 h-2 rounded-full" style={{ background: meta.color }} />
-                  {meta.label}
-                </span>
-                <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md" style={{ color: "var(--color-muted-soft)", background: "var(--color-canvas)" }}>
-                  {colTasks.length}
-                </span>
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+          {COLUMNS.map((col) => {
+            const colTasks = projectTasks
+              .filter((t) => t.status === col)
+              .sort((a, b) => a.order - b.order);
+            const meta = STATUS_META[col];
+            return (
+              <DroppableColumn key={col} col={col}>
+                <Card className="p-3">
+                  <div className="flex items-center justify-between px-1.5 py-1 mb-2">
+                    <span className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>
+                      <span className="w-2 h-2 rounded-full" style={{ background: meta.color }} />
+                      {meta.label}
+                    </span>
+                    <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md" style={{ color: "var(--color-muted-soft)", background: "var(--color-canvas)" }}>
+                      {colTasks.length}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-2 min-h-[40px]">
+                    {colTasks.length === 0 && (
+                      <p className="text-[12px] px-1.5 py-4 text-center" style={{ color: "var(--color-muted-soft)" }}>No tasks</p>
+                    )}
+                    {colTasks.map((task) => (
+                      <DraggableTaskChip key={task.id} task={task} onOpen={() => setOpenTaskId(task.id)} onSetStatus={(s) => setStatus(task.id, s)} />
+                    ))}
+                  </div>
+                </Card>
+              </DroppableColumn>
+            );
+          })}
+        </div>
+        <DragOverlay>
+          {activeTask ? (
+            <div className="rounded-[10px] border p-3 shadow-lg bg-[var(--color-surface)] opacity-95" style={{ borderColor: "var(--color-hairline)" }}>
+              <p className="text-[13px] font-medium leading-snug" style={{ color: "var(--color-ink)" }}>{activeTask.title}</p>
+              <div className="flex items-center gap-2 mt-2">
+                <Badge variant={activeTask.priority} className="capitalize">{activeTask.priority}</Badge>
               </div>
-              <div className="flex flex-col gap-2 min-h-[40px]">
-                {colTasks.length === 0 && (
-                  <p className="text-[12px] px-1.5 py-4 text-center" style={{ color: "var(--color-muted-soft)" }}>No tasks</p>
-                )}
-                {colTasks.map((task) => (
-                  <TaskChip key={task.id} task={task} onOpen={() => setOpenTaskId(task.id)} onSetStatus={(s) => setStatus(task.id, s)} />
-                ))}
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       <TaskDetailDialog taskId={openTaskId} onClose={() => setOpenTaskId(null)} />
 
@@ -204,6 +241,31 @@ export default function ProjectDetailPage() {
         </DialogContent>
       </Dialog>
     </ShellLayout>
+  );
+}
+
+function DroppableColumn({ col, children }: { col: TaskStatus; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: col });
+  return (
+    <div
+      ref={setNodeRef}
+      className="rounded-xl transition-colors"
+      style={isOver ? { background: "var(--color-canvas)", boxShadow: "inset 0 0 0 2px var(--color-hairline)" } : {}}
+    >
+      {children}
+    </div>
+  );
+}
+
+function DraggableTaskChip({ task, onOpen, onSetStatus }: { task: Task; onOpen: () => void; onSetStatus: (s: TaskStatus) => void }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id });
+  const style = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, opacity: isDragging ? 0.4 : 1, zIndex: isDragging ? 50 : undefined }
+    : { opacity: isDragging ? 0.4 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <TaskChip task={task} onOpen={isDragging ? () => {} : onOpen} onSetStatus={onSetStatus} />
+    </div>
   );
 }
 

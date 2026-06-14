@@ -184,10 +184,29 @@ export default function AllTasksPage() {
       >
         <Icon name="arrow-left" size={13} /> Projects
       </Link>
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <PageHeader title="All Tasks" subtitle={`${filtered.length} of ${tasks.length} tasks`} />
+      <PageHeader title="All Tasks" subtitle={`${filtered.length} of ${tasks.length} tasks`} />
+
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        {/* Filter tabs — list view only */}
+        {viewMode === "list" && (
+          <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
+            <TabsList>
+              {FILTERS.map((f) => (
+                <TabsTrigger key={f.value} value={f.value}>{f.label}</TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        )}
+        <div className="flex-1" />
+        {/* Search + view toggle side by side */}
+        <div className="relative w-full sm:w-56">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--color-muted-soft)" }}>
+            <Icon name="search" size={13} />
+          </span>
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search tasks…" className="pl-9" />
+        </div>
         {/* View toggle */}
-        <div className="flex items-center gap-1 p-1 rounded-lg" style={{ background: "var(--color-canvas)", border: "1px solid var(--color-hairline)" }}>
+        <div className="flex items-center gap-1 p-1 rounded-lg flex-shrink-0" style={{ background: "var(--color-canvas)", border: "1px solid var(--color-hairline)" }}>
           <button
             onClick={() => setViewMode("list")}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors"
@@ -196,7 +215,6 @@ export default function AllTasksPage() {
               color: viewMode === "list" ? "var(--color-ink)" : "var(--color-muted)",
               boxShadow: viewMode === "list" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
             }}
-            aria-label="List view"
           >
             <Icon name="list-check" size={14} /> List
           </button>
@@ -208,29 +226,9 @@ export default function AllTasksPage() {
               color: viewMode === "kanban" ? "var(--color-ink)" : "var(--color-muted)",
               boxShadow: viewMode === "kanban" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
             }}
-            aria-label="Kanban view"
           >
             <Icon name="chart-bar" size={14} /> Kanban
           </button>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-        {viewMode === "list" && (
-          <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
-            <TabsList>
-              {FILTERS.map((f) => (
-                <TabsTrigger key={f.value} value={f.value}>{f.label}</TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        )}
-        {viewMode === "kanban" && <div />}
-        <div className="relative w-full sm:w-64">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--color-muted-soft)" }}>
-            <Icon name="search" size={13} />
-          </span>
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search tasks…" className="pl-9" />
         </div>
       </div>
 
