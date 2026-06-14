@@ -1,7 +1,7 @@
 "use client";
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { forwardRef } from "react";
 
@@ -34,7 +34,7 @@ export const DialogContent = forwardRef<
           className="absolute right-5 top-5 w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:opacity-70 outline-none"
           style={{ background: "var(--color-canvas)", color: "var(--color-muted)" }}
         >
-          <X size={16} />
+          <Icon name="x" size={16} />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
       )}

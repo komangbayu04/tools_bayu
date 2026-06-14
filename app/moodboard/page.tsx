@@ -3,7 +3,7 @@
 import { ShellLayout } from "@/components/shell/Layout";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { useRef, useState, useMemo } from "react";
-import { Plus, ExternalLink, Trash2, UploadCloud, X, Play, ChevronDown } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import { useMoodStore, type MoodCategory, type MediaType } from "@/lib/store";
 import { resolveCover } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -132,7 +132,7 @@ export default function MoodboardPage() {
       <PageHeader
         title="Moodboard"
         subtitle={`${items.length} references collected`}
-        actions={<Button onClick={() => setShowModal(true)}><Plus size={15} /> Add Reference</Button>}
+        actions={<Button onClick={() => setShowModal(true)}><Icon name="plus" size={15} /> Add Reference</Button>}
       />
 
       {/* Filters: category tabs + date dropdown */}
@@ -156,7 +156,7 @@ export default function MoodboardPage() {
                 : { background: "var(--color-surface)", color: "var(--color-muted)", borderColor: "var(--color-hairline)" }
             }
           >
-            {dateLabels[dateFilter]} <ChevronDown size={13} />
+            {dateLabels[dateFilter]} <Icon name="chevron-down" size={13} />
           </button>
           <AnimatePresence>
             {showDateMenu && (
@@ -236,7 +236,7 @@ export default function MoodboardPage() {
                   {item.media_type === "video" && (
                     <div className="absolute top-2.5 left-2.5 w-7 h-7 rounded-lg flex items-center justify-center opacity-80 group-hover:opacity-0 transition-opacity"
                       style={{ background: "rgba(0,0,0,0.55)" }}>
-                      <Play size={11} className="text-white fill-white" />
+                      <Icon name="play" size={11} className="text-white" />
                     </div>
                   )}
 
@@ -258,11 +258,11 @@ export default function MoodboardPage() {
                     <div className="absolute top-2.5 right-2.5 flex gap-1.5" onClick={e => e.stopPropagation()}>
                       {item.url && (
                         <a href={item.url} target="_blank" rel="noopener noreferrer" className="w-7 h-7 bg-white/95 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-white shadow-sm transition-colors">
-                          <ExternalLink size={12} className="text-[#3D5159]" />
+                          <Icon name="external-link" size={12} className="text-[#3D5159]" />
                         </a>
                       )}
                       <button onClick={() => deleteItem(item.id)} className="w-7 h-7 bg-white/95 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-red-50 shadow-sm transition-colors">
-                        <Trash2 size={12} className="text-[#C64545]" />
+                        <Icon name="trash" size={12} className="text-[#C64545]" />
                       </button>
                     </div>
                   </div>
@@ -317,7 +317,7 @@ export default function MoodboardPage() {
                   : <img src={mediaData} alt={mediaName} className="w-full max-h-56 object-cover" />}
                 <button onClick={() => { setMediaData(null); setMediaType(null); setMediaName(""); }}
                   className="absolute top-2 right-2 w-7 h-7 bg-black/60 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-black/80 transition-colors">
-                  <X size={14} className="text-white" />
+                  <Icon name="x" size={14} className="text-white" />
                 </button>
               </div>
             ) : (
@@ -330,7 +330,7 @@ export default function MoodboardPage() {
                   border: `2px dashed ${dragActive ? "#2A9D8F" : "var(--color-hairline)"}`,
                   background: dragActive ? "var(--color-primary-light)" : "var(--color-canvas)",
                 }}>
-                <UploadCloud size={26} className="text-[#2A9D8F]" />
+                <Icon name="upload-cloud" size={26} className="text-[#2A9D8F]" />
                 <p className="text-[13px] font-semibold" style={{ color: "var(--color-ink)" }}>Click to upload or drag & drop</p>
                 <p className="text-[11px]" style={{ color: "var(--color-muted)" }}>Image or video file</p>
               </button>

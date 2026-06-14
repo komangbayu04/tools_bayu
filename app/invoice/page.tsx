@@ -3,13 +3,12 @@
 import { ShellLayout } from "@/components/shell/Layout";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { useState } from "react";
-import { Plus, Trash2, Download, Save, History, X, Clock, FileText } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useInvoiceHistoryStore } from "@/lib/store";
 import { format } from "date-fns";
 
@@ -68,9 +67,9 @@ const labelStyle = { color: "var(--color-muted)" };
 const divider = { borderTop: "1px solid var(--color-hairline)" };
 
 export default function InvoicePage() {
-  const { history, saveDoc, deleteDoc } = useInvoiceHistoryStore();
+  const { saveDoc } = useInvoiceHistoryStore();
+  const router = useRouter();
   const [docType, setDocType] = useState<DocumentType>("invoice");
-  const [showHistory, setShowHistory] = useState(false);
 
   // Shared fields
   const [fromName, setFromName] = useState("Bayu Krisnayana");
@@ -150,11 +149,11 @@ export default function InvoicePage() {
         subtitle="Invoice & Quotation builder"
         actions={
           <>
-            <Button variant="outline" onClick={() => setShowHistory(true)}>
-              <History size={15} /> History
+            <Button variant="outline" onClick={() => router.push("/invoice/history")}>
+              <Icon name="history" size={15} /> History
             </Button>
-            <Button variant="outline" onClick={handleSave}><Save size={15} /> Save</Button>
-            <Button><Download size={15} /> Export PDF</Button>
+            <Button variant="outline" onClick={handleSave}><Icon name="save" size={15} /> Save</Button>
+            <Button><Icon name="download" size={15} /> Export PDF</Button>
           </>
         }
       />
@@ -264,7 +263,7 @@ export default function InvoicePage() {
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-semibold" style={{ color: "var(--color-muted)" }}>Item {idx + 1}</span>
                         {items.length > 1 && (
-                          <button onClick={() => removeItem(item.id)} className="p-1 rounded hover:bg-red-50" style={{ color: "#C64545" }}><Trash2 size={13} /></button>
+                          <button onClick={() => removeItem(item.id)} className="p-1 rounded hover:bg-red-50" style={{ color: "#C64545" }}><Icon name="trash" size={13} /></button>
                         )}
                       </div>
                       <div className="grid grid-cols-2 gap-2">
@@ -277,7 +276,7 @@ export default function InvoicePage() {
                     </div>
                   ))}
                   <button onClick={addItem} className="flex items-center gap-2 text-sm font-semibold mt-1 hover:opacity-70 w-fit" style={{ color: "#2A9D8F" }}>
-                    <Plus size={14} /> Add Item
+                    <Icon name="plus" size={14} /> Add Item
                   </button>
                 </>
               ) : (
@@ -287,7 +286,7 @@ export default function InvoicePage() {
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-semibold" style={{ color: "var(--color-muted)" }}>Item {idx + 1}</span>
                         {quoteItems.length > 1 && (
-                          <button onClick={() => removeQuoteItem(item.id)} className="p-1 rounded hover:bg-red-50" style={{ color: "#C64545" }}><Trash2 size={13} /></button>
+                          <button onClick={() => removeQuoteItem(item.id)} className="p-1 rounded hover:bg-red-50" style={{ color: "#C64545" }}><Icon name="trash" size={13} /></button>
                         )}
                       </div>
                       <Input value={item.service} onChange={e => updateQuoteItem(item.id, "service", e.target.value)} placeholder="Service (e.g. Website)" className="bg-[var(--color-surface-card)]" />
@@ -313,7 +312,7 @@ export default function InvoicePage() {
                     </div>
                   ))}
                   <button onClick={addQuoteItem} className="flex items-center gap-2 text-sm font-semibold mt-1 hover:opacity-70 w-fit" style={{ color: "#2A9D8F" }}>
-                    <Plus size={14} /> Add Service
+                    <Icon name="plus" size={14} /> Add Service
                   </button>
                 </>
               )}
@@ -370,48 +369,6 @@ export default function InvoicePage() {
           </div>
         </div>
       </div>
-
-      {/* History Drawer */}
-      <Dialog open={showHistory} onOpenChange={setShowHistory}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Document History</DialogTitle>
-            <DialogDescription>{history.length} saved documents</DialogDescription>
-          </DialogHeader>
-          <div className="p-6">
-            {history.length === 0 ? (
-              <div className="text-center py-12">
-                <FileText size={32} className="mx-auto mb-3" style={{ color: "var(--color-muted-soft)" }} />
-                <p className="text-[13px]" style={{ color: "var(--color-muted)" }}>No saved documents yet.</p>
-                <p className="text-[11px] mt-1" style={{ color: "var(--color-muted-soft)" }}>Click "Save" to store your current document.</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2 max-h-96 overflow-auto">
-                {history.map(doc => (
-                  <div key={doc.id} className="flex items-center gap-3 p-3 rounded-[10px] border" style={{ borderColor: "var(--color-hairline)", background: "var(--color-canvas)" }}>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <Badge variant={doc.type === "invoice" ? "teal" : "purple"} className="text-[10px]">{doc.type}</Badge>
-                        <p className="text-[13px] font-semibold truncate" style={{ color: "var(--color-ink)" }}>{doc.clientName}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px]" style={{ color: "var(--color-muted)" }}>
-                          {new Date(doc.savedAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
-                        </span>
-                        <span style={{ color: "var(--color-hairline)" }}>·</span>
-                        <span className="text-[11px] font-semibold" style={{ color: "#2A9D8F" }}>{fmtIDR(doc.total)}</span>
-                      </div>
-                    </div>
-                    <button onClick={() => deleteDoc(doc.id)} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors flex-shrink-0" style={{ color: "#C64545" }}>
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </ShellLayout>
   );
 }

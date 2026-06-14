@@ -1,36 +1,24 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ShellLayout } from "@/components/shell/Layout";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { useState } from "react";
-import { Plus, Upload, Search, X, Loader2, GripVertical, Check, Clock } from "lucide-react";
-import { useTaskStore, type Priority, type Task } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
+import { Icon } from "@/components/ui/icon";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
-} from "@dnd-kit/core";
-import {
-  SortableContext, verticalListSortingStrategy, useSortable,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { AnimatePresence, motion } from "framer-motion";
-
-type FilterTab = "all" | Priority | "done" | "project";
-
-const priorityMeta: Record<Priority, { label: string; dot: string; badge: "high" | "medium" | "low" }> = {
-  high: { label: "High priority", dot: "#C64545", badge: "high" },
-  medium: { label: "Medium priority", dot: "#E8A55A", badge: "medium" },
-  low: { label: "Low priority / Someday", dot: "#5DB872", badge: "low" },
-};
+  useTaskStore, useProjectStore,
+  type Priority, type ProjectStatus,
+} from "@/lib/store";
+import { PROJECT_PALETTE, progressOf } from "./shared";
 
 interface ExtractedItem {
   task: string;
@@ -40,102 +28,59 @@ interface ExtractedItem {
   selected: boolean;
 }
 
-function SortableTask({ task, onToggle }: { task: Task; onToggle: (id: string) => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1, zIndex: isDragging ? 10 : "auto" };
-
+function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="flex items-center gap-3 px-4 py-3.5 group transition-colors hover:bg-[var(--color-canvas)]"
-    >
-      <button
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing p-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-        style={{ color: "var(--color-muted-soft)" }}
-        aria-label="Drag to reorder"
-      >
-        <GripVertical size={15} />
-      </button>
-      <button
-        onClick={() => onToggle(task.id)}
-        className="w-[18px] h-[18px] rounded-md flex-shrink-0 transition-all hover:border-[#2A9D8F]"
-        style={{ border: "2px solid var(--color-hairline)" }}
-        aria-label="Mark complete"
-      />
-      <div className="flex-1 min-w-0">
-        <p className="text-[13px] font-medium truncate" style={{ color: "var(--color-ink)" }}>{task.title}</p>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <span className="text-[11px] truncate" style={{ color: "var(--color-muted)" }}>{task.project}</span>
-          {task.due && (
-            <>
-              <span style={{ color: "var(--color-hairline)" }}>·</span>
-              <span className="text-[11px] flex-shrink-0" style={{ color: "var(--color-muted-soft)" }}>Due {task.due}</span>
-            </>
-          )}
-          {task.hours && task.hours > 0 && (
-            <>
-              <span style={{ color: "var(--color-hairline)" }}>·</span>
-              <span className="text-[11px] flex-shrink-0 flex items-center gap-0.5" style={{ color: "var(--color-muted-soft)" }}>
-                <Clock size={10} /> {task.hours}h
-              </span>
-            </>
-          )}
-          {task.source === "transcript" && (
-            <>
-              <span style={{ color: "var(--color-hairline)" }}>·</span>
-              <span className="text-[10px] font-semibold rounded px-1.5 py-0.5 flex-shrink-0" style={{ background: "var(--color-canvas)", color: "var(--color-muted)" }}>
-                transcript
-              </span>
-            </>
-          )}
-        </div>
-      </div>
-      <Badge variant={priorityMeta[task.priority].badge} className="capitalize">{task.priority}</Badge>
-    </div>
+    <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>
+      {children}
+    </label>
   );
 }
 
 export default function TodoPage() {
-  const { tasks, addTask, toggleDone } = useTaskStore();
-  const reorderTasks = useTaskStore((s) => s.reorderTasks);
-  const [filter, setFilter] = useState<FilterTab>("all");
-  const [search, setSearch] = useState("");
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newProject, setNewProject] = useState("");
-  const [newPriority, setNewPriority] = useState<Priority>("medium");
-  const [newHours, setNewHours] = useState(0);
+  const router = useRouter();
+  const tasks = useTaskStore((s) => s.tasks);
+  const addTask = useTaskStore((s) => s.addTask);
+  const projects = useProjectStore((s) => s.projects);
+  const addProject = useProjectStore((s) => s.addProject);
+  const deleteProject = useProjectStore((s) => s.deleteProject);
+
+  // New project dialog
+  const [showProject, setShowProject] = useState(false);
+  const [pName, setPName] = useState("");
+  const [pClient, setPClient] = useState("");
+  const [pDesc, setPDesc] = useState("");
+  const [pColor, setPColor] = useState(PROJECT_PALETTE[0]);
+  const [pStatus, setPStatus] = useState<ProjectStatus>("active");
+
+  // Import transcript dialog
   const [showImport, setShowImport] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const [clientTag, setClientTag] = useState("Overclock");
+  const [importProject, setImportProject] = useState(projects[0]?.id ?? "");
   const [extracting, setExtracting] = useState(false);
   const [extracted, setExtracted] = useState<ExtractedItem[] | null>(null);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-
-  const handleAddTask = () => {
-    if (!newTitle.trim()) return;
-    addTask({ title: newTitle.trim(), project: newProject.trim() || "General", priority: newPriority, status: "todo", source: "manual", hours: newHours || undefined });
-    setNewTitle(""); setNewProject(""); setNewPriority("medium"); setNewHours(0); setShowAddForm(false);
+  const allCounts = {
+    todo: tasks.filter((t) => t.status === "todo").length,
+    in_progress: tasks.filter((t) => t.status === "in_progress").length,
+    done: tasks.filter((t) => t.status === "done").length,
   };
 
-  const matchesSearch = (t: Task) => !search || t.title.toLowerCase().includes(search.toLowerCase()) || t.project.toLowerCase().includes(search.toLowerCase());
+  const resetProject = () => {
+    setPName(""); setPClient(""); setPDesc(""); setPColor(PROJECT_PALETTE[0]); setPStatus("active");
+  };
 
-  const filteredTasks = tasks.filter((t) => {
-    if (filter === "done") return t.status === "done";
-    if (filter !== "all") return t.priority === filter && t.status === "todo";
-    return t.status === "todo";
-  }).filter(matchesSearch);
-
-  const groupedByPriority = (["high", "medium", "low"] as Priority[]).map((p) => ({
-    priority: p,
-    tasks: filteredTasks.filter((t) => t.priority === p).sort((a, b) => a.order - b.order),
-  })).filter((g) => g.tasks.length > 0);
-
-  const doneTasks = tasks.filter((t) => t.status === "done").filter(matchesSearch);
+  const handleCreateProject = () => {
+    if (!pName.trim()) return;
+    addProject({
+      name: pName.trim(),
+      client: pClient.trim() || "—",
+      description: pDesc.trim() || undefined,
+      color: pColor,
+      status: pStatus,
+    });
+    resetProject();
+    setShowProject(false);
+  };
 
   const mockExtract = async () => {
     setExtracting(true);
@@ -150,14 +95,21 @@ export default function TodoPage() {
   };
 
   const toggleExtracted = (idx: number) =>
-    setExtracted((prev) => prev ? prev.map((e, i) => i === idx ? { ...e, selected: !e.selected } : e) : null);
+    setExtracted((prev) => (prev ? prev.map((e, i) => (i === idx ? { ...e, selected: !e.selected } : e)) : null));
 
   const addExtracted = () => {
-    if (!extracted) return;
+    if (!extracted || !importProject) return;
     extracted.filter((e) => e.selected).forEach((e) =>
-      addTask({ title: e.task, project: clientTag, priority: e.priority, status: "todo", due: e.due_hint || undefined, source: "transcript" })
+      addTask({
+        title: e.task,
+        projectId: importProject,
+        priority: e.priority,
+        status: "todo",
+        due: e.due_hint || undefined,
+        source: "transcript",
+      })
     );
-    setShowImport(false); setTranscript(""); setExtracted(null);
+    closeImport();
   };
 
   const closeImport = () => { setShowImport(false); setExtracted(null); setTranscript(""); };
@@ -165,139 +117,143 @@ export default function TodoPage() {
   return (
     <ShellLayout>
       <PageHeader
-        title="To do list"
-        subtitle={`${tasks.filter((t) => t.status === "todo").length} open · ${doneTasks.length} completed`}
+        title="Projects"
+        subtitle={`${projects.length} projects · ${allCounts.todo + allCounts.in_progress} open tasks`}
         actions={
           <>
-            <Button variant="outline" onClick={() => setShowImport(true)}>
-              <Upload size={15} /> Import Transcript
+            <Button variant="outline" onClick={() => { setImportProject(projects[0]?.id ?? ""); setShowImport(true); }}>
+              <Icon name="upload" size={15} /> Import Transcript
             </Button>
-            <Button onClick={() => setShowAddForm((v) => !v)}>
-              <Plus size={15} /> Add Task
+            <Button onClick={() => setShowProject(true)}>
+              <Icon name="plus" size={15} /> New Project
             </Button>
           </>
         }
       />
 
-      {/* Filters + search */}
-      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
-        <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterTab)}>
-          <TabsList>
-            {(["all", "high", "medium", "low", "done", "project"] as FilterTab[]).map((key) => (
-              <TabsTrigger key={key} value={key} className="capitalize">{key === "project" ? "By Project" : key}</TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--color-muted-soft)" }} />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search tasks…" className="pl-8 w-52 py-2" />
-        </div>
-      </div>
-
-      {/* Inline add form */}
-      <AnimatePresence>
-        {showAddForm && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden mb-5"
-          >
-            <Card className="p-4 flex flex-col sm:flex-row gap-3 sm:items-end" style={{ background: "var(--color-surface-card)" }}>
-              <div className="flex-1">
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--color-muted)" }}>Task</label>
-                <Input
-                  autoFocus value={newTitle} onChange={(e) => setNewTitle(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleAddTask(); if (e.key === "Escape") setShowAddForm(false); }}
-                  placeholder="What needs to be done?" className="bg-[var(--color-surface)]"
-                />
-              </div>
-              <div className="sm:w-40">
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--color-muted)" }}>Project</label>
-                <Input value={newProject} onChange={(e) => setNewProject(e.target.value)} placeholder="Project" className="bg-[var(--color-surface)]" />
-              </div>
-              <div className="sm:w-36">
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--color-muted)" }}>Priority</label>
-                <Select value={newPriority} onChange={(e) => setNewPriority(e.target.value as Priority)} className="bg-[var(--color-surface)]">
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </Select>
-              </div>
-              <div className="sm:w-28">
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--color-muted)" }}>Hours</label>
-                <Input type="number" value={newHours} onChange={(e) => setNewHours(Number(e.target.value))} placeholder="0" className="bg-[var(--color-surface)]" />
-              </div>
-              <Button onClick={handleAddTask}>Save</Button>
-              <Button variant="ghost" size="icon" onClick={() => setShowAddForm(false)}><X size={16} /></Button>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+        {/* LEFT: project list */}
+        <div className="flex flex-col gap-3">
+          {projects.length === 0 && (
+            <Card className="p-10 text-center">
+              <p className="text-sm font-medium" style={{ color: "var(--color-muted-soft)" }}>
+                No projects yet — create one to get started.
+              </p>
             </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+          {projects.map((project) => {
+            const pTasks = tasks.filter((t) => t.projectId === project.id);
+            const { done, total, pct } = progressOf(pTasks);
+            const hours = pTasks.reduce((s, t) => s + (t.hours || 0), 0);
+            return (
+              <Card
+                key={project.id}
+                onClick={() => router.push(`/todo/${project.id}`)}
+                className="group relative p-5 cursor-pointer transition-all hover:shadow-md"
+              >
+                <button
+                  onClick={(e) => { e.stopPropagation(); if (confirm(`Delete project "${project.name}"?`)) deleteProject(project.id); }}
+                  className="absolute right-4 top-4 w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--color-canvas)]"
+                  style={{ color: "var(--color-muted-soft)" }}
+                  aria-label="Delete project"
+                >
+                  <Icon name="trash" size={13} />
+                </button>
 
-      {/* Task groups */}
-      <div className="flex flex-col gap-7">
-        {filter !== "done" && groupedByPriority.map(({ priority, tasks: pts }) => (
-          <div key={priority}>
-            <div className="flex items-center gap-2 mb-2.5 px-1">
-              <div className="w-2 h-2 rounded-full" style={{ background: priorityMeta[priority].dot }} />
-              <span className="text-[11px] font-bold tracking-wider uppercase" style={{ color: "var(--color-muted)" }}>
-                {priorityMeta[priority].label}
-              </span>
-              <span className="text-[11px] font-semibold rounded-full px-2 py-0.5" style={{ background: "var(--color-canvas)", color: "var(--color-muted)" }}>
-                {pts.length}
-              </span>
-            </div>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={({ active, over }) => {
-                if (over && active.id !== over.id) reorderTasks(priority, String(active.id), String(over.id));
-              }}
-            >
-              <SortableContext items={pts.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-                <Card className="overflow-hidden divide-y" style={{ borderColor: "var(--color-hairline)" }}>
-                  {pts.map((task) => (
-                    <div key={task.id} style={{ borderColor: "var(--color-hairline)" }}>
-                      <SortableTask task={task} onToggle={toggleDone} />
+                <div className="flex items-start gap-3">
+                  <span className="w-3 h-3 rounded-full mt-1 flex-shrink-0" style={{ background: project.color }} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-[15px] font-semibold truncate" style={{ color: "var(--color-ink)" }}>{project.name}</h3>
+                      {project.status !== "active" && (
+                        <Badge variant="gray" className="capitalize">{project.status}</Badge>
+                      )}
                     </div>
-                  ))}
-                </Card>
-              </SortableContext>
-            </DndContext>
-          </div>
-        ))}
+                    <p className="text-[12px] mt-0.5" style={{ color: "var(--color-muted)" }}>{project.client}</p>
 
-        {filter === "done" && (
-          doneTasks.length > 0 ? (
-            <div>
-              <div className="flex items-center gap-2 mb-2.5 px-1">
-                <div className="w-2 h-2 rounded-full" style={{ background: "var(--color-muted-soft)" }} />
-                <span className="text-[11px] font-bold tracking-wider uppercase" style={{ color: "var(--color-muted)" }}>Done</span>
-                <span className="text-[11px] font-semibold rounded-full px-2 py-0.5" style={{ background: "var(--color-canvas)", color: "var(--color-muted)" }}>{doneTasks.length}</span>
-              </div>
-              <Card className="overflow-hidden">
-                {doneTasks.map((task, i) => (
-                  <div key={task.id} className="flex items-center gap-3 px-4 py-3.5" style={{ borderTop: i === 0 ? "none" : "1px solid var(--color-hairline)" }}>
-                    <button onClick={() => toggleDone(task.id)} className="w-[18px] h-[18px] rounded-md flex-shrink-0 flex items-center justify-center bg-[#2A9D8F] border-2 border-[#2A9D8F]">
-                      <Check size={11} className="text-white" strokeWidth={3} />
-                    </button>
-                    <p className="text-[13px] line-through truncate" style={{ color: "var(--color-muted-soft)" }}>{task.title}</p>
+                    <div className="flex items-center gap-2 mt-3">
+                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--color-canvas)" }}>
+                        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: project.color }} />
+                      </div>
+                      <span className="text-[11px] flex-shrink-0" style={{ color: "var(--color-muted-soft)" }}>{done}/{total}</span>
+                    </div>
+
+                    <div className="flex items-center gap-3 mt-2.5 text-[11px]" style={{ color: "var(--color-muted-soft)" }}>
+                      <span className="flex items-center gap-1"><Icon name="list-check" size={11} /> {total} tasks</span>
+                      {hours > 0 && <span className="flex items-center gap-1"><Icon name="clock" size={11} /> {hours}h</span>}
+                    </div>
                   </div>
-                ))}
+                </div>
               </Card>
-            </div>
-          ) : (
-            <EmptyState text="No completed tasks yet" />
-          )
-        )}
+            );
+          })}
+        </div>
 
-        {filter !== "done" && filter !== "project" && groupedByPriority.length === 0 && <EmptyState text="No tasks here — add one to get started" />}
-
-        {filter === "project" && (
-          <ProjectView tasks={tasks} />
-        )}
+        {/* RIGHT: quick stats */}
+        <Card className="p-5 lg:sticky lg:top-6">
+          <h3 className="text-[13px] font-bold uppercase tracking-wider mb-4" style={{ color: "var(--color-muted)" }}>Quick stats</h3>
+          <div className="flex flex-col gap-2.5">
+            <StatRow label="Open / To Do" value={allCounts.todo} dot="var(--color-muted-soft)" />
+            <StatRow label="In Progress" value={allCounts.in_progress} dot="#E8A55A" />
+            <StatRow label="Done" value={allCounts.done} dot="#5DB872" />
+          </div>
+          <div className="h-px my-4" style={{ background: "var(--color-hairline)" }} />
+          <Button variant="secondary" className="w-full" onClick={() => router.push("/todo/all")}>
+            <Icon name="list-check" size={15} /> Lihat Semua Task
+          </Button>
+        </Card>
       </div>
+
+      {/* New Project Dialog */}
+      <Dialog open={showProject} onOpenChange={(o) => { if (!o) { setShowProject(false); resetProject(); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>New Project</DialogTitle>
+            <DialogDescription>Create a project to organize your tasks</DialogDescription>
+          </DialogHeader>
+          <div className="p-6 flex flex-col gap-4">
+            <div>
+              <FieldLabel>Name</FieldLabel>
+              <Input autoFocus value={pName} onChange={(e) => setPName(e.target.value)} placeholder="Project name" />
+            </div>
+            <div>
+              <FieldLabel>Client</FieldLabel>
+              <Input value={pClient} onChange={(e) => setPClient(e.target.value)} placeholder="Client name" />
+            </div>
+            <div>
+              <FieldLabel>Description</FieldLabel>
+              <Textarea rows={2} value={pDesc} onChange={(e) => setPDesc(e.target.value)} placeholder="Optional description" />
+            </div>
+            <div>
+              <FieldLabel>Color</FieldLabel>
+              <div className="flex items-center gap-2 flex-wrap">
+                {PROJECT_PALETTE.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setPColor(c)}
+                    className="w-7 h-7 rounded-full transition-transform"
+                    style={{ background: c, outline: pColor === c ? "2px solid var(--color-ink)" : "none", outlineOffset: 2 }}
+                    aria-label={`Pick ${c}`}
+                  />
+                ))}
+              </div>
+            </div>
+            <div>
+              <FieldLabel>Status</FieldLabel>
+              <Select value={pStatus} onChange={(e) => setPStatus(e.target.value as ProjectStatus)}>
+                <option value="active">Active</option>
+                <option value="paused">Paused</option>
+                <option value="completed">Completed</option>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="ghost" onClick={() => { setShowProject(false); resetProject(); }}>Cancel</Button>
+              <Button onClick={handleCreateProject} disabled={!pName.trim()}>Create Project</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Import Transcript Dialog */}
       <Dialog open={showImport} onOpenChange={(o) => !o && closeImport()}>
@@ -310,20 +266,24 @@ export default function TodoPage() {
             {!extracted ? (
               <div className="flex flex-col gap-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Paste Transcript</label>
+                  <FieldLabel>Paste Transcript</FieldLabel>
                   <Textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} rows={6} placeholder="Paste your meeting transcript here…" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Client / Project Tag</label>
-                  <Input value={clientTag} onChange={(e) => setClientTag(e.target.value)} placeholder="e.g. Overclock" />
+                  <FieldLabel>Assign to Project</FieldLabel>
+                  <Select value={importProject} onChange={(e) => setImportProject(e.target.value)}>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name} · {p.client}</option>
+                    ))}
+                  </Select>
                 </div>
-                <Button onClick={mockExtract} disabled={!transcript.trim() || extracting} className="w-full">
-                  {extracting ? <><Loader2 size={15} className="animate-spin" /> Extracting with Claude…</> : "Extract Action Items →"}
+                <Button onClick={mockExtract} disabled={!transcript.trim() || extracting || !importProject} className="w-full">
+                  {extracting ? <><Icon name="spinner" size={15} spin /> Extracting with Claude…</> : "Extract Action Items →"}
                 </Button>
               </div>
             ) : (
               <div className="flex flex-col gap-4">
-                <p className="text-[13px] font-semibold" style={{ color: "var(--color-primary-ink)" }}>
+                <p className="text-[13px] font-semibold" style={{ color: "var(--color-ink)" }}>
                   Extracted {extracted.length} items · {extracted.filter((e) => e.selected).length} selected
                 </p>
                 <div className="flex flex-col gap-2 max-h-72 overflow-auto -mx-1 px-1">
@@ -344,17 +304,17 @@ export default function TodoPage() {
                           background: item.selected ? "#2A9D8F" : "transparent",
                         }}
                       >
-                        {item.selected && <Check size={11} className="text-white" strokeWidth={3} />}
+                        {item.selected && <Icon name="check" size={11} className="text-white" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-medium" style={{ color: "var(--color-ink)" }}>{item.task}</p>
                         {item.due_hint && <p className="text-[11px] mt-0.5" style={{ color: "var(--color-muted)" }}>Due: {item.due_hint}</p>}
                       </div>
-                      <Badge variant={priorityMeta[item.priority].badge} className="capitalize flex-shrink-0">{item.priority}</Badge>
+                      <Badge variant={item.priority} className="capitalize flex-shrink-0">{item.priority}</Badge>
                     </button>
                   ))}
                 </div>
-                <Button onClick={addExtracted} className="w-full">Add Selected to List</Button>
+                <Button onClick={addExtracted} className="w-full">Add Selected to Project</Button>
               </div>
             )}
           </div>
@@ -364,49 +324,14 @@ export default function TodoPage() {
   );
 }
 
-function ProjectView({ tasks }: { tasks: Task[] }) {
-  const projectNames = [...new Set(tasks.map(t => t.project))].sort();
+function StatRow({ label, value, dot }: { label: string; value: number; dot: string }) {
   return (
-    <div className="flex flex-col gap-7">
-      {projectNames.map(projectName => {
-        const projectTasks = tasks.filter(t => t.project === projectName);
-        const done = projectTasks.filter(t => t.status === "done").length;
-        const total = projectTasks.length;
-        const hours = projectTasks.reduce((s, t) => s + (t.hours || 0), 0);
-        return (
-          <div key={projectName}>
-            <div className="flex items-center gap-3 mb-2.5 px-1">
-              <span className="text-[11px] font-bold tracking-wider uppercase" style={{ color: "var(--color-muted)" }}>{projectName}</span>
-              <span className="text-[11px] font-semibold rounded-full px-2 py-0.5" style={{ background: "var(--color-canvas)", color: "var(--color-muted)" }}>{total} tasks</span>
-              {hours > 0 && <span className="text-[11px] font-semibold" style={{ color: "var(--color-muted-soft)" }}>{hours}h total</span>}
-              <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--color-canvas)", maxWidth: 120 }}>
-                <div className="h-full rounded-full bg-[#2A9D8F] transition-all" style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }} />
-              </div>
-              <span className="text-[11px]" style={{ color: "var(--color-muted-soft)" }}>{done}/{total} done</span>
-            </div>
-            <Card className="overflow-hidden divide-y" style={{ borderColor: "var(--color-hairline)" }}>
-              {projectTasks.map((task, i) => (
-                <div key={task.id} className="flex items-center gap-3 px-4 py-3" style={{ borderColor: "var(--color-hairline)" }}>
-                  <div className={`w-[18px] h-[18px] rounded-md flex-shrink-0 flex items-center justify-center ${task.status === "done" ? "bg-[#2A9D8F] border-2 border-[#2A9D8F]" : "border-2"}`} style={task.status !== "done" ? { borderColor: "var(--color-hairline)" } : {}}>
-                    {task.status === "done" && <Check size={11} className="text-white" strokeWidth={3} />}
-                  </div>
-                  <p className={`flex-1 text-[13px] font-medium truncate ${task.status === "done" ? "line-through" : ""}`} style={{ color: task.status === "done" ? "var(--color-muted-soft)" : "var(--color-ink)" }}>{task.title}</p>
-                  {task.hours && task.hours > 0 && <span className="text-[11px] flex-shrink-0" style={{ color: "var(--color-muted-soft)" }}>{task.hours}h</span>}
-                  <Badge variant={task.priority === "high" ? "high" : task.priority === "medium" ? "medium" : "low"} className="capitalize flex-shrink-0">{task.priority}</Badge>
-                </div>
-              ))}
-            </Card>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function EmptyState({ text }: { text: string }) {
-  return (
-    <div className="text-center py-16">
-      <p className="text-sm font-medium" style={{ color: "var(--color-muted-soft)" }}>{text}</p>
+    <div className="flex items-center justify-between">
+      <span className="flex items-center gap-2 text-[13px]" style={{ color: "var(--color-body)" }}>
+        <span className="w-2 h-2 rounded-full" style={{ background: dot }} />
+        {label}
+      </span>
+      <span className="text-[15px] font-semibold" style={{ color: "var(--color-ink)" }}>{value}</span>
     </div>
   );
 }

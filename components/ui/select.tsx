@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { ChevronDown } from "lucide-react";
+import { Icon } from "@/components/ui/icon";
 import { SelectHTMLAttributes, forwardRef } from "react";
 
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
@@ -17,7 +17,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
       >
         {children}
       </select>
-      <ChevronDown
+      <Icon
+        name="chevron-down"
         size={15}
         className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2"
         style={{ color: "var(--color-muted)" }}

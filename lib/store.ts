@@ -3,25 +3,29 @@ import { persist } from "zustand/middleware"
 
 // ─── Task store ───────────────────────────────────────────────────
 export type Priority = "high" | "medium" | "low"
-export type TaskStatus = "todo" | "done"
+export type TaskStatus = "todo" | "in_progress" | "done"
 
 export interface Task {
   id: string
   title: string
-  project: string
+  description?: string
+  projectId: string
   priority: Priority
   status: TaskStatus
-  due?: string
+  deadline?: string        // ISO date "2026-06-20"
+  due?: string             // legacy short label, kept for compatibility
   source: "manual" | "transcript"
   order: number
   hours?: number
   invoiceLinked?: boolean
+  createdAt: number
 }
 
 interface TaskStore {
   tasks: Task[]
-  addTask: (task: Omit<Task, "id" | "order">) => void
+  addTask: (task: Omit<Task, "id" | "order" | "createdAt"> & { createdAt?: number }) => void
   toggleDone: (id: string) => void
+  setStatus: (id: string, status: TaskStatus) => void
   deleteTask: (id: string) => void
   updateTask: (id: string, patch: Partial<Task>) => void
   reorderTasks: (priority: Priority, activeId: string, overId: string) => void
@@ -31,17 +35,18 @@ export const useTaskStore = create<TaskStore>()(
   persist(
     (set) => ({
       tasks: [
-        { id: "1", title: "Revisi cover slide deck Overclock ke light mode", project: "Overclock", priority: "high", status: "todo", due: "16 Jun", source: "transcript", order: 0, hours: 2 },
-        { id: "2", title: "Build reusable email template Bedford", project: "Bedford", priority: "high", status: "todo", due: "18 Jun", source: "manual", order: 1, hours: 4 },
-        { id: "3", title: 'Finalize "The Current" newsletter revision', project: "Bedford", priority: "medium", status: "todo", source: "transcript", order: 0, hours: 1.5 },
-        { id: "4", title: "Update brand deck transition slides", project: "Overclock", priority: "medium", status: "todo", source: "transcript", order: 1, hours: 3 },
-        { id: "5", title: "Research competitor moodboards for Q3", project: "Internal", priority: "low", status: "todo", source: "manual", order: 0, hours: 2 },
-        { id: "6", title: "Send revised deck to Ahmed", project: "Overclock", priority: "high", status: "done", source: "transcript", order: 2, hours: 1 },
+        { id: "1", title: "Revisi cover slide deck Overclock ke light mode", description: "Client requested a lighter palette across all cover slides. Update gradient backgrounds and text contrast.", projectId: "p1", priority: "high", status: "in_progress", deadline: "2026-06-16", due: "16 Jun", source: "transcript", order: 0, hours: 2, createdAt: Date.now() - 3 * 86400000 },
+        { id: "2", title: "Build reusable email template Bedford", description: "Modular email template with header, hero, CTA, footer blocks.", projectId: "p2", priority: "high", status: "todo", deadline: "2026-06-18", due: "18 Jun", source: "manual", order: 1, hours: 4, createdAt: Date.now() - 2 * 86400000 },
+        { id: "3", title: 'Finalize "The Current" newsletter revision', description: "", projectId: "p2", priority: "medium", status: "todo", source: "transcript", order: 0, hours: 1.5, createdAt: Date.now() - 2 * 86400000 },
+        { id: "4", title: "Update brand deck transition slides", description: "Apply new branding to all transition slides for consistency.", projectId: "p1", priority: "medium", status: "todo", source: "transcript", order: 1, hours: 3, createdAt: Date.now() - 86400000 },
+        { id: "5", title: "Research competitor moodboards for Q3", description: "", projectId: "p3", priority: "low", status: "todo", source: "manual", order: 0, hours: 2, createdAt: Date.now() - 86400000 },
+        { id: "6", title: "Send revised deck to Ahmed", description: "Send after revisions complete.", projectId: "p1", priority: "high", status: "done", source: "transcript", order: 2, hours: 1, createdAt: Date.now() - 4 * 86400000 },
       ],
       addTask: (task) => set((s) => ({
-        tasks: [...s.tasks, { ...task, id: crypto.randomUUID(), order: s.tasks.filter(t => t.priority === task.priority).length }]
+        tasks: [...s.tasks, { ...task, id: crypto.randomUUID(), order: s.tasks.filter(t => t.priority === task.priority).length, createdAt: task.createdAt ?? Date.now() }]
       })),
       toggleDone: (id) => set((s) => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, status: t.status === "done" ? "todo" : "done" } : t) })),
+      setStatus: (id, status) => set((s) => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, status } : t) })),
       deleteTask: (id) => set((s) => ({ tasks: s.tasks.filter(t => t.id !== id) })),
       updateTask: (id, patch) => set((s) => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...patch } : t) })),
       reorderTasks: (priority, activeId, overId) => set((s) => {
@@ -56,7 +61,7 @@ export const useTaskStore = create<TaskStore>()(
         return { tasks: [...others, ...reordered.map((t, i) => ({ ...t, order: i }))] }
       }),
     }),
-    { name: "tasks-storage" }
+    { name: "tasks-storage-v2" }
   )
 )
 
@@ -67,6 +72,7 @@ export interface Project {
   id: string
   name: string
   client: string
+  description?: string
   color: string
   status: ProjectStatus
   createdAt: number

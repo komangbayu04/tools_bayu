@@ -3,8 +3,9 @@
 import { ShellLayout } from "@/components/shell/Layout";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { useState, useMemo } from "react";
-import { Plus, Trash2, TrendingUp, TrendingDown, Sparkles, ChevronLeft, ChevronRight, X, AlertTriangle, CheckCircle } from "lucide-react";
-import { useFinanceStore, type TransactionType, type FinanceCategory } from "@/lib/store";
+import { useRouter } from "next/navigation";
+import { Icon, type IconName } from "@/components/ui/icon";
+import { useFinanceStore, type TransactionType } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -29,6 +30,7 @@ const ICON_OPTIONS = ["💼","🎯","🛠️","🍜","🚗","🏠","💊","🎬"
 const COLOR_OPTIONS = ["#2A9D8F","#6D8DF0","#E8A55A","#C77DD6","#5DB872","#F0A07C","#4DBFC4","#D85A4A","#8C7DE8","#3A4FC4"];
 
 export default function FinancePage() {
+  const router = useRouter();
   const { transactions, categories, addTransaction, deleteTransaction, addCategory, deleteCategory } = useFinanceStore();
 
   // Month navigation
@@ -37,7 +39,6 @@ export default function FinancePage() {
   // Modal state
   const [showAddTx, setShowAddTx] = useState(false);
   const [showAddCat, setShowAddCat] = useState(false);
-  const [showEval, setShowEval] = useState(false);
   const [txTab, setTxTab] = useState<"all" | TransactionType>("all");
 
   // Add Transaction form
@@ -118,28 +119,6 @@ export default function FinancePage() {
 
   const getCat = (id: string) => categories.find(c => c.id === id);
 
-  // Simple evaluation logic
-  const evaluation = useMemo(() => {
-    const issues: { type: "warning" | "ok"; text: string }[] = [];
-    if (savingsRate < 20) issues.push({ type: "warning", text: `Tabungan hanya ${savingsRate}% dari pemasukan — target minimal 20%` });
-    else issues.push({ type: "ok", text: `Tabungan ${savingsRate}% dari pemasukan — sudah bagus!` });
-
-    const topExpCat = catBreakdown[0];
-    if (topExpCat && income > 0 && topExpCat.total / income > 0.4) {
-      issues.push({ type: "warning", text: `Kategori "${topExpCat.name}" menyerap ${Math.round(topExpCat.total / income * 100)}% pemasukan — terlalu besar` });
-    }
-    if (expense > income) issues.push({ type: "warning", text: `Pengeluaran melebihi pemasukan sebesar ${fmtIDR(expense - income)} bulan ini` });
-    else issues.push({ type: "ok", text: "Pengeluaran masih di bawah pemasukan — cashflow positif" });
-
-    const softwareExp = monthTxs.filter(t => {
-      const cat = getCat(t.categoryId);
-      return cat?.name.toLowerCase().includes("software") || cat?.name.toLowerCase().includes("tool");
-    }).reduce((s, t) => s + t.amount, 0);
-    if (softwareExp > 500000) issues.push({ type: "warning", text: `Biaya tools/software ${fmtIDR(softwareExp)} — cek apakah semua aktif dipakai` });
-
-    return issues;
-  }, [savingsRate, catBreakdown, expense, income, monthTxs]);
-
   return (
     <ShellLayout>
       <PageHeader
@@ -147,9 +126,9 @@ export default function FinancePage() {
         subtitle="Pencatatan keuangan bulanan"
         actions={
           <>
-            <Button variant="outline" onClick={() => setShowAddCat(true)}><Plus size={15} /> Kategori</Button>
-            <Button variant="outline" onClick={() => setShowEval(true)}><Sparkles size={15} /> Evaluasi</Button>
-            <Button onClick={() => setShowAddTx(true)}><Plus size={15} /> Tambah</Button>
+            <Button variant="outline" onClick={() => setShowAddCat(true)}><Icon name="plus" size={15} /> Kategori</Button>
+            <Button variant="outline" onClick={() => router.push("/finance/evaluate")}><Icon name="sparkles" size={15} /> Evaluasi</Button>
+            <Button onClick={() => setShowAddTx(true)}><Icon name="plus" size={15} /> Tambah</Button>
           </>
         }
       />
@@ -157,11 +136,11 @@ export default function FinancePage() {
       {/* Month navigator */}
       <div className="flex items-center gap-3 mb-7">
         <button onClick={prevMonth} className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-canvas)]" style={{ border: "1px solid var(--color-hairline)" }}>
-          <ChevronLeft size={16} style={{ color: "var(--color-muted)" }} />
+          <Icon name="chevron-left" size={16} style={{ color: "var(--color-muted)" }} />
         </button>
         <p className="text-[15px] font-bold min-w-[160px] text-center" style={{ color: "var(--color-ink)" }}>{monthLabel(currentMonth)}</p>
         <button onClick={nextMonth} disabled={isCurrentMonth} className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-canvas)] disabled:opacity-30" style={{ border: "1px solid var(--color-hairline)" }}>
-          <ChevronRight size={16} style={{ color: "var(--color-muted)" }} />
+          <Icon name="chevron-right" size={16} style={{ color: "var(--color-muted)" }} />
         </button>
         {!isCurrentMonth && (
           <button onClick={() => setCurrentMonth(monthKey(new Date()))} className="text-[12px] font-semibold hover:opacity-70" style={{ color: "#2A9D8F" }}>Kembali ke bulan ini</button>
@@ -170,18 +149,18 @@ export default function FinancePage() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-7">
-        {[
-          { label: "Pemasukan", value: income, color: "#5DB872", icon: TrendingUp, positive: true },
-          { label: "Pengeluaran", value: expense, color: "#D85A4A", icon: TrendingDown, positive: false },
-          { label: "Saldo", value: balance, color: balance >= 0 ? "#2A9D8F" : "#D85A4A", icon: balance >= 0 ? TrendingUp : TrendingDown, positive: balance >= 0 },
-          { label: "Savings Rate", value: savingsRate, color: savingsRate >= 20 ? "#5DB872" : "#E8A55A", icon: Sparkles, positive: savingsRate >= 20, isPercent: true },
-        ].map(({ label, value, color, icon: Icon, isPercent }) => (
+        {([
+          { label: "Pemasukan", value: income, color: "#5DB872", icon: "trending-up" as IconName },
+          { label: "Pengeluaran", value: expense, color: "#D85A4A", icon: "trending-down" as IconName },
+          { label: "Saldo", value: balance, color: balance >= 0 ? "#2A9D8F" : "#D85A4A", icon: (balance >= 0 ? "trending-up" : "trending-down") as IconName },
+          { label: "Savings Rate", value: savingsRate, color: savingsRate >= 20 ? "#5DB872" : "#E8A55A", icon: "sparkles" as IconName, isPercent: true },
+        ]).map(({ label, value, color, icon, isPercent }) => (
           <Card key={label}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>{label}</p>
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: color + "18" }}>
-                  <Icon size={14} style={{ color }} />
+                  <Icon name={icon} size={14} style={{ color }} />
                 </div>
               </div>
               <p className="text-[18px] font-bold leading-tight" style={{ color }}>
@@ -246,7 +225,7 @@ export default function FinancePage() {
                         className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 transition-all flex-shrink-0"
                         style={{ color: "#C64545" }}
                       >
-                        <Trash2 size={13} />
+                        <Icon name="trash" size={13} />
                       </button>
                     </motion.div>
                   );
@@ -305,7 +284,7 @@ export default function FinancePage() {
                     </Badge>
                     {!["c1","c2","c3","c4","c5","c6","c7","c8"].includes(cat.id) && (
                       <button onClick={() => deleteCategory(cat.id)} className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 transition-all" style={{ color: "#C64545" }}>
-                        <X size={12} />
+                        <Icon name="x" size={12} />
                       </button>
                     )}
                   </div>
@@ -417,63 +396,6 @@ export default function FinancePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Evaluation Dialog */}
-      <Dialog open={showEval} onOpenChange={setShowEval}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Evaluasi Keuangan</DialogTitle>
-            <DialogDescription>{monthLabel(currentMonth)}</DialogDescription>
-          </DialogHeader>
-          <div className="p-6 flex flex-col gap-5">
-            {/* Summary numbers */}
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: "Pemasukan", value: fmtIDR(income), color: "#5DB872" },
-                { label: "Pengeluaran", value: fmtIDR(expense), color: "#D85A4A" },
-                { label: "Savings Rate", value: `${savingsRate}%`, color: savingsRate >= 20 ? "#5DB872" : "#E8A55A" },
-              ].map(({ label, value, color }) => (
-                <div key={label} className="rounded-[10px] p-3 text-center" style={{ background: "var(--color-canvas)" }}>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--color-muted)" }}>{label}</p>
-                  <p className="text-[15px] font-bold" style={{ color }}>{value}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Analysis */}
-            <div className="flex flex-col gap-2.5">
-              <p className="text-[12px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>Analisis & Saran</p>
-              {evaluation.map((item, i) => (
-                <div key={i} className="flex items-start gap-3 p-3 rounded-[10px]"
-                  style={{ background: item.type === "warning" ? "#FFF5E6" : "#E6F4F2", border: `1px solid ${item.type === "warning" ? "#E8A55A44" : "#2A9D8F44"}` }}>
-                  {item.type === "warning"
-                    ? <AlertTriangle size={15} className="flex-shrink-0 mt-0.5" style={{ color: "#C16A2E" }} />
-                    : <CheckCircle size={15} className="flex-shrink-0 mt-0.5" style={{ color: "#2A9D8F" }} />}
-                  <p className="text-[13px]" style={{ color: item.type === "warning" ? "#7A3E0A" : "#1C4F4F" }}>{item.text}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Top expenses */}
-            {catBreakdown.length > 0 && (
-              <div>
-                <p className="text-[12px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted)" }}>Top Pengeluaran</p>
-                <div className="flex flex-col gap-1.5">
-                  {catBreakdown.slice(0, 4).map((cat, i) => (
-                    <div key={cat.id} className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold w-4 text-center" style={{ color: "var(--color-muted)" }}>#{i + 1}</span>
-                      <span className="text-[14px]">{cat.icon}</span>
-                      <span className="flex-1 text-[13px] font-medium" style={{ color: "var(--color-ink)" }}>{cat.name}</span>
-                      <span className="text-[13px] font-bold" style={{ color: "#D85A4A" }}>{fmtIDR(cat.total)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <Button onClick={() => setShowEval(false)} className="w-full">Tutup</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </ShellLayout>
   );
 }

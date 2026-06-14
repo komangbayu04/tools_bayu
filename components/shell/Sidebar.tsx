@@ -3,15 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
-import { LayoutDashboard, FileText, CheckSquare, Image, Wallet, Settings, Moon, Sun } from "lucide-react";
+import { Icon, type IconName } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
-const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Template Invoice", href: "/invoice", icon: FileText },
-  { label: "To do list", href: "/todo", icon: CheckSquare },
-  { label: "Finance", href: "/finance", icon: Wallet },
-  { label: "Moodboard", href: "/moodboard", icon: Image },
+const navItems: { label: string; href: string; icon: IconName }[] = [
+  { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
+  { label: "Template Invoice", href: "/invoice", icon: "file-text" },
+  { label: "To do list", href: "/todo", icon: "check-square" },
+  { label: "Finance", href: "/finance", icon: "wallet" },
+  { label: "Moodboard", href: "/moodboard", icon: "image" },
 ];
 
 export function Sidebar() {
@@ -39,7 +39,7 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 flex flex-col gap-0.5">
-          {navItems.map(({ label, href, icon: Icon }) => {
+          {navItems.map(({ label, href, icon }) => {
             const isActive = pathname === href || pathname.startsWith(href + "/");
             return (
               <Link
@@ -57,7 +57,7 @@ export function Sidebar() {
                     : { color: "var(--color-muted)" }
                 }
               >
-                <Icon size={17} style={{ color: isActive ? "#2A9D8F" : "var(--color-muted-soft)" }} />
+                <Icon name={icon} size={17} style={{ color: isActive ? "#2A9D8F" : "var(--color-muted-soft)" }} />
                 {label}
               </Link>
             );
@@ -79,7 +79,7 @@ export function Sidebar() {
                 : { color: "var(--color-muted)" }
             }
           >
-            <Settings size={17} style={{ color: pathname === "/settings" ? "#2A9D8F" : "var(--color-muted-soft)" }} />
+            <Icon name="settings" size={17} style={{ color: pathname === "/settings" ? "#2A9D8F" : "var(--color-muted-soft)" }} />
             Settings
           </Link>
           <button
@@ -88,8 +88,8 @@ export function Sidebar() {
             style={{ color: "var(--color-muted)" }}
           >
             {theme === "dark"
-              ? <Sun size={17} style={{ color: "var(--color-muted-soft)" }} />
-              : <Moon size={17} style={{ color: "var(--color-muted-soft)" }} />
+              ? <Icon name="sun" size={17} style={{ color: "var(--color-muted-soft)" }} />
+              : <Icon name="moon" size={17} style={{ color: "var(--color-muted-soft)" }} />
             }
             {theme === "dark" ? "Light Mode" : "Dark Mode"}
           </button>
@@ -101,7 +101,7 @@ export function Sidebar() {
         className="md:hidden fixed bottom-0 left-0 right-0 flex items-center justify-around px-2 py-2 z-50 border-t"
         style={{ background: "var(--color-surface)", borderColor: "var(--color-hairline)" }}
       >
-        {navItems.map(({ href, icon: Icon }) => {
+        {navItems.map(({ href, icon }) => {
           const isActive = pathname === href || pathname.startsWith(href + "/");
           return (
             <Link
@@ -110,7 +110,7 @@ export function Sidebar() {
               className="flex flex-col items-center p-2.5 rounded-xl transition-colors"
               style={{ color: isActive ? "#2A9D8F" : "var(--color-muted-soft)" }}
             >
-              <Icon size={22} />
+              <Icon name={icon} size={22} />
             </Link>
           );
         })}

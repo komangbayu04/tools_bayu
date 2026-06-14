@@ -6,15 +6,15 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
-import { Moon, Sun, Monitor } from "lucide-react";
+import { Icon, type IconName } from "@/components/ui/icon";
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
 
-  const themeOptions = [
-    { key: "light", label: "Light", icon: Sun },
-    { key: "dark", label: "Dark", icon: Moon },
-    { key: "system", label: "System", icon: Monitor },
+  const themeOptions: { key: string; label: string; icon: IconName }[] = [
+    { key: "light", label: "Light", icon: "sun" },
+    { key: "dark", label: "Dark", icon: "moon" },
+    { key: "system", label: "System", icon: "monitor" },
   ];
 
   return (
@@ -32,7 +32,7 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-3">
-              {themeOptions.map(({ key, label, icon: Icon }) => (
+              {themeOptions.map(({ key, label, icon }) => (
                 <button
                   key={key}
                   onClick={() => setTheme(key)}
@@ -43,7 +43,7 @@ export default function SettingsPage() {
                       : { borderColor: "var(--color-hairline)", color: "var(--color-muted)" }
                   }
                 >
-                  <Icon size={20} />
+                  <Icon name={icon} size={20} />
                   <span className="text-[13px] font-semibold">{label}</span>
                 </button>
               ))}
