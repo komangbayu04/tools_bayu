@@ -52,24 +52,32 @@ export default function MoodboardPage() {
   const filtered = activeCategory === "all" ? items : items.filter((i) => i.category === activeCategory);
   const categories: Category[] = ["all", "graphic_design", "product_design", "3d", "motion"];
 
-  const handleUrlBlur = async () => {
-    if (!newUrl) return;
-    setFetchingPreview(true);
+  type PreviewData = { title?: string; domain?: string; image_url?: string };
+
+  // Fetch OG metadata + image via Microlink. Returns the resolved preview.
+  const fetchPreview = async (url: string): Promise<PreviewData> => {
+    let domain = url;
+    try { domain = new URL(url).hostname.replace("www.", ""); } catch {}
+    const fallbackTitle = domain.split(".")[0].charAt(0).toUpperCase() + domain.split(".")[0].slice(1) + " — Reference";
     try {
-      const res = await fetch(`https://api.microlink.io?url=${encodeURIComponent(newUrl)}`);
+      const res = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(url)}&palette=false&audio=false&video=false`);
       const json = await res.json();
-      const domain = new URL(newUrl).hostname.replace("www.", "");
-      setPreview({
-        title: json.data?.title || (domain.split(".")[0].charAt(0).toUpperCase() + domain.split(".")[0].slice(1) + " — Reference"),
-        domain,
-        image_url: json.data?.image?.url || json.data?.screenshot?.url || undefined,
-      });
+      // Prefer the page OG image; fall back to a Microlink-proxied screenshot.
+      let image_url: string | undefined = json?.data?.image?.url || json?.data?.logo?.url;
+      if (!image_url && json?.status === "success") {
+        // Proxy a screenshot through Microlink so even hotlink-protected pages render.
+        image_url = `https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=true&embed=screenshot.url`;
+      }
+      return { title: json?.data?.title || fallbackTitle, domain, image_url };
     } catch {
-      try {
-        const domain = new URL(newUrl).hostname.replace("www.", "");
-        setPreview({ title: domain.split(".")[0].charAt(0).toUpperCase() + domain.split(".")[0].slice(1) + " — Reference", domain });
-      } catch { setPreview(null); }
+      return { title: fallbackTitle, domain };
     }
+  };
+
+  const handleUrlBlur = async () => {
+    if (!newUrl.trim()) return;
+    setFetchingPreview(true);
+    setPreview(await fetchPreview(newUrl));
     setFetchingPreview(false);
   };
 
@@ -77,19 +85,26 @@ export default function MoodboardPage() {
     setNewUrl(""); setNewCategory("graphic_design"); setNewTags(""); setNewNote(""); setPreview(null);
   };
 
-  const handleAddItem = () => {
+  const handleAddItem = async () => {
     if (!newUrl.trim()) return;
+    // Ensure we have the image even if the user clicked Add before blur finished.
+    let data = preview;
+    if (!data || !data.image_url) {
+      setFetchingPreview(true);
+      data = await fetchPreview(newUrl);
+      setFetchingPreview(false);
+    }
     let domain = newUrl;
     try { domain = new URL(newUrl).hostname.replace("www.", ""); } catch {}
     addItem({
       url: newUrl,
-      title: preview?.title || `Reference from ${domain}`,
-      source_domain: preview?.domain || domain,
+      title: data?.title || `Reference from ${domain}`,
+      source_domain: data?.domain || domain,
       category: newCategory,
       tags: newTags.split(",").map((t) => t.trim()).filter(Boolean),
       note: newNote,
       color: randomGradient(),
-      image_url: preview?.image_url,
+      image_url: data?.image_url,
     });
     setShowModal(false);
     resetForm();
@@ -139,7 +154,14 @@ export default function MoodboardPage() {
                     <img
                       src={item.image_url}
                       alt={item.title}
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      style={{ background: resolveCover(item.color, item.id) }}
+                      onError={(e) => {
+                        // Hide broken image; gradient background shows through.
+                        e.currentTarget.style.visibility = "hidden";
+                      }}
                     />
                   ) : (
                     <div
