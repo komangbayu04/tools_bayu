@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase, supabaseEnabled, primeCloudCache } from "@/lib/supabase";
 import { rehydrateAllStores } from "@/lib/store";
@@ -22,6 +22,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   // "checking" = initial auth check; "hydrating" = loading store data post-login
   const [phase, setPhase] = useState<"checking" | "hydrating" | "ready">("checking");
+  // The user id we've already fetched + hydrated stores for. Supabase re-emits
+  // SIGNED_IN whenever the tab regains focus (it re-checks the session), so we
+  // use this to skip re-hydrating for the *same* user — otherwise switching tabs
+  // and coming back would wipe any unsaved, in-progress form data with cloud data.
+  const hydratedUserId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -37,6 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // One bulk fetch of all state, then rehydrate every store from cache.
         await primeCloudCache();
         await rehydrateAllStores();
+        hydratedUserId.current = s.user.id;
       }
       setPhase("ready");
     });
@@ -44,14 +50,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange(async (event, s) => {
       setSession(s);
       // Only re-hydrate when the user identity actually changes. Token refreshes
-      // (hourly) and user-metadata updates keep the same data, so skipping them
-      // avoids needlessly reloading every store and flashing the loading screen.
+      // (hourly), user-metadata updates, AND tab-focus re-checks all keep the same
+      // user — re-emitted SIGNED_IN events for an already-hydrated user are ignored
+      // so we never clobber unsaved work or flash the loading screen.
       if (event === "SIGNED_IN" && s) {
+        if (hydratedUserId.current === s.user.id) return; // same user → no-op
         setPhase("hydrating");
         await primeCloudCache();
         await rehydrateAllStores();
+        hydratedUserId.current = s.user.id;
         setPhase("ready");
       } else if (event === "SIGNED_OUT") {
+        hydratedUserId.current = null;
         setPhase("ready");
       }
     });
