@@ -422,7 +422,7 @@ export default function DesignAssistantPage() {
       <PageHeader
         eyebrow="AI Studio"
         title="Design Assistant"
-        subtitle="Upload screenshot desain kamu — Claude akan menganalisis dan memberikan feedback mendalam"
+        subtitle="Upload screenshot desain kamu — AI akan menganalisis dan memberikan feedback mendalam"
       />
 
       <div className="flex flex-col xl:flex-row gap-6 pb-16">
@@ -568,7 +568,7 @@ export default function DesignAssistantPage() {
                 >
                   <span className="text-[30px] animate-pulse">{modeConfig.icon}</span>
                 </div>
-                <p className="text-[15px] font-semibold" style={{ color: "var(--color-ink)" }}>Claude sedang menganalisis…</p>
+                <p className="text-[15px] font-semibold" style={{ color: "var(--color-ink)" }}>AI sedang menganalisis…</p>
                 <p className="text-[13px] mt-1.5" style={{ color: "var(--color-muted)" }}>{modeConfig.label}</p>
                 <div className="flex gap-1.5 mt-5">
                   {[0, 0.15, 0.3].map((d) => (
@@ -600,7 +600,7 @@ export default function DesignAssistantPage() {
                   <span className="text-[20px]">{MODES.find(m => m.id === resultMode)?.icon}</span>
                   <div>
                     <p className="text-[13px] font-bold" style={{ color: "var(--color-ink)" }}>{MODES.find(m => m.id === resultMode)?.label}</p>
-                    <p className="text-[11px]" style={{ color: "var(--color-muted)" }}>Analisis selesai · Powered by Claude</p>
+                    <p className="text-[11px]" style={{ color: "var(--color-muted)" }}>Analisis selesai · Powered by GPT-4o</p>
                   </div>
                   <button
                     onClick={() => setResult(null)}
