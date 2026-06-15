@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useInvoiceHistoryStore } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
 
 type DocumentType = "invoice" | "quotation";
@@ -127,19 +128,45 @@ export default function InvoicePage() {
     ["Bank Swift Code", swift], ["Bank Code", bankCode], ["Branch Code", branchCode],
   ];
 
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+
+  const buildSnapshot = () => ({
+    docType, fromName, fromAddress, clientName, dateIssued, paymentStatus, rate, totalTasks,
+    items, companyName, projectName, docNo, quoteItems,
+    bankName, bankAddress, bankCountry, accHolder, accAddress, accNo, swift, bankCode, branchCode,
+    contactName, contactEmail, contactPhone,
+  });
+
   const handleSave = () => {
     saveDoc({
       type: docType,
       clientName: docType === "quotation" ? companyName : clientName,
       dateIssued,
       total,
-      snapshot: {
-        docType, fromName, fromAddress, clientName, dateIssued, paymentStatus, rate, totalTasks,
-        items, companyName, projectName, docNo, quoteItems,
-        bankName, bankAddress, bankCountry, accHolder, accAddress, accNo, swift, bankCode, branchCode,
-        contactName, contactEmail, contactPhone,
-      },
+      snapshot: buildSnapshot(),
     });
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleShare = async () => {
+    if (!supabase) return;
+    setShareBusy(true);
+    setShareUrl(null);
+    const { data, error } = await supabase
+      .from("shared_invoices")
+      .insert({ snapshot: buildSnapshot() })
+      .select("id")
+      .single();
+    if (!error && data) {
+      const url = `${window.location.origin}/invoice/share/${data.id}`;
+      setShareUrl(url);
+      await navigator.clipboard.writeText(url).catch(() => {});
+    }
+    setShareBusy(false);
   };
 
   return (
@@ -148,15 +175,38 @@ export default function InvoicePage() {
         title="Template Invoice"
         subtitle="Invoice & Quotation builder"
         actions={
-          <>
+          <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" onClick={() => router.push("/invoice/history")}>
               <Icon name="history" size={15} /> History
             </Button>
             <Button variant="outline" onClick={handleSave}><Icon name="save" size={15} /> Save</Button>
-            <Button><Icon name="download" size={15} /> Export PDF</Button>
-          </>
+            <Button variant="outline" onClick={handleShare} disabled={shareBusy}>
+              <Icon name="link" size={15} /> {shareBusy ? "Membuat link…" : "Share Link"}
+            </Button>
+            <Button onClick={handlePrint}><Icon name="download" size={15} /> Export PDF</Button>
+          </div>
         }
       />
+
+      {/* Share URL banner */}
+      {shareUrl && (
+        <div className="mb-5 flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: "var(--color-primary-light)", border: "1px solid var(--color-primary-muted)" }}>
+          <Icon name="check-circle" size={16} style={{ color: "var(--color-primary)", flexShrink: 0 }} />
+          <p className="text-[13px] font-medium flex-1 truncate" style={{ color: "var(--color-primary-ink)" }}>
+            Link tersalin: <span className="font-semibold">{shareUrl}</span>
+          </p>
+          <button
+            onClick={() => navigator.clipboard.writeText(shareUrl)}
+            className="text-[12px] font-semibold px-3 py-1 rounded-lg transition-opacity hover:opacity-70 flex-shrink-0"
+            style={{ background: "var(--color-primary)", color: "var(--color-on-primary)" }}
+          >
+            Salin Lagi
+          </button>
+          <button onClick={() => setShareUrl(null)} style={{ color: "var(--color-muted)" }}>
+            <Icon name="x" size={14} />
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] gap-5 items-start">
         {/* ── LEFT: FORM ── */}
@@ -350,7 +400,7 @@ export default function InvoicePage() {
 
         {/* ── RIGHT: LIVE PREVIEW ── */}
         <div className="rounded-[14px] border overflow-hidden shadow-sm sticky top-6" style={{ borderColor: "var(--color-hairline)", maxHeight: "calc(100vh - 48px)", overflowY: "auto" }}>
-          <div className="bg-white text-[#1A1A1A] px-10 py-12">
+          <div id="invoice-print-area" className="bg-white text-[#1A1A1A] px-10 py-12">
             {docType === "invoice" ? (
               <InvoicePreview
                 fromName={fromName} fromAddress={fromAddress} clientName={clientName}

@@ -29,3 +29,22 @@ create policy "own_rows_write"
   on public.app_state for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- ============================================================
+--  Shared invoices — publicly readable, auth-required to create
+-- ============================================================
+create table if not exists public.shared_invoices (
+  id          uuid primary key default gen_random_uuid(),
+  snapshot    jsonb not null,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.shared_invoices enable row level security;
+
+create policy "shared_public_read"
+  on public.shared_invoices for select
+  using (true);
+
+create policy "shared_auth_insert"
+  on public.shared_invoices for insert
+  with check (auth.uid() is not null);
