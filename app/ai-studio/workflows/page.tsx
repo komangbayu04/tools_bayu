@@ -117,9 +117,6 @@ export default function WorkflowBuilderPage() {
   const openEditStep = (step: WorkflowStep) => {
     setEditingStep(step);
     setStepTitle(step.title);
-    const known = (TOOL_OPTIONS as readonly string[]).includes(step.tool);
-    setStepTool(known ? step.tool : "Custom");
-    setStepCustomTool(known ? "" : step.tool);
     setStepNote(step.note);
     setStepDialogOpen(true);
   };
@@ -128,9 +125,7 @@ export default function WorkflowBuilderPage() {
     if (!selected) return;
     const title = stepTitle.trim();
     if (!title) return;
-    const tool =
-      stepTool === "Custom" ? stepCustomTool.trim() || "Custom" : stepTool;
-    const payload = { title, tool, note: stepNote.trim() };
+    const payload = { title, prompt: "", note: stepNote.trim() };
     if (editingStep) {
       updateStep(selected.id, editingStep.id, payload);
     } else {
@@ -424,9 +419,7 @@ export default function WorkflowBuilderPage() {
                                 >
                                   {step.title}
                                 </span>
-                                <Badge variant={toolBadgeVariant(step.tool)}>
-                                  {step.tool}
-                                </Badge>
+                                <Badge variant="teal">GPT-4o</Badge>
                               </div>
                               {step.note && (
                                 <p

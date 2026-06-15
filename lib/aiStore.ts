@@ -38,8 +38,8 @@ export const usePromptStore = create<PromptStore>()(
 export interface WorkflowStep {
   id: string;
   title: string;
-  tool: string;
-  note: string;
+  prompt: string;    // actual GPT prompt for this step, can use {{input}}
+  note: string;      // optional description shown in UI
 }
 export interface Workflow {
   id: string;
@@ -58,6 +58,43 @@ interface WorkflowStore {
   updateStep: (workflowId: string, stepId: string, patch: Partial<WorkflowStep>) => void;
   deleteStep: (workflowId: string, stepId: string) => void;
 }
+
+export interface WorkflowRunStep {
+  stepId: string;
+  title: string;
+  output: string;
+  status: "pending" | "running" | "done" | "error";
+}
+
+export interface WorkflowRun {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  userInput: string;
+  steps: WorkflowRunStep[];
+  createdAt: number;
+}
+
+interface WorkflowRunStore {
+  runs: WorkflowRun[];
+  addRun: (run: Omit<WorkflowRun, "id" | "createdAt">) => string;
+  deleteRun: (id: string) => void;
+}
+
+export const useWorkflowRunStore = create<WorkflowRunStore>()(
+  persist(
+    (set) => ({
+      runs: [],
+      addRun: (run) => {
+        const id = crypto.randomUUID();
+        set((s) => ({ runs: [{ ...run, id, createdAt: Date.now() }, ...s.runs] }));
+        return id;
+      },
+      deleteRun: (id) => set((s) => ({ runs: s.runs.filter((r) => r.id !== id) })),
+    }),
+    { name: "ai-workflow-runs-storage", storage: cloud() }
+  )
+);
 
 export const useWorkflowStore = create<WorkflowStore>()(
   persist(
