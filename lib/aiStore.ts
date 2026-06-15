@@ -122,6 +122,129 @@ export const useExperimentStore = create<ExperimentStore>()(
   )
 );
 
+// ─── Sitemap Generator ────────────────────────────────────────────
+export interface SitemapSection {
+  id: string;
+  name: string;
+}
+export interface SitemapPage {
+  id: string;
+  name: string;
+  sections: SitemapSection[];
+}
+export interface Sitemap {
+  id: string;
+  name: string;
+  pages: SitemapPage[];
+  createdAt: number;
+}
+
+const sId = () => crypto.randomUUID();
+
+interface SitemapStore {
+  sitemaps: Sitemap[];
+  addSitemap: (name: string, pages: SitemapPage[]) => string;
+  renameSitemap: (id: string, name: string) => void;
+  deleteSitemap: (id: string) => void;
+  addPage: (sitemapId: string, name: string) => void;
+  renamePage: (sitemapId: string, pageId: string, name: string) => void;
+  deletePage: (sitemapId: string, pageId: string) => void;
+  addSection: (sitemapId: string, pageId: string, name: string) => void;
+  renameSection: (sitemapId: string, pageId: string, sectionId: string, name: string) => void;
+  deleteSection: (sitemapId: string, pageId: string, sectionId: string) => void;
+  moveSection: (sitemapId: string, pageId: string, sectionId: string, dir: -1 | 1) => void;
+}
+
+// Map over a sitemap's pages, then over a page's sections — keeps the
+// nested updaters below short and readable.
+const mapPages = (sm: Sitemap, sitemapId: string, fn: (p: SitemapPage[]) => SitemapPage[]) =>
+  sm.id === sitemapId ? { ...sm, pages: fn(sm.pages) } : sm;
+
+export const useSitemapStore = create<SitemapStore>()(
+  persist(
+    (set) => ({
+      sitemaps: [],
+      addSitemap: (name, pages) => {
+        const id = sId();
+        set((s) => ({ sitemaps: [{ id, name, pages, createdAt: Date.now() }, ...s.sitemaps] }));
+        return id;
+      },
+      renameSitemap: (id, name) =>
+        set((s) => ({ sitemaps: s.sitemaps.map((sm) => (sm.id === id ? { ...sm, name } : sm)) })),
+      deleteSitemap: (id) => set((s) => ({ sitemaps: s.sitemaps.filter((sm) => sm.id !== id) })),
+
+      addPage: (sitemapId, name) =>
+        set((s) => ({
+          sitemaps: s.sitemaps.map((sm) =>
+            mapPages(sm, sitemapId, (pages) => [...pages, { id: sId(), name, sections: [] }])
+          ),
+        })),
+      renamePage: (sitemapId, pageId, name) =>
+        set((s) => ({
+          sitemaps: s.sitemaps.map((sm) =>
+            mapPages(sm, sitemapId, (pages) => pages.map((p) => (p.id === pageId ? { ...p, name } : p)))
+          ),
+        })),
+      deletePage: (sitemapId, pageId) =>
+        set((s) => ({
+          sitemaps: s.sitemaps.map((sm) =>
+            mapPages(sm, sitemapId, (pages) => pages.filter((p) => p.id !== pageId))
+          ),
+        })),
+
+      addSection: (sitemapId, pageId, name) =>
+        set((s) => ({
+          sitemaps: s.sitemaps.map((sm) =>
+            mapPages(sm, sitemapId, (pages) =>
+              pages.map((p) =>
+                p.id === pageId ? { ...p, sections: [...p.sections, { id: sId(), name }] } : p
+              )
+            )
+          ),
+        })),
+      renameSection: (sitemapId, pageId, sectionId, name) =>
+        set((s) => ({
+          sitemaps: s.sitemaps.map((sm) =>
+            mapPages(sm, sitemapId, (pages) =>
+              pages.map((p) =>
+                p.id === pageId
+                  ? { ...p, sections: p.sections.map((sec) => (sec.id === sectionId ? { ...sec, name } : sec)) }
+                  : p
+              )
+            )
+          ),
+        })),
+      deleteSection: (sitemapId, pageId, sectionId) =>
+        set((s) => ({
+          sitemaps: s.sitemaps.map((sm) =>
+            mapPages(sm, sitemapId, (pages) =>
+              pages.map((p) =>
+                p.id === pageId ? { ...p, sections: p.sections.filter((sec) => sec.id !== sectionId) } : p
+              )
+            )
+          ),
+        })),
+      moveSection: (sitemapId, pageId, sectionId, dir) =>
+        set((s) => ({
+          sitemaps: s.sitemaps.map((sm) =>
+            mapPages(sm, sitemapId, (pages) =>
+              pages.map((p) => {
+                if (p.id !== pageId) return p;
+                const idx = p.sections.findIndex((sec) => sec.id === sectionId);
+                const next = idx + dir;
+                if (idx < 0 || next < 0 || next >= p.sections.length) return p;
+                const sections = [...p.sections];
+                [sections[idx], sections[next]] = [sections[next], sections[idx]];
+                return { ...p, sections };
+              })
+            )
+          ),
+        })),
+    }),
+    { name: "ai-sitemaps-storage", storage: cloud() }
+  )
+);
+
 // ─── AI Assets Library ────────────────────────────────────────────
 export type AssetType = "image" | "video" | "text" | "audio";
 export interface AiAsset {
