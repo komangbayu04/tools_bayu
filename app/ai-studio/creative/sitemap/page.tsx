@@ -382,6 +382,44 @@ export default function SitemapGeneratorPage() {
   const [zoom, setZoom] = useState(1);
   const canvasRef = useRef<HTMLDivElement>(null);
 
+  // AI generation state
+  const [genMode, setGenMode] = useState<"template" | "ai">("template");
+  const [aiDesc, setAiDesc] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const handleAiGenerate = async () => {
+    if (!aiDesc.trim()) return;
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await fetch("/api/sitemap-generator", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: aiDesc }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setAiError(data.error ?? "Terjadi kesalahan.");
+        return;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = data.result as { name: string; pages: { name: string; sections: { name: string; description: string }[] }[]; rationale?: string };
+      const pages: SitemapPage[] = result.pages.map((p) => ({
+        id: crypto.randomUUID(),
+        name: p.name,
+        sections: p.sections.map((s) => ({ id: crypto.randomUUID(), name: s.name, description: s.description })),
+      }));
+      const id = addSitemap(result.name, pages);
+      setActiveId(id);
+      setAiDesc("");
+    } catch {
+      setAiError("Koneksi gagal. Coba lagi.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const ZOOM_MIN = 0.4;
   const ZOOM_MAX = 1.5;
   const zoomBy = (delta: number) =>
@@ -638,58 +676,125 @@ export default function SitemapGeneratorPage() {
 
       {/* Generator card */}
       <div
-        className="rounded-[20px] border p-6 mb-8"
+        className="rounded-[20px] border mb-8 overflow-hidden"
         style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface-card)" }}
       >
-        <label className="block text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted-soft)" }}>
-          Nama Website / Proyek
-        </label>
-        <input
-          placeholder="mis. Studio Kamarupa"
-          value={siteName}
-          onChange={(e) => setSiteName(e.target.value)}
-          className={`${inputBase} w-full mb-6`}
-          style={inputStyle}
-        />
-
-        <label className="block text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: "var(--color-muted-soft)" }}>
-          Tipe Website
-        </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-          {SITE_TYPES.map((type) => {
-            const selected = selectedType === type.id;
+        {/* Mode tabs */}
+        <div className="flex border-b" style={{ borderColor: "var(--color-hairline)" }}>
+          {[
+            { id: "template", label: "Dari Template", icon: "layout-grid" },
+            { id: "ai", label: "Generate dengan AI", icon: "sparkles" },
+          ].map((tab) => {
+            const active = genMode === tab.id;
             return (
               <button
-                key={type.id}
-                onClick={() => setSelectedType(type.id)}
-                className="text-left rounded-2xl border p-4 transition"
+                key={tab.id}
+                onClick={() => { setGenMode(tab.id as "template" | "ai"); setAiError(null); }}
+                className="flex items-center gap-2 px-5 py-3.5 text-[13px] font-semibold transition border-b-2"
                 style={{
-                  borderColor: selected ? "var(--color-primary)" : "var(--color-hairline)",
-                  background: selected ? "var(--color-primary-light)" : "var(--color-surface)",
-                  boxShadow: selected ? "0 0 0 1px var(--color-primary)" : "none",
+                  borderColor: active ? "var(--color-primary)" : "transparent",
+                  color: active ? "var(--color-primary-ink)" : "var(--color-muted)",
+                  background: active ? "var(--color-primary-light)" : "transparent",
                 }}
               >
-                <div className="flex items-center gap-2.5 mb-1.5">
-                  <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: selected ? "var(--color-primary)" : "var(--color-canvas)" }}
-                  >
-                    <Icon name={type.icon} size={16} style={{ color: selected ? "var(--color-on-primary)" : "var(--color-muted)" }} />
-                  </div>
-                  <span className="text-[14px] font-bold" style={{ color: "var(--color-ink)" }}>{type.label}</span>
-                </div>
-                <p className="text-[12px] leading-snug" style={{ color: "var(--color-muted)" }}>{type.description}</p>
-                <p className="text-[11px] mt-2 font-medium" style={{ color: "var(--color-muted-soft)" }}>
-                  {type.pages.length} halaman
-                </p>
+                <Icon name={tab.icon as IconName} size={14} />
+                {tab.label}
               </button>
             );
           })}
         </div>
 
-        <Button onClick={handleGenerate} size="lg">
-          <Icon name="sparkles" size={16} /> Generate Sitemap
-        </Button>
+        <div className="p-6">
+          {genMode === "template" ? (
+            <>
+              <label className="block text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted-soft)" }}>
+                Nama Website / Proyek
+              </label>
+              <input
+                placeholder="mis. Studio Kamarupa"
+                value={siteName}
+                onChange={(e) => setSiteName(e.target.value)}
+                className={`${inputBase} w-full mb-6`}
+                style={inputStyle}
+              />
+
+              <label className="block text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: "var(--color-muted-soft)" }}>
+                Tipe Website
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+                {SITE_TYPES.map((type) => {
+                  const selected = selectedType === type.id;
+                  return (
+                    <button
+                      key={type.id}
+                      onClick={() => setSelectedType(type.id)}
+                      className="text-left rounded-2xl border p-4 transition"
+                      style={{
+                        borderColor: selected ? "var(--color-primary)" : "var(--color-hairline)",
+                        background: selected ? "var(--color-primary-light)" : "var(--color-surface)",
+                        boxShadow: selected ? "0 0 0 1px var(--color-primary)" : "none",
+                      }}
+                    >
+                      <div className="flex items-center gap-2.5 mb-1.5">
+                        <div
+                          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                          style={{ background: selected ? "var(--color-primary)" : "var(--color-canvas)" }}
+                        >
+                          <Icon name={type.icon} size={16} style={{ color: selected ? "var(--color-on-primary)" : "var(--color-muted)" }} />
+                        </div>
+                        <span className="text-[14px] font-bold" style={{ color: "var(--color-ink)" }}>{type.label}</span>
+                      </div>
+                      <p className="text-[12px] leading-snug" style={{ color: "var(--color-muted)" }}>{type.description}</p>
+                      <p className="text-[11px] mt-2 font-medium" style={{ color: "var(--color-muted-soft)" }}>
+                        {type.pages.length} halaman
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <Button onClick={handleGenerate} size="lg">
+                <Icon name="layout-grid" size={16} /> Generate dari Template
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="flex items-start gap-3 mb-4 rounded-xl px-4 py-3" style={{ background: "var(--color-primary-light)" }}>
+                <Icon name="sparkles" size={14} style={{ color: "var(--color-primary-ink)", flexShrink: 0, marginTop: 2 }} />
+                <p className="text-[13px]" style={{ color: "var(--color-primary-ink)" }}>
+                  Deskripsikan website kamu — bisnis, target audience, fitur utama. GPT-4o akan membuat struktur halaman dan sections yang paling sesuai.
+                </p>
+              </div>
+
+              <label className="block text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted-soft)" }}>
+                Deskripsi Website / Bisnis
+              </label>
+              <textarea
+                placeholder={`Contoh:\n"Saya punya klinik kecantikan di Bali yang menawarkan perawatan kulit, laser, dan body treatment. Target klien wanita 25-45 tahun. Saya ingin website yang elegan dan bisa booking online."`}
+                value={aiDesc}
+                onChange={(e) => setAiDesc(e.target.value)}
+                rows={5}
+                className={`${inputBase} w-full mb-4 resize-none`}
+                style={inputStyle}
+              />
+
+              {aiError && (
+                <div className="flex items-start gap-2.5 rounded-xl px-4 py-3 mb-4" style={{ background: "#fef2f2" }}>
+                  <Icon name="alert-triangle" size={13} style={{ color: "#dc2626", flexShrink: 0, marginTop: 1 }} />
+                  <p className="text-[13px]" style={{ color: "#991b1b" }}>{aiError}</p>
+                </div>
+              )}
+
+              <Button onClick={handleAiGenerate} disabled={!aiDesc.trim() || aiLoading} size="lg">
+                {aiLoading ? (
+                  <><Icon name="spinner" size={16} spin /> AI sedang membuat sitemap…</>
+                ) : (
+                  <><Icon name="sparkles" size={16} /> Generate dengan AI</>
+                )}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Saved sitemaps */}
