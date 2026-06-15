@@ -985,8 +985,8 @@ export default function WorkflowRunnerPage() {
                       </div>
                     )}
 
-                  {/* Combined result document when done */}
-                  {runDone && !isRunning && (
+                  {/* Combined result document when done — hide once saved to history */}
+                  {runDone && !isRunning && !savedRun && (
                     <motion.div
                       initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -1015,6 +1015,26 @@ export default function WorkflowRunnerPage() {
                         userInput={userInput}
                         steps={runSteps.map((rs) => ({ title: rs.title, output: rs.output }))}
                       />
+                    </motion.div>
+                  )}
+
+                  {/* Saved confirmation banner */}
+                  {runDone && !isRunning && savedRun && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex items-center gap-3 rounded-[14px] px-5 py-4"
+                      style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}
+                    >
+                      <Icon name="check-circle" size={18} style={{ color: "#16a34a" }} />
+                      <div>
+                        <p className="font-semibold text-[14px]" style={{ color: "#15803d" }}>
+                          Hasil tersimpan di History
+                        </p>
+                        <p className="text-[12px]" style={{ color: "#16a34a" }}>
+                          Buka tab <strong>History</strong> untuk melihat hasilnya kembali.
+                        </p>
+                      </div>
                     </motion.div>
                   )}
                 </div>
