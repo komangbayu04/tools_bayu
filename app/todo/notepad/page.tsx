@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Icon } from "@/components/ui/icon";
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
+import { supabaseStorage } from "@/lib/supabase";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 
@@ -71,7 +72,7 @@ const useNoteStore = create<NoteStore>()(
         })),
       deleteNote: (id) => set((s) => ({ notes: s.notes.filter((n) => n.id !== id) })),
     }),
-    { name: "notepad-storage" }
+    { name: "notepad-storage", storage: createJSONStorage(() => supabaseStorage) }
   )
 );
 

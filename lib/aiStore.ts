@@ -1,5 +1,8 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
+import { supabaseStorage } from "./supabase";
+
+const cloud = () => createJSONStorage(() => supabaseStorage);
 
 // ─── Prompt Library ───────────────────────────────────────────────
 export interface Prompt {
@@ -31,7 +34,7 @@ export const usePromptStore = create<PromptStore>()(
       updatePrompt: (id, patch) => set((s) => ({ prompts: s.prompts.map((p) => (p.id === id ? { ...p, ...patch } : p)) })),
       deletePrompt: (id) => set((s) => ({ prompts: s.prompts.filter((p) => p.id !== id) })),
     }),
-    { name: "ai-prompts-storage" }
+    { name: "ai-prompts-storage", storage: cloud() }
   )
 );
 
@@ -99,7 +102,7 @@ export const useWorkflowStore = create<WorkflowStore>()(
         ),
       })),
     }),
-    { name: "ai-workflows-storage" }
+    { name: "ai-workflows-storage", storage: cloud() }
   )
 );
 
@@ -134,7 +137,7 @@ export const useExperimentStore = create<ExperimentStore>()(
       updateExperiment: (id, patch) => set((s) => ({ experiments: s.experiments.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
       deleteExperiment: (id) => set((s) => ({ experiments: s.experiments.filter((e) => e.id !== id) })),
     }),
-    { name: "ai-experiments-storage" }
+    { name: "ai-experiments-storage", storage: cloud() }
   )
 );
 
@@ -167,6 +170,6 @@ export const useAssetStore = create<AssetStore>()(
       addAsset: (a) => set((s) => ({ assets: [{ ...a, id: crypto.randomUUID(), createdAt: Date.now() }, ...s.assets] })),
       deleteAsset: (id) => set((s) => ({ assets: s.assets.filter((a) => a.id !== id) })),
     }),
-    { name: "ai-assets-storage" }
+    { name: "ai-assets-storage", storage: cloud() }
   )
 );

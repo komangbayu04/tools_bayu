@@ -1,5 +1,8 @@
 import { create } from "zustand"
-import { persist } from "zustand/middleware"
+import { persist, createJSONStorage } from "zustand/middleware"
+import { supabaseStorage } from "./supabase"
+
+const cloud = () => createJSONStorage(() => supabaseStorage)
 
 // ─── Task store ───────────────────────────────────────────────────
 export type Priority = "high" | "medium" | "low"
@@ -61,7 +64,7 @@ export const useTaskStore = create<TaskStore>()(
         return { tasks: [...others, ...reordered.map((t, i) => ({ ...t, order: i }))] }
       }),
     }),
-    { name: "tasks-storage-v2" }
+    { name: "tasks-storage-v2", storage: cloud() }
   )
 )
 
@@ -97,7 +100,7 @@ export const useProjectStore = create<ProjectStore>()(
       updateProject: (id, patch) => set((s) => ({ projects: s.projects.map(p => p.id === id ? { ...p, ...patch } : p) })),
       deleteProject: (id) => set((s) => ({ projects: s.projects.filter(p => p.id !== id) })),
     }),
-    { name: "projects-storage" }
+    { name: "projects-storage", storage: cloud() }
   )
 )
 
@@ -129,7 +132,7 @@ export const useInvoiceHistoryStore = create<InvoiceHistoryStore>()(
       },
       deleteDoc: (id) => set((s) => ({ history: s.history.filter(d => d.id !== id) })),
     }),
-    { name: "invoice-history-storage" }
+    { name: "invoice-history-storage", storage: cloud() }
   )
 )
 
@@ -173,7 +176,7 @@ export const useMoodStore = create<MoodStore>()(
       addItem: (item) => set((s) => ({ items: [{ ...item, id: crypto.randomUUID(), createdAt: item.createdAt ?? Date.now() }, ...s.items] })),
       deleteItem: (id) => set((s) => ({ items: s.items.filter(i => i.id !== id) })),
     }),
-    { name: "moodboard-storage" }
+    { name: "moodboard-storage", storage: cloud() }
   )
 )
 
@@ -246,6 +249,6 @@ export const useFinanceStore = create<FinanceStore>()(
       addCategory: (c) => set((s) => ({ categories: [...s.categories, { ...c, id: crypto.randomUUID() }] })),
       deleteCategory: (id) => set((s) => ({ categories: s.categories.filter(c => c.id !== id) })),
     }),
-    { name: "finance-storage" }
+    { name: "finance-storage", storage: cloud() }
   )
 )
