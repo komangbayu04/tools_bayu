@@ -192,6 +192,7 @@ interface FinanceStore {
   transactions: Transaction[]
   categories: FinanceCategory[]
   addTransaction: (t: Omit<Transaction, "id">) => void
+  updateTransaction: (id: string, patch: Partial<Omit<Transaction, "id">>) => void
   deleteTransaction: (id: string) => void
   addCategory: (c: Omit<FinanceCategory, "id">) => void
   deleteCategory: (id: string) => void
@@ -214,6 +215,7 @@ export const useFinanceStore = create<FinanceStore>()(
       transactions: [],
       categories: DEFAULT_CATEGORIES,
       addTransaction: (t) => set((s) => ({ transactions: [{ ...t, id: crypto.randomUUID() }, ...s.transactions] })),
+      updateTransaction: (id, patch) => set((s) => ({ transactions: s.transactions.map(t => t.id === id ? { ...t, ...patch } : t) })),
       deleteTransaction: (id) => set((s) => ({ transactions: s.transactions.filter(t => t.id !== id) })),
       addCategory: (c) => set((s) => ({ categories: [...s.categories, { ...c, id: crypto.randomUUID() }] })),
       deleteCategory: (id) => set((s) => ({ categories: s.categories.filter(c => c.id !== id) })),

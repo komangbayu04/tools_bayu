@@ -31,7 +31,7 @@ const COLOR_OPTIONS = ["var(--color-primary)","#6D8DF0","#E8A55A","#C77DD6","#5D
 
 export default function FinancePage() {
   const router = useRouter();
-  const { transactions, categories, addTransaction, deleteTransaction, addCategory, deleteCategory } = useFinanceStore();
+  const { transactions, categories, addTransaction, updateTransaction, deleteTransaction, addCategory, deleteCategory } = useFinanceStore();
 
   // Month navigation
   const [currentMonth, setCurrentMonth] = useState(() => monthKey(new Date()));
@@ -48,6 +48,37 @@ export default function FinancePage() {
   const [txDesc, setTxDesc] = useState("");
   const [txDate, setTxDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [txNote, setTxNote] = useState("");
+
+  // Edit Transaction
+  const [editTx, setEditTx] = useState<typeof transactions[number] | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editCatId, setEditCatId] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editNote, setEditNote] = useState("");
+
+  const openEdit = (tx: typeof transactions[number]) => {
+    setEditTx(tx);
+    setEditAmount(String(tx.amount));
+    setEditDesc(tx.description);
+    setEditCatId(tx.categoryId);
+    setEditDate(tx.date);
+    setEditNote(tx.note ?? "");
+  };
+
+  const saveEdit = () => {
+    if (!editTx) return;
+    const newDate = editDate || editTx.date;
+    updateTransaction(editTx.id, {
+      amount: Number(editAmount) || editTx.amount,
+      description: editDesc || editTx.description,
+      categoryId: editCatId || editTx.categoryId,
+      date: newDate,
+      month: newDate.slice(0, 7),
+      note: editNote || undefined,
+    });
+    setEditTx(null);
+  };
 
   // Add Category form
   const [catName, setCatName] = useState("");
@@ -302,13 +333,22 @@ export default function FinancePage() {
                       <p className="text-[14px] font-bold flex-shrink-0" style={{ color: tx.type === "income" ? "#2E9E5B" : "#D85A4A" }}>
                         {tx.type === "income" ? "+" : "-"}{fmtIDR(tx.amount)}
                       </p>
-                      <button
-                        onClick={() => deleteTransaction(tx.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 transition-all flex-shrink-0"
-                        style={{ color: "#C64545" }}
-                      >
-                        <Icon name="trash" size={13} />
-                      </button>
+                      <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all flex-shrink-0">
+                        <button
+                          onClick={() => openEdit(tx)}
+                          className="p-1.5 rounded-lg hover:bg-[var(--color-canvas)] transition-all"
+                          style={{ color: "var(--color-muted-soft)" }}
+                        >
+                          <Icon name="edit" size={13} />
+                        </button>
+                        <button
+                          onClick={() => deleteTransaction(tx.id)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 transition-all"
+                          style={{ color: "#C64545" }}
+                        >
+                          <Icon name="trash" size={13} />
+                        </button>
+                      </div>
                     </motion.div>
                   );
                 })}
@@ -488,6 +528,57 @@ export default function FinancePage() {
             <div className="flex gap-3 pt-1">
               <Button variant="outline" className="flex-1" onClick={() => setShowAddCat(false)}>Batal</Button>
               <Button className="flex-1" onClick={handleAddCat} disabled={!catName.trim()}>Simpan</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Transaction Dialog */}
+      <Dialog open={!!editTx} onOpenChange={(o) => { if (!o) setEditTx(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Transaksi</DialogTitle>
+            <DialogDescription>Ubah detail transaksi</DialogDescription>
+          </DialogHeader>
+          <div className="p-6 flex flex-col gap-4">
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Nominal (IDR)</label>
+              <Input
+                type="number"
+                value={editAmount}
+                onChange={(e) => setEditAmount(e.target.value)}
+                placeholder="0"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Deskripsi</label>
+              <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="Deskripsi transaksi" />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Kategori</label>
+              <Select
+                value={editCatId}
+                onChange={(e) => setEditCatId(e.target.value)}
+              >
+                {categories
+                  .filter((c) => !editTx || c.type === editTx.type)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+              </Select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Tanggal</label>
+              <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Catatan (opsional)</label>
+              <Input value={editNote} onChange={(e) => setEditNote(e.target.value)} placeholder="Catatan tambahan…" />
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setEditTx(null)}>Batal</Button>
+              <Button className="flex-1" onClick={saveEdit} disabled={!editAmount || Number(editAmount) <= 0}>Simpan</Button>
             </div>
           </div>
         </DialogContent>
