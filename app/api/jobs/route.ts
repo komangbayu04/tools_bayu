@@ -54,77 +54,91 @@ async function fetchRemotive(search: string, category: string): Promise<JobItem[
   }));
 }
 
-// ─── LinkedIn guest search ─────────────────────────────────────────
-// LinkedIn's guest-facing job search API — no key required, rate-limited
-// server-side so individual users don't hit blocks.
+// ─── LinkedIn guest search (scraper) ──────────────────────────────
+// LinkedIn has no public jobs API, so we scrape the guest-facing job search
+// endpoint that powers their logged-out search results page and parse the
+// returned HTML job cards. Rate-limited and cached server-side.
 async function fetchLinkedIn(search: string, location: string): Promise<JobItem[]> {
   if (!search.trim()) return [];
 
-  const params = new URLSearchParams({
-    keywords: search,
-    location: location || "Remote",
-    start: "0",
-    count: "20",
-    f_TPR: "r604800", // past week
-  });
-
-  const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?${params}`;
-
-  let html = "";
-  try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "en-US,en;q=0.9",
-        Referer: "https://www.linkedin.com/",
-      },
-      // Cache 10 min
-      next: { revalidate: 600 },
-    });
-    if (!res.ok) return [];
-    html = await res.text();
-  } catch {
-    return [];
-  }
+  const headers = {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    Referer: "https://www.linkedin.com/jobs",
+    "X-Requested-With": "XMLHttpRequest",
+  };
 
   const jobs: JobItem[] = [];
+  const seen = new Set<string>();
 
-  // Each job card is a <li> — extract with regex chunks
-  const liMatches = html.match(/<li>[\s\S]*?<\/li>/g) ?? [];
-  for (const li of liMatches) {
-    // entity URN or data-id
-    const idMatch = li.match(/data-entity-urn="[^"]*:(\d+)"/);
-    if (!idMatch) continue;
-    const id = `linkedin-${idMatch[1]}`;
-
-    const titleMatch = li.match(/<h3[^>]*class="[^"]*base-search-card__title[^"]*"[^>]*>([\s\S]*?)<\/h3>/);
-    const companyMatch = li.match(/<h4[^>]*class="[^"]*base-search-card__subtitle[^"]*"[^>]*>([\s\S]*?)<\/h4>/);
-    const locationMatch = li.match(/<span[^>]*class="[^"]*job-search-card__location[^"]*"[^>]*>([\s\S]*?)<\/span>/);
-    const dateMatch = li.match(/<time[^>]*datetime="([^"]+)"/);
-    const linkMatch = li.match(/href="(https:\/\/www\.linkedin\.com\/jobs\/view\/[^"?]+)/);
-
-    const title = stripHtml(titleMatch?.[1] ?? "").trim();
-    const company = stripHtml(companyMatch?.[1] ?? "").trim();
-    if (!title || !company) continue;
-
-    jobs.push({
-      id,
-      title,
-      company,
-      category: "",
-      type: "",
-      location: stripHtml(locationMatch?.[1] ?? location).trim(),
-      salary: "",
-      url: linkMatch?.[1] ?? `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(search)}`,
-      date: dateMatch?.[1] ?? "",
-      tags: [],
-      description: "",
-      source: "linkedin" as const,
+  // Fetch a couple of pages (each ~25 cards) for a fuller list.
+  for (const start of [0, 25]) {
+    const params = new URLSearchParams({
+      keywords: search,
+      location: location || "Remote",
+      start: String(start),
+      f_TPR: "r604800", // posted in the past week
     });
+    const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?${params}`;
 
-    if (jobs.length >= 20) break;
+    let html = "";
+    try {
+      const res = await fetch(url, { headers, next: { revalidate: 600 } });
+      if (!res.ok) break;
+      html = await res.text();
+    } catch {
+      break;
+    }
+
+    // Split on each card wrapper — guest cards use <li> or a div.base-card.
+    const cards = html.split(/<li[^>]*>/i).slice(1);
+    if (cards.length === 0) break;
+
+    for (const card of cards) {
+      const idMatch =
+        card.match(/data-entity-urn="urn:li:jobPosting:(\d+)"/) ||
+        card.match(/jobs\/view\/[^"/?]*?-(\d+)(?:[/?"])/) ||
+        card.match(/currentJobId=(\d+)/);
+      const linkMatch = card.match(/href="(https:\/\/[a-z.]*linkedin\.com\/jobs\/view\/[^"]+)"/);
+
+      const titleMatch =
+        card.match(/class="[^"]*base-search-card__title[^"]*"[^>]*>([\s\S]*?)<\//) ||
+        card.match(/class="[^"]*sr-only[^"]*"[^>]*>([\s\S]*?)<\//);
+      const companyMatch = card.match(/class="[^"]*base-search-card__subtitle[^"]*"[^>]*>([\s\S]*?)<\/[a-z0-9]+>/i);
+      const locationMatch = card.match(/class="[^"]*job-search-card__location[^"]*"[^>]*>([\s\S]*?)<\/span>/);
+      const dateMatch = card.match(/datetime="([^"]+)"/);
+
+      const title = stripHtml(titleMatch?.[1] ?? "").trim();
+      const company = stripHtml(companyMatch?.[1] ?? "").trim();
+      if (!title || !company) continue;
+
+      const rawUrl = linkMatch?.[1] ?? "";
+      const cleanUrl = rawUrl.split("?")[0];
+      const id = `linkedin-${idMatch?.[1] || cleanUrl || crypto.randomUUID()}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+
+      jobs.push({
+        id,
+        title,
+        company,
+        category: "",
+        type: "",
+        location: stripHtml(locationMatch?.[1] ?? location).trim(),
+        salary: "",
+        url: cleanUrl || `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(search)}&location=${encodeURIComponent(location || "")}`,
+        date: dateMatch?.[1] ?? "",
+        tags: [],
+        description: "",
+        source: "linkedin" as const,
+      });
+
+      if (jobs.length >= 30) break;
+    }
+
+    if (jobs.length >= 30) break;
   }
 
   return jobs;
