@@ -266,7 +266,7 @@ export function Sidebar() {
         }}
       >
         {/* Logo + collapse toggle */}
-        <div className="pt-7 pb-8 px-3 flex-shrink-0">
+        <div className="pt-4 pb-5 px-3 flex-shrink-0">
           <div className="flex items-center gap-2.5">
             {collapsed ? (
               <button
