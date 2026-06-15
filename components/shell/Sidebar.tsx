@@ -14,7 +14,18 @@ type NavGroup = { label: string; icon: IconName; children: NavItem[] };
 
 const navItems: (NavItem | { group: NavGroup })[] = [
   { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
-  { label: "Template Invoice", href: "/invoice", icon: "file-text" },
+  {
+    group: {
+      label: "Dokumen",
+      icon: "file-text",
+      children: [
+        { label: "Invoice Builder", href: "/invoice", icon: "receipt" },
+        { label: "Riwayat Invoice", href: "/invoice/history", icon: "history" },
+        { label: "Proposal", href: "/documents/proposal", icon: "edit" },
+        { label: "Kontrak", href: "/documents/contract", icon: "pen-ruler" },
+      ],
+    },
+  },
   {
     group: {
       label: "Workboard",
@@ -73,10 +84,13 @@ function isNavItem(item: (typeof navItems)[number]): item is NavItem {
   return "href" in item;
 }
 
-// Is a /todo-style href active, treating /todo/notepad as a distinct route.
 function hrefActive(pathname: string, href: string) {
   if (href === "/todo") {
     return pathname === "/todo" || (pathname.startsWith("/todo/") && !pathname.startsWith("/todo/notepad"));
+  }
+  // /invoice (builder) should not activate on /invoice/history
+  if (href === "/invoice") {
+    return pathname === "/invoice" || (pathname.startsWith("/invoice/") && !pathname.startsWith("/invoice/history") && !pathname.startsWith("/invoice/share"));
   }
   return pathname === href || pathname.startsWith(href + "/");
 }
