@@ -2,6 +2,7 @@
 
 import { Sidebar } from "./Sidebar";
 import { PageTransition } from "./PageTransition";
+import { FloatingChat } from "@/components/ai/FloatingChat";
 
 /**
  * Persistent app chrome. Rendered ONCE at the root layout so the sidebar
@@ -25,6 +26,7 @@ export function ShellChrome({ children }: { children: React.ReactNode }) {
         <div className="px-5 py-6 md:px-[52px] md:py-12 min-h-full">
           <div className="mx-auto w-full max-w-[1472px] pb-16 md:pb-0">
             <PageTransition>{children}</PageTransition>
+        <FloatingChat />
           </div>
         </div>
       </main>
