@@ -50,12 +50,16 @@ export default function VideoGeneratorPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollers = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  // Guards against state updates after the page unmounts: an 8s poll can resolve
+  // after the user has navigated away, which would warn + waste work.
+  const mounted = useRef(true);
 
   const startPolling = (localId: string, videoId: string) => {
     const tick = async () => {
       try {
         const res = await fetch(`/api/creative/video?id=${encodeURIComponent(videoId)}`);
         const data = await res.json();
+        if (!mounted.current) return;
         if (data.error) {
           updateVideo(localId, { status: "failed", error: data.error });
           stopPolling(localId);
@@ -94,6 +98,7 @@ export default function VideoGeneratorPage() {
       }
     });
     return () => {
+      mounted.current = false;
       Object.values(active).forEach(clearInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

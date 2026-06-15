@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { uploadMedia } from "@/lib/supabase";
 import {
   useMotionStore,
   type MotionProject,
@@ -94,6 +95,9 @@ function getImage(src: string, onLoad: () => void): HTMLImageElement | null {
   const cached = imgCache.get(src);
   if (cached) return cached.complete ? cached : null;
   const img = new window.Image();
+  // Remote (Storage) images must be CORS-enabled or drawing them taints the
+  // canvas and breaks WebM export. Data URLs are same-origin, so skip it there.
+  if (!src.startsWith("data:")) img.crossOrigin = "anonymous";
   img.onload = onLoad;
   img.src = src;
   imgCache.set(src, img);
@@ -200,13 +204,12 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
     [project]
   );
 
-  // Preview loop
+  // Preview loop. NOTE: `tick` is deliberately NOT a dependency — it bumps only
+  // to force a one-shot redraw when an async image finishes loading. Including it
+  // would tear down and recreate the rAF loop on every image load, resetting
+  // `startRef` and snapping the animation back to t=0.
   useEffect(() => {
-    if (exporting) return;
-    if (!playing) {
-      redraw(project.duration); // show final composed frame when paused
-      return;
-    }
+    if (exporting || !playing) return;
     startRef.current = performance.now();
     const loop = () => {
       const elapsed = (performance.now() - startRef.current) / 1000;
@@ -216,6 +219,13 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
     };
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
+  }, [playing, exporting, redraw, project.duration]);
+
+  // Paused: show the final composed frame, and redraw once whenever a layer
+  // image loads (tick) so it appears without needing to hit play.
+  useEffect(() => {
+    if (exporting || playing) return;
+    redraw(project.duration);
   }, [playing, exporting, redraw, project.duration, tick]);
 
   // ── Pointer drag to reposition selected layer ──
@@ -252,13 +262,21 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
     setSelectedId(l.id);
     setPlaying(false);
   };
-  const onUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    e.target.value = "";
+    // Prefer a Storage URL so the persisted project stays small — embedding
+    // base64 images can blow the localStorage quota and silently drop the save.
+    const uploaded = await uploadMedia(file);
+    if (uploaded) {
+      addLayer("image", uploaded);
+      return;
+    }
+    // Offline / not signed in: fall back to an inline data URL.
     const reader = new FileReader();
     reader.onload = () => addLayer("image", reader.result as string);
     reader.readAsDataURL(file);
-    e.target.value = "";
   };
 
   // ── Export to WebM ──

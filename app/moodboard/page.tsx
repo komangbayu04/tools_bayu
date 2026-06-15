@@ -114,32 +114,38 @@ export default function MoodboardPage() {
   const handleAddItem = async () => {
     if (!mediaData || saving) return;
     setSaving(true);
-    let domain = "";
-    if (newUrl) { try { domain = new URL(newUrl).hostname.replace("www.", ""); } catch { domain = newUrl; } }
+    try {
+      let domain = "";
+      if (newUrl) { try { domain = new URL(newUrl).hostname.replace("www.", ""); } catch { domain = newUrl; } }
 
-    // Prefer a Storage URL (keeps the synced row tiny); fall back to inline
-    // base64 if the upload isn't available so nothing is ever lost.
-    let imageUrl = mediaData;
-    if (mediaFile) {
-      const uploaded = await uploadMedia(mediaFile);
-      if (uploaded) imageUrl = uploaded;
+      // Prefer a Storage URL (keeps the synced row tiny); fall back to inline
+      // base64 if the upload isn't available so nothing is ever lost.
+      let imageUrl = mediaData;
+      if (mediaFile) {
+        const uploaded = await uploadMedia(mediaFile);
+        if (uploaded) imageUrl = uploaded;
+      }
+
+      addItem({
+        url: newUrl,
+        title: newTitle.trim() || "Untitled reference",
+        source_domain: domain,
+        category: newCategory,
+        tags: newTags.split(",").map((t) => t.trim()).filter(Boolean),
+        note: newNote,
+        color: "linear-gradient(135deg,#6ba539,#2e4d1b)",
+        image_url: imageUrl,
+        media_type: mediaType ?? "image",
+        createdAt: Date.now(),
+      });
+      setShowModal(false);
+      resetForm();
+    } catch (e) {
+      console.error("[moodboard] gagal menyimpan item:", e);
+    } finally {
+      // Always release the button — a thrown upload/read error must not lock the dialog.
+      setSaving(false);
     }
-
-    addItem({
-      url: newUrl,
-      title: newTitle.trim() || "Untitled reference",
-      source_domain: domain,
-      category: newCategory,
-      tags: newTags.split(",").map((t) => t.trim()).filter(Boolean),
-      note: newNote,
-      color: "linear-gradient(135deg,#6ba539,#2e4d1b)",
-      image_url: imageUrl,
-      media_type: mediaType ?? "image",
-      createdAt: Date.now(),
-    });
-    setSaving(false);
-    setShowModal(false);
-    resetForm();
   };
 
   return (

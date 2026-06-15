@@ -113,12 +113,13 @@ export default function FinanceEvaluatePage() {
   const donutTotal = expByCat.reduce((s, c) => s + c.total, 0);
   const R = 56;
   const C = 2 * Math.PI * R;
-  let acc = 0;
-  const donutSegments = expByCat.map((c) => {
-    const frac = donutTotal > 0 ? c.total / donutTotal : 0;
-    const seg = { color: c.color, dash: frac * C, offset: -acc * C, frac };
-    acc += frac;
-    return seg;
+  const fracOf = (total: number) => (donutTotal > 0 ? total / donutTotal : 0);
+  const donutSegments = expByCat.map((c, i) => {
+    const frac = fracOf(c.total);
+    // Offset is the cumulative fraction of all preceding segments — computed
+    // without a mutable accumulator so it stays render-pure.
+    const prior = expByCat.slice(0, i).reduce((s, x) => s + fracOf(x.total), 0);
+    return { color: c.color, dash: frac * C, offset: -prior * C, frac };
   });
 
   // ─── Analysis & suggestions ─────────────────────────────────────

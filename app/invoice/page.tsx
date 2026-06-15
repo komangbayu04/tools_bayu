@@ -486,7 +486,7 @@ export default function InvoicePage() {
               <div className="flex items-center justify-between px-6 py-5 border-b" style={{ borderColor: "var(--color-hairline)" }}>
                 <div>
                   <h2 className="text-[16px] font-semibold" style={{ color: "var(--color-ink)" }}>Import dari Task</h2>
-                  <p className="text-[12.5px] mt-0.5" style={{ color: "var(--color-muted)" }}>Pilih task yang sudah "Linked to Invoice" dan punya jam kerja</p>
+                  <p className="text-[12.5px] mt-0.5" style={{ color: "var(--color-muted)" }}>Pilih task yang sudah &quot;Linked to Invoice&quot; dan punya jam kerja</p>
                 </div>
                 <button onClick={() => setTaskPickerOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-70" style={{ background: "var(--color-canvas)", color: "var(--color-muted)" }}>
                   <Icon name="x" size={15} />
@@ -496,7 +496,7 @@ export default function InvoicePage() {
               {/* Task list */}
               <div className="max-h-[50vh] overflow-y-auto divide-y" style={{ borderColor: "var(--color-hairline)" }}>
                 {billableTasks.length === 0 ? (
-                  <p className="py-10 text-center text-[13px]" style={{ color: "var(--color-muted)" }}>Belum ada task dengan "Linked to Invoice" dan jam kerja.</p>
+                  <p className="py-10 text-center text-[13px]" style={{ color: "var(--color-muted)" }}>Belum ada task dengan &quot;Linked to Invoice&quot; dan jam kerja.</p>
                 ) : billableTasks.map((t) => {
                   const project = projects.find((p) => p.id === t.projectId);
                   const isSel = selectedTaskIds.has(t.id);
