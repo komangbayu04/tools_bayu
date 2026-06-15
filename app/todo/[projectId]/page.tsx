@@ -320,9 +320,20 @@ function ProjectTimeline({ tasks, color, onOpen }: { tasks: Task[]; color: strin
     .filter((t) => t.deadline)
     .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime());
   const undated = tasks.filter((t) => !t.deadline);
-  const ordered = [...dated, ...undated];
 
-  if (ordered.length === 0) {
+  // Group tasks that share the same deadline date so the date label & dot
+  // appear only once, with all tasks of that day stacked together.
+  type Group = { key: string; deadline: string | null; tasks: Task[] };
+  const groups: Group[] = [];
+  for (const t of dated) {
+    const key = format(new Date(t.deadline!), "yyyy-MM-dd");
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) last.tasks.push(t);
+    else groups.push({ key, deadline: t.deadline!, tasks: [t] });
+  }
+  if (undated.length > 0) groups.push({ key: "undated", deadline: null, tasks: undated });
+
+  if (groups.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: "var(--color-primary-light)" }}>
@@ -336,29 +347,42 @@ function ProjectTimeline({ tasks, color, onOpen }: { tasks: Task[]; color: strin
 
   return (
     <div className="relative">
-      {ordered.map((task, i) => {
-        const meta = STATUS_META[task.status];
-        const rem = remainingMeta(task);
-        const isLast = i === ordered.length - 1;
+      {groups.map((group, gi) => {
+        const isLast = gi === groups.length - 1;
+        // The dot color reflects the "least done" status in the group:
+        // in_progress > todo > done, so an active day reads as active.
+        const dotStatus: TaskStatus = group.tasks.some((t) => t.status === "in_progress")
+          ? "in_progress"
+          : group.tasks.some((t) => t.status === "todo")
+            ? "todo"
+            : "done";
+        const dotColor = dotStatus === "done" ? "#5DB872" : STATUS_META[dotStatus].color;
 
         return (
-          <div key={task.id} className="flex gap-0 items-stretch">
-            {/* LEFT: timeline rail */}
+          <div key={group.key} className="flex gap-0 items-stretch">
+            {/* LEFT: timeline rail — date shown once per group */}
             <div className="flex flex-col items-center" style={{ width: 160, minWidth: 160, flexShrink: 0 }}>
-              {/* Date label */}
               <div className="pt-3 pb-2 text-right pr-4 w-full">
                 <p
-                  className="text-[11px] font-bold tabular-nums leading-tight"
-                  style={{ color: task.deadline ? "var(--color-ink)" : "var(--color-muted-soft)" }}
+                  className="text-[12px] font-bold tabular-nums leading-tight"
+                  style={{ color: group.deadline ? "var(--color-ink)" : "var(--color-muted-soft)" }}
                 >
-                  {task.deadline
-                    ? format(new Date(task.deadline), "d MMM", { locale: idLocale })
-                    : "—"}
+                  {group.deadline
+                    ? format(new Date(group.deadline), "d MMM", { locale: idLocale })
+                    : "Tanpa tanggal"}
                 </p>
-                {task.deadline && (
+                {group.deadline && (
                   <p className="text-[10px]" style={{ color: "var(--color-muted-soft)" }}>
-                    {format(new Date(task.deadline), "yyyy", { locale: idLocale })}
+                    {format(new Date(group.deadline), "EEEE · yyyy", { locale: idLocale })}
                   </p>
+                )}
+                {group.tasks.length > 1 && (
+                  <span
+                    className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                    style={{ background: `color-mix(in srgb, ${dotColor} 14%, transparent)`, color: dotColor }}
+                  >
+                    {group.tasks.length} task
+                  </span>
                 )}
               </div>
             </div>
@@ -366,21 +390,21 @@ function ProjectTimeline({ tasks, color, onOpen }: { tasks: Task[]; color: strin
             {/* CENTER: dot + vertical line */}
             <div className="flex flex-col items-center flex-shrink-0" style={{ width: 32 }}>
               {/* top connector */}
-              <div className="w-px flex-1" style={{ background: i === 0 ? "transparent" : "var(--color-hairline)", minHeight: 12 }} />
+              <div className="w-px flex-1" style={{ background: gi === 0 ? "transparent" : "var(--color-hairline)", minHeight: 12 }} />
               {/* dot node */}
               <div
                 className="relative z-10 w-[18px] h-[18px] rounded-full flex items-center justify-center flex-shrink-0"
                 style={{
                   background: "var(--color-surface-card)",
-                  border: `2.5px solid ${task.status === "done" ? "#5DB872" : meta.color}`,
-                  boxShadow: `0 0 0 3px color-mix(in srgb, ${task.status === "done" ? "#5DB872" : meta.color} 14%, transparent)`,
+                  border: `2.5px solid ${dotColor}`,
+                  boxShadow: `0 0 0 3px color-mix(in srgb, ${dotColor} 14%, transparent)`,
                 }}
               >
-                {task.status === "done" && (
+                {dotStatus === "done" && (
                   <span className="w-[7px] h-[7px] rounded-full" style={{ background: "#5DB872" }} />
                 )}
-                {task.status === "in_progress" && (
-                  <span className="w-[6px] h-[6px] rounded-full animate-pulse" style={{ background: meta.color }} />
+                {dotStatus === "in_progress" && (
+                  <span className="w-[6px] h-[6px] rounded-full animate-pulse" style={{ background: dotColor }} />
                 )}
               </div>
               {/* bottom connector */}
@@ -389,65 +413,72 @@ function ProjectTimeline({ tasks, color, onOpen }: { tasks: Task[]; color: strin
               )}
             </div>
 
-            {/* RIGHT: task card */}
-            <div className="flex-1 min-w-0 py-3 pl-4 pr-0 pb-5">
-              <button
-                onClick={() => onOpen(task.id)}
-                className="w-full text-left rounded-[14px] border p-4 transition-all hover:shadow-md group"
-                style={{
-                  background: "var(--color-surface-card)",
-                  borderColor: "var(--color-hairline)",
-                  boxShadow: "var(--shadow-card)",
-                }}
-              >
-                {/* Card header row */}
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-[14px] font-semibold leading-snug flex-1 group-hover:text-[var(--color-primary)] transition-colors" style={{ color: "var(--color-ink)" }}>
-                    {task.title}
-                  </p>
-                  <span
-                    className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5"
+            {/* RIGHT: stacked task cards for this date */}
+            <div className="flex-1 min-w-0 py-3 pl-4 pr-0 pb-5 flex flex-col gap-2.5">
+              {group.tasks.map((task) => {
+                const meta = STATUS_META[task.status];
+                const rem = remainingMeta(task);
+                return (
+                  <button
+                    key={task.id}
+                    onClick={() => onOpen(task.id)}
+                    className="w-full text-left rounded-[14px] border p-4 transition-all hover:shadow-md group"
                     style={{
-                      background: `color-mix(in srgb, ${rem.color} 14%, transparent)`,
-                      color: rem.color,
+                      background: "var(--color-surface-card)",
+                      borderColor: "var(--color-hairline)",
+                      boxShadow: "var(--shadow-card)",
                     }}
                   >
-                    {rem.label}
-                  </span>
-                </div>
+                    {/* Card header row */}
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-[14px] font-semibold leading-snug flex-1 group-hover:text-[var(--color-primary)] transition-colors" style={{ color: "var(--color-ink)" }}>
+                        {task.title}
+                      </p>
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5"
+                        style={{
+                          background: `color-mix(in srgb, ${rem.color} 14%, transparent)`,
+                          color: rem.color,
+                        }}
+                      >
+                        {rem.label}
+                      </span>
+                    </div>
 
-                {/* Description */}
-                {task.description && (
-                  <p className="text-[12px] mt-1.5 line-clamp-2 leading-relaxed" style={{ color: "var(--color-muted)" }}>
-                    {task.description}
-                  </p>
-                )}
+                    {/* Description */}
+                    {task.description && (
+                      <p className="text-[12px] mt-1.5 line-clamp-2 leading-relaxed" style={{ color: "var(--color-muted)" }}>
+                        {task.description}
+                      </p>
+                    )}
 
-                {/* Footer row */}
-                <div className="flex items-center gap-2 mt-3 flex-wrap">
-                  <span
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md"
-                    style={{
-                      background: `color-mix(in srgb, ${meta.color} 14%, transparent)`,
-                      color: meta.color,
-                    }}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: meta.color }} />
-                    {meta.label}
-                  </span>
-                  <Badge variant={task.priority} className="capitalize">{task.priority}</Badge>
-                  {task.hours ? (
-                    <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: "var(--color-muted-soft)" }}>
-                      <Icon name="clock" size={10} /> {task.hours}h
-                    </span>
-                  ) : null}
-                  {task.invoiceLinked && (
-                    <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: "var(--color-primary)" }}>
-                      <Icon name="receipt" size={10} /> invoiced
-                    </span>
-                  )}
-                </div>
-              </button>
+                    {/* Footer row */}
+                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+                      <span
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md"
+                        style={{
+                          background: `color-mix(in srgb, ${meta.color} 14%, transparent)`,
+                          color: meta.color,
+                        }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: meta.color }} />
+                        {meta.label}
+                      </span>
+                      <Badge variant={task.priority} className="capitalize">{task.priority}</Badge>
+                      {task.hours ? (
+                        <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: "var(--color-muted-soft)" }}>
+                          <Icon name="clock" size={10} /> {task.hours}h
+                        </span>
+                      ) : null}
+                      {task.invoiceLinked && (
+                        <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: "var(--color-primary)" }}>
+                          <Icon name="receipt" size={10} /> invoiced
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         );
