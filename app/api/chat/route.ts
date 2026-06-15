@@ -3,41 +3,72 @@ import { NextRequest } from "next/server";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+const today = () => new Date().toISOString().split("T")[0];
+const thisMonth = () => new Date().toISOString().slice(0, 7);
+
 const SYSTEM_PROMPT = `Kamu adalah asisten AI personal untuk dashboard produktivitas milik Bayu.
-Kamu bisa membantu membuat, mengelola, dan menavigasi semua fitur yang ada di dashboard ini.
+Kamu BISA dan HARUS langsung mengeksekusi aksi — bukan hanya mengarahkan user.
+Jika user minta tambah pengeluaran, LANGSUNG tambahkan. Jika minta buat sitemap, LANGSUNG buat.
+Setelah aksi selesai, konfirmasi apa yang sudah dilakukan dengan singkat dan ramah.
 
 FITUR YANG TERSEDIA:
-1. **Sitemap Generator** (/ai-studio/creative/sitemap) — buat struktur website lengkap dengan halaman & sections
-2. **Design Assistant** (/ai-studio/design-assistant) — analisis screenshot desain (UI critique, palet warna, konsistensi, layout)
-3. **Prompt Library** (/ai-studio/prompts) — simpan dan kelola koleksi prompt AI
-4. **Workflow Builder** (/ai-studio/workflows) — buat alur kerja AI multi-step
-5. **Moodboard** (/moodboard) — kumpulkan inspirasi visual
-6. **Finance** (/finance) — kelola keuangan dan evaluasi proyek
-7. **Invoice** (/invoice) — buat dan kirim invoice
-8. **Todo / Project** (/todo) — manajemen tugas dan proyek
-9. **Documents** (/documents) — kontrak dan proposal
+1. Finance — catat pengeluaran & pemasukan, lihat riwayat transaksi
+2. Sitemap Generator — buat struktur website dengan halaman & sections
+3. Design Assistant — analisis screenshot desain (butuh upload gambar)
+4. Prompt Library — simpan koleksi prompt AI
+5. Todo / Project — manajemen tugas
+6. Invoice — buat dan kirim invoice
+7. Moodboard — kumpulkan inspirasi visual
+8. Documents — kontrak dan proposal
 
-CARA BERTINDAK:
-- Jika diminta buat sitemap → gunakan tool generate_sitemap
-- Jika diminta navigasi/buka halaman → gunakan tool navigate
-- Jika diminta analisis desain → gunakan tool navigate ke /ai-studio/design-assistant
-- Untuk pertanyaan umum → jawab langsung dengan ramah dan singkat
-- Balas dalam Bahasa Indonesia kecuali user memakai bahasa lain
-- Jangan terlalu panjang, to the point dan helpful`;
+KATEGORI KEUANGAN YANG ADA:
+- c1: Freelance (income)
+- c2: Project Bonus (income)
+- c3: Software & Tools (expense)
+- c4: Food & Beverage (expense) — untuk makan/minum/jajan
+- c5: Transport (expense)
+- c6: Housing (expense)
+- c7: Health (expense)
+- c8: Entertainment (expense)
+
+Tanggal hari ini: ${today()}
+Bulan ini: ${thisMonth()}
+
+PANDUAN:
+- Kalau ada nominal uang dalam ribuan (mis. 50rb, 50k) → gunakan 50000
+- Tebak kategori yang paling cocok dari konteks
+- Balas singkat dan ramah dalam Bahasa Indonesia
+- Setelah eksekusi, ceritakan apa yang sudah kamu lakukan (bukan instruksi)`;
 
 const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
-      name: "generate_sitemap",
-      description: "Generate sitemap website lengkap berdasarkan deskripsi bisnis/proyek. Hasilnya langsung ditambahkan ke Sitemap Generator.",
+      name: "add_transaction",
+      description: "Tambahkan transaksi keuangan (pengeluaran atau pemasukan) ke finance tracker",
       parameters: {
         type: "object",
         properties: {
-          description: {
-            type: "string",
-            description: "Deskripsi lengkap tentang website/bisnis yang ingin dibuatkan sitemap-nya",
-          },
+          type: { type: "string", enum: ["income", "expense"], description: "Jenis transaksi" },
+          amount: { type: "number", description: "Nominal dalam rupiah (contoh: 50000)" },
+          description: { type: "string", description: "Deskripsi singkat transaksi" },
+          categoryId: { type: "string", description: "ID kategori: c1-c8" },
+          date: { type: "string", description: "Tanggal format YYYY-MM-DD, default hari ini" },
+          note: { type: "string", description: "Catatan tambahan (opsional)" },
+        },
+        required: ["type", "amount", "description", "categoryId", "date"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "generate_sitemap",
+      description: "Generate sitemap website lengkap dan langsung simpan ke Sitemap Generator",
+      parameters: {
+        type: "object",
+        properties: {
+          description: { type: "string", description: "Deskripsi bisnis/proyek" },
         },
         required: ["description"],
       },
@@ -47,18 +78,12 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "navigate",
-      description: "Arahkan user ke halaman tertentu di dashboard",
+      description: "Arahkan user ke halaman tertentu. Gunakan HANYA jika user memang ingin pergi ke halaman, bukan sebagai pengganti aksi.",
       parameters: {
         type: "object",
         properties: {
-          url: {
-            type: "string",
-            description: "URL halaman tujuan (contoh: /ai-studio/design-assistant)",
-          },
-          reason: {
-            type: "string",
-            description: "Alasan singkat kenapa navigasi ke halaman ini",
-          },
+          url: { type: "string" },
+          reason: { type: "string" },
         },
         required: ["url", "reason"],
       },
@@ -69,33 +94,24 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 async function runSitemapGeneration(description: string) {
-  const sitemapPrompt = `Kamu adalah information architect. Buat sitemap website berdasarkan deskripsi ini.
-Balas HANYA dengan JSON valid:
-{
-  "name": "<nama website>",
-  "pages": [
-    {
-      "name": "<nama halaman>",
-      "sections": [
-        { "name": "<nama section>", "description": "<deskripsi 1 kalimat>" }
-      ]
-    }
-  ]
-}
-Buat 4-8 halaman, tiap halaman 4-12 sections. Mulai dengan Navbar, akhiri dengan Footer.`;
-
   const res = await client.chat.completions.create({
     model: "gpt-4o",
     max_tokens: 2000,
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: sitemapPrompt },
+      {
+        role: "system",
+        content: `Buat sitemap website. Balas HANYA JSON:
+{"name":"<nama>","pages":[{"name":"<halaman>","sections":[{"name":"<section>","description":"<1 kalimat>"}]}]}
+4-8 halaman, tiap halaman 4-12 sections, mulai Navbar, akhiri Footer.`,
+      },
       { role: "user", content: description },
     ],
   });
-
-  const raw = res.choices[0]?.message?.content ?? "{}";
-  return JSON.parse(raw) as { name: string; pages: { name: string; sections: { name: string; description: string }[] }[] };
+  return JSON.parse(res.choices[0]?.message?.content ?? "{}") as {
+    name: string;
+    pages: { name: string; sections: { name: string; description: string }[] }[];
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -110,47 +126,36 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Request tidak valid." }, { status: 400 });
   }
 
-  const { messages } = body;
-
   try {
-    // First call — let GPT decide if it needs a tool
     const first = await client.chat.completions.create({
       model: "gpt-4o",
-      max_tokens: 800,
+      max_tokens: 600,
       tools,
       tool_choice: "auto",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        ...messages,
-      ],
+      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...body.messages],
     });
 
     const choice = first.choices[0];
 
-    // No tool call → plain text reply
+    // No tool call → plain reply
     if (choice.finish_reason !== "tool_calls" || !choice.message.tool_calls?.length) {
       return Response.json({ message: choice.message.content ?? "" });
     }
 
-    // Handle tool calls
-    const toolCall = choice.message.tool_calls[0] as OpenAI.Chat.Completions.ChatCompletionMessageToolCall & { function: { name: string; arguments: string } };
-    const fnName = toolCall.function.name;
-    const fnArgs = JSON.parse(toolCall.function.arguments) as Record<string, string>;
+    const rawToolCall = choice.message.tool_calls[0];
+    const fnName = (rawToolCall as { function: { name: string; arguments: string } }).function.name;
+    const fnArgs = JSON.parse((rawToolCall as { function: { name: string; arguments: string } }).function.arguments) as Record<string, unknown>;
 
+    // ── navigate ──────────────────────────────────────────────────
     if (fnName === "navigate") {
-      // Second call to get natural language reply
       const second = await client.chat.completions.create({
         model: "gpt-4o",
-        max_tokens: 200,
+        max_tokens: 150,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          ...messages,
+          ...body.messages,
           choice.message,
-          {
-            role: "tool",
-            tool_call_id: toolCall.id,
-            content: JSON.stringify({ success: true }),
-          },
+          { role: "tool", tool_call_id: rawToolCall.id, content: JSON.stringify({ success: true }) },
         ],
       });
       return Response.json({
@@ -159,19 +164,53 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // ── add_transaction ───────────────────────────────────────────
+    if (fnName === "add_transaction") {
+      const tx = {
+        type: fnArgs.type as "income" | "expense",
+        amount: fnArgs.amount as number,
+        description: fnArgs.description as string,
+        categoryId: fnArgs.categoryId as string,
+        date: (fnArgs.date as string) || today(),
+        month: ((fnArgs.date as string) || today()).slice(0, 7),
+        note: fnArgs.note as string | undefined,
+      };
+
+      const second = await client.chat.completions.create({
+        model: "gpt-4o",
+        max_tokens: 150,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          ...body.messages,
+          choice.message,
+          {
+            role: "tool",
+            tool_call_id: rawToolCall.id,
+            content: JSON.stringify({ success: true, transaction: tx }),
+          },
+        ],
+      });
+
+      return Response.json({
+        message: second.choices[0].message.content ?? "",
+        action: { type: "add_transaction", transaction: tx },
+      });
+    }
+
+    // ── generate_sitemap ──────────────────────────────────────────
     if (fnName === "generate_sitemap") {
       const sitemap = await runSitemapGeneration(fnArgs.description as string);
 
       const second = await client.chat.completions.create({
         model: "gpt-4o",
-        max_tokens: 200,
+        max_tokens: 150,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          ...messages,
+          ...body.messages,
           choice.message,
           {
             role: "tool",
-            tool_call_id: toolCall.id,
+            tool_call_id: rawToolCall.id,
             content: JSON.stringify({ success: true, name: sitemap.name, pageCount: sitemap.pages.length }),
           },
         ],
@@ -183,7 +222,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return Response.json({ message: "Tool tidak dikenali." });
+    return Response.json({ message: "Hmm, ada yang tidak dikenali. Coba ulangi." });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     return Response.json({ error: message }, { status: 500 });
