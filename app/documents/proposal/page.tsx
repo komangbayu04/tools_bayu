@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
+import { useInvoiceHistoryStore } from "@/lib/store";
 import { format } from "date-fns";
 
 interface ScopeItem {
@@ -75,8 +76,31 @@ export default function ProposalPage() {
   // Share
   const [shareUrl, setShareUrl] = useState("");
   const [shareBusy, setShareBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const saveDoc = useInvoiceHistoryStore((s) => s.saveDoc);
 
   const totalPrice = pricing.reduce((s, r) => s + r.price, 0);
+
+  const handleSave = () => {
+    const snapshot = {
+      docType: "proposal",
+      fromName, fromTitle, fromEmail, fromPhone,
+      clientName, clientCompany, projectName, docNo, dateIssued, validUntil,
+      overview, scopeItems, phases, pricing, terms,
+    };
+    saveDoc({
+      type: "proposal",
+      clientName: clientName || clientCompany || "—",
+      title: projectName || undefined,
+      docNo: docNo || undefined,
+      dateIssued,
+      total: totalPrice,
+      snapshot,
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
 
   // ── Scope helpers ────────────────────────────────────────
   const updateScope = (id: string, field: keyof ScopeItem, val: string) =>
@@ -301,6 +325,9 @@ export default function ProposalPage() {
             </Button>
             <Button onClick={handleShare} disabled={shareBusy} className="flex items-center gap-2">
               <Icon name={shareBusy ? "spinner" : "link"} size={13} spin={shareBusy} /> Buat Link Klien
+            </Button>
+            <Button onClick={handleSave} variant="outline" className="flex items-center gap-2">
+              <Icon name={saved ? "check-circle" : "save"} size={13} /> {saved ? "Tersimpan!" : "Simpan ke Riwayat"}
             </Button>
           </div>
           {shareUrl && (

@@ -9,11 +9,19 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
-import { useInvoiceHistoryStore, type SavedDoc } from "@/lib/store";
+import { useInvoiceHistoryStore, type SavedDoc, type DocType } from "@/lib/store";
 import { differenceInCalendarDays } from "date-fns";
 
 const fmtIDR = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(n);
+
+// Display metadata per document type.
+const TYPE_META: Record<DocType, { label: string; variant: "teal" | "purple" | "medium" | "low" }> = {
+  invoice: { label: "Invoice", variant: "teal" },
+  quotation: { label: "Quotation", variant: "purple" },
+  contract: { label: "Kontrak", variant: "medium" },
+  proposal: { label: "Proposal", variant: "low" },
+};
 
 // Returns a reminder badge for an unpaid invoice based on its due date.
 function dueInfo(doc: SavedDoc): { label: string; color: string; bg: string } | null {
@@ -33,10 +41,11 @@ const monthKey = (doc: SavedDoc) => {
 
 const monthLabel = (key: string) => format(new Date(key + "-01"), "MMMM yyyy");
 
-export default function InvoiceHistoryPage() {
+export default function DocumentHistoryPage() {
   const { history, deleteDoc, setDocStatus } = useInvoiceHistoryStore();
   const router = useRouter();
   const [month, setMonth] = useState<string>("all");
+  const [docType, setDocType] = useState<"all" | DocType>("all");
 
   // Unpaid invoices that are due soon or overdue — surfaced as reminders.
   const reminders = useMemo(
@@ -55,9 +64,19 @@ export default function InvoiceHistoryPage() {
   }, [history]);
 
   const filtered = useMemo(
-    () => (month === "all" ? history : history.filter((d) => monthKey(d) === month)),
-    [history, month]
+    () =>
+      history.filter(
+        (d) => (month === "all" || monthKey(d) === month) && (docType === "all" || d.type === docType)
+      ),
+    [history, month, docType]
   );
+
+  // Available document types present in history, for the type filter.
+  const typeCounts = useMemo(() => {
+    const counts = {} as Record<DocType, number>;
+    history.forEach((d) => { counts[d.type] = (counts[d.type] ?? 0) + 1; });
+    return counts;
+  }, [history]);
 
   const chip = (active: boolean) =>
     active
@@ -67,8 +86,8 @@ export default function InvoiceHistoryPage() {
   return (
     <ShellLayout>
       <PageHeader
-        title="Invoice History"
-        subtitle={`${history.length} saved document${history.length === 1 ? "" : "s"}`}
+        title="Riwayat Dokumen"
+        subtitle={`${history.length} dokumen tersimpan — invoice, kontrak, proposal & quotation`}
         actions={
           <Button onClick={() => router.push("/invoice")}>
             <Icon name="plus" size={15} /> Buat Invoice
@@ -119,6 +138,31 @@ export default function InvoiceHistoryPage() {
         </div>
       )}
 
+      {/* Type filter */}
+      {history.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <button
+            onClick={() => setDocType("all")}
+            className="px-3.5 py-1.5 rounded-full text-[13px] font-semibold border transition-all"
+            style={chip(docType === "all")}
+          >
+            Semua Tipe
+          </button>
+          {(Object.keys(TYPE_META) as DocType[])
+            .filter((t) => typeCounts[t])
+            .map((t) => (
+              <button
+                key={t}
+                onClick={() => setDocType(t)}
+                className="px-3.5 py-1.5 rounded-full text-[13px] font-semibold border transition-all"
+                style={chip(docType === t)}
+              >
+                {TYPE_META[t].label} ({typeCounts[t]})
+              </button>
+            ))}
+        </div>
+      )}
+
       {/* Month filter */}
       {history.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 mb-6">
@@ -146,10 +190,10 @@ export default function InvoiceHistoryPage() {
         <Card className="flex flex-col items-center justify-center text-center py-20">
           <Icon name="file-text" size={34} style={{ color: "var(--color-muted-soft)" }} />
           <p className="text-[14px] font-semibold mt-4" style={{ color: "var(--color-ink)" }}>
-            No saved documents{month === "all" ? "" : " this month"}.
+            Belum ada dokumen tersimpan{month === "all" && docType === "all" ? "" : " untuk filter ini"}.
           </p>
           <p className="text-[12px] mt-1" style={{ color: "var(--color-muted-soft)" }}>
-            Saved invoices and quotations will appear here.
+            Invoice, kontrak, proposal & quotation yang kamu simpan akan muncul di sini.
           </p>
         </Card>
       ) : (
@@ -158,10 +202,15 @@ export default function InvoiceHistoryPage() {
             <Card key={doc.id} className="flex items-center gap-4 p-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
-                  <Badge variant={doc.type === "invoice" ? "teal" : "purple"}>{doc.type}</Badge>
+                  <Badge variant={TYPE_META[doc.type].variant}>{TYPE_META[doc.type].label}</Badge>
                   <p className="text-[14px] font-semibold truncate" style={{ color: "var(--color-ink)" }}>
                     {doc.clientName || "—"}
                   </p>
+                  {doc.title && (
+                    <span className="text-[12.5px] truncate" style={{ color: "var(--color-muted)" }}>
+                      · {doc.title}
+                    </span>
+                  )}
                   {doc.type === "invoice" && (
                     doc.status === "paid" ? (
                       <span className="text-[11px] font-semibold rounded-full px-2.5 py-0.5" style={{ color: "var(--color-success)", background: "rgba(78,157,84,0.14)" }}>
@@ -194,9 +243,11 @@ export default function InvoiceHistoryPage() {
                   )}
                 </div>
               </div>
-              <p className="text-[15px] font-semibold flex-shrink-0" style={{ color: "var(--color-primary)" }}>
-                {fmtIDR(doc.total)}
-              </p>
+              {doc.total > 0 && (
+                <p className="text-[15px] font-semibold flex-shrink-0" style={{ color: "var(--color-primary)" }}>
+                  {fmtIDR(doc.total)}
+                </p>
+              )}
               {doc.type === "invoice" && (
                 <button
                   onClick={() => setDocStatus(doc.id, doc.status === "paid" ? "unpaid" : "paid")}

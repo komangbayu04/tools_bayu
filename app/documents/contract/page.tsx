@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
+import { useInvoiceHistoryStore } from "@/lib/store";
 
 const fmtIDR = (n: number) => "IDR " + new Intl.NumberFormat("en-US").format(n);
 const LABEL = "block text-[11px] font-semibold uppercase tracking-wider mb-1.5";
@@ -54,6 +55,31 @@ export default function ContractPage() {
   // Share
   const [shareUrl, setShareUrl] = useState("");
   const [shareBusy, setShareBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const saveDoc = useInvoiceHistoryStore((s) => s.saveDoc);
+
+  const handleSave = () => {
+    const snapshot = {
+      docType: "contract",
+      freelancerName, freelancerAddress, freelancerEmail,
+      clientName, clientCompany, clientAddress,
+      projectName, projectDescription, startDate, endDate, docNo,
+      totalAmount, paymentTerms, bankInfo,
+      ipClause, revisionClause, confidentialClause, terminationClause, additionalClauses,
+    };
+    saveDoc({
+      type: "contract",
+      clientName: clientName || clientCompany || "—",
+      title: projectName || undefined,
+      docNo: docNo || undefined,
+      dateIssued: startDate,
+      total: totalAmount,
+      snapshot,
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
 
   const handleShare = async () => {
     if (!supabase) return;
@@ -210,6 +236,9 @@ export default function ContractPage() {
             </Button>
             <Button onClick={handleShare} disabled={shareBusy} className="flex items-center gap-2">
               <Icon name={shareBusy ? "spinner" : "link"} size={13} spin={shareBusy} /> Buat Link Klien
+            </Button>
+            <Button onClick={handleSave} variant="outline" className="flex items-center gap-2">
+              <Icon name={saved ? "check-circle" : "save"} size={13} /> {saved ? "Tersimpan!" : "Simpan ke Riwayat"}
             </Button>
           </div>
           {shareUrl && (

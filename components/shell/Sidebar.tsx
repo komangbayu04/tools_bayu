@@ -20,7 +20,7 @@ const navItems: (NavItem | { group: NavGroup })[] = [
       icon: "file-text",
       children: [
         { label: "Invoice Builder", href: "/invoice", icon: "receipt" },
-        { label: "Riwayat Invoice", href: "/invoice/history", icon: "history" },
+        { label: "Riwayat Dokumen", href: "/invoice/history", icon: "history" },
         { label: "Proposal", href: "/documents/proposal", icon: "edit" },
         { label: "Kontrak", href: "/documents/contract", icon: "pen-ruler" },
       ],

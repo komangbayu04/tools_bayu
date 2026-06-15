@@ -96,10 +96,14 @@ export const useProjectStore = create<ProjectStore>()(
 // ─── Invoice History store ────────────────────────────────────────
 export type PaymentStatus = "unpaid" | "paid"
 
+export type DocType = "invoice" | "quotation" | "contract" | "proposal"
+
 export interface SavedDoc {
   id: string
-  type: "invoice" | "quotation"
+  type: DocType
   clientName: string
+  title?: string            // project / document name (non-invoice docs)
+  docNo?: string            // document number, if any
   dateIssued: string
   dueDate?: string          // ISO date — when payment is due (invoices)
   status?: PaymentStatus    // payment tracking (invoices); default "unpaid"
