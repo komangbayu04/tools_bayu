@@ -2,34 +2,9 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { supabase, supabaseEnabled, supabaseStorage } from "@/lib/supabase";
+import { supabase, supabaseEnabled } from "@/lib/supabase";
+import { rehydrateAllStores } from "@/lib/store";
 import { Icon } from "@/components/ui/icon";
-
-// All cloud-persisted store keys — we wait for each to hydrate before
-// rendering the app so the UI never flashes stale/empty data on login.
-const CLOUD_STORE_KEYS = [
-  "tasks-storage-v2",
-  "projects-storage",
-  "invoice-history-storage",
-  "moodboard-storage",
-  "finance-storage",
-  "clients-storage",
-  "time-tracker-storage",
-  "ai-prompts-storage",
-  "ai-workflows-storage",
-  "ai-workflow-runs-storage",
-  "ai-sitemaps-storage",
-  "ai-assets-storage",
-  "saved-jobs-storage",
-];
-
-async function waitForHydration(): Promise<void> {
-  // Pre-fetch all store keys from Supabase in parallel so Zustand persist
-  // middleware picks them up from the mirror cache when it hydrates.
-  await Promise.allSettled(
-    CLOUD_STORE_KEYS.map((key) => supabaseStorage.getItem(key))
-  );
-}
 
 interface AuthContextValue {
   user: User | null;
@@ -59,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(s);
       if (s) {
         setPhase("hydrating");
-        await waitForHydration();
+        await rehydrateAllStores();
       }
       setPhase("ready");
     });
@@ -68,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(s);
       if (s) {
         setPhase("hydrating");
-        await waitForHydration();
+        await rehydrateAllStores();
       }
       setPhase("ready");
     });

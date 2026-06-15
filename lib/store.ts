@@ -415,3 +415,24 @@ export const useSavedJobStore = create<SavedJobStore>()(
     { name: "saved-jobs-storage", storage: cloud() }
   )
 )
+
+// ─── Cross-store rehydration ──────────────────────────────────────
+// Zustand's persist middleware hydrates each store once at module load —
+// which happens BEFORE the user signs in (so it reads empty anon data).
+// After login we must explicitly re-read every cloud store from Supabase.
+import { useAssetStore, usePromptStore, useSitemapStore, useWorkflowRunStore, useWorkflowStore } from "./aiStore"
+
+const PERSISTED_STORES = [
+  useTaskStore, useProjectStore, useInvoiceHistoryStore, useMoodStore, useFinanceStore,
+  useClientStore, useTimeTrackerStore, useIntegrationStore, useSavedJobStore,
+  usePromptStore, useWorkflowRunStore, useWorkflowStore, useSitemapStore, useAssetStore,
+]
+
+export async function rehydrateAllStores(): Promise<void> {
+  await Promise.allSettled(
+    PERSISTED_STORES.map((s) => {
+      const p = (s as unknown as { persist?: { rehydrate?: () => Promise<void> | void } }).persist
+      return p?.rehydrate ? p.rehydrate() : Promise.resolve()
+    })
+  )
+}
