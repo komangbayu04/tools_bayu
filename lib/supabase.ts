@@ -1,8 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 import type { StateStorage } from "zustand/middleware";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// The publishable (anon) key + project URL are safe to ship in the client
+// bundle — they're public by design and data is protected by Row Level
+// Security. Env vars take precedence so other environments can override.
+const FALLBACK_URL = "https://frqwamdqfnuvihmregja.supabase.co";
+const FALLBACK_ANON_KEY = "sb_publishable_N07WAghUlpHLaK2ydAqooA_6v7Xvbxb";
+
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL || FALLBACK_URL;
+const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || FALLBACK_ANON_KEY;
 
 /**
  * Supabase is optional: if env vars are missing we fall back to localStorage so
