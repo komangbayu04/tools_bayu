@@ -10,9 +10,20 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
 import { useInvoiceHistoryStore, type SavedDoc } from "@/lib/store";
+import { differenceInCalendarDays } from "date-fns";
 
 const fmtIDR = (n: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(n);
+
+// Returns a reminder badge for an unpaid invoice based on its due date.
+function dueInfo(doc: SavedDoc): { label: string; color: string; bg: string } | null {
+  if (doc.type !== "invoice" || doc.status === "paid" || !doc.dueDate) return null;
+  const days = differenceInCalendarDays(new Date(doc.dueDate + "T00:00:00"), new Date());
+  if (days < 0) return { label: `Telat ${Math.abs(days)} hari`, color: "#C64545", bg: "rgba(198,69,69,0.12)" };
+  if (days === 0) return { label: "Jatuh tempo hari ini", color: "#C64545", bg: "rgba(198,69,69,0.12)" };
+  if (days <= 3) return { label: `Jatuh tempo ${days} hari lagi`, color: "#D99A3C", bg: "rgba(217,154,60,0.14)" };
+  return { label: `Jatuh tempo ${days} hari lagi`, color: "var(--color-muted)", bg: "var(--color-canvas)" };
+}
 
 // Group/filter key derived from the document's issued date (fallback: saved date).
 const monthKey = (doc: SavedDoc) => {
@@ -23,9 +34,20 @@ const monthKey = (doc: SavedDoc) => {
 const monthLabel = (key: string) => format(new Date(key + "-01"), "MMMM yyyy");
 
 export default function InvoiceHistoryPage() {
-  const { history, deleteDoc } = useInvoiceHistoryStore();
+  const { history, deleteDoc, setDocStatus } = useInvoiceHistoryStore();
   const router = useRouter();
   const [month, setMonth] = useState<string>("all");
+
+  // Unpaid invoices that are due soon or overdue — surfaced as reminders.
+  const reminders = useMemo(
+    () =>
+      history
+        .filter((d) => d.type === "invoice" && d.status !== "paid" && d.dueDate)
+        .map((d) => ({ doc: d, days: differenceInCalendarDays(new Date(d.dueDate! + "T00:00:00"), new Date()) }))
+        .filter((r) => r.days <= 7)
+        .sort((a, b) => a.days - b.days),
+    [history]
+  );
 
   const months = useMemo(() => {
     const set = new Set(history.map(monthKey));
@@ -53,6 +75,49 @@ export default function InvoiceHistoryPage() {
           </Button>
         }
       />
+
+      {/* Reminders: invoices due soon / overdue */}
+      {reminders.length > 0 && (
+        <div className="mb-6 rounded-[14px] border p-4" style={{ background: "rgba(217,154,60,0.06)", borderColor: "rgba(217,154,60,0.3)" }}>
+          <div className="flex items-center gap-2 mb-3">
+            <Icon name="alert-triangle" size={15} style={{ color: "#D99A3C" }} />
+            <p className="text-[13px] font-bold" style={{ color: "var(--color-ink)" }}>
+              Pengingat Pembayaran ({reminders.length})
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            {reminders.map(({ doc, days }) => {
+              const overdue = days < 0;
+              const today = days === 0;
+              const urgent = overdue || today || days <= 3;
+              return (
+                <div key={doc.id} className="flex items-center gap-3 rounded-lg px-3 py-2" style={{ background: "var(--color-surface)" }}>
+                  <span className="text-[13px] font-semibold flex-1 truncate" style={{ color: "var(--color-ink)" }}>
+                    {doc.clientName || "—"}
+                  </span>
+                  <span className="text-[12px]" style={{ color: "var(--color-muted)" }}>{fmtIDR(doc.total)}</span>
+                  <span
+                    className="text-[11px] font-semibold rounded-full px-2.5 py-1 whitespace-nowrap"
+                    style={{
+                      color: urgent ? "#C64545" : "var(--color-muted)",
+                      background: urgent ? "rgba(198,69,69,0.12)" : "var(--color-canvas)",
+                    }}
+                  >
+                    {overdue ? `Telat ${Math.abs(days)} hari` : today ? "Jatuh tempo hari ini" : `${days} hari lagi`}
+                  </span>
+                  <button
+                    onClick={() => setDocStatus(doc.id, "paid")}
+                    className="text-[11px] font-semibold rounded-full px-3 py-1 whitespace-nowrap transition-opacity hover:opacity-80"
+                    style={{ background: "var(--color-primary)", color: "var(--color-on-primary)" }}
+                  >
+                    Tandai Lunas
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Month filter */}
       {history.length > 0 && (
@@ -92,26 +157,59 @@ export default function InvoiceHistoryPage() {
           {filtered.map((doc) => (
             <Card key={doc.id} className="flex items-center gap-4 p-4">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2.5 mb-1.5">
+                <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
                   <Badge variant={doc.type === "invoice" ? "teal" : "purple"}>{doc.type}</Badge>
                   <p className="text-[14px] font-semibold truncate" style={{ color: "var(--color-ink)" }}>
                     {doc.clientName || "—"}
                   </p>
+                  {doc.type === "invoice" && (
+                    doc.status === "paid" ? (
+                      <span className="text-[11px] font-semibold rounded-full px-2.5 py-0.5" style={{ color: "var(--color-success)", background: "rgba(78,157,84,0.14)" }}>
+                        Lunas
+                      </span>
+                    ) : (() => {
+                      const info = dueInfo(doc);
+                      return info ? (
+                        <span className="text-[11px] font-semibold rounded-full px-2.5 py-0.5" style={{ color: info.color, background: info.bg }}>
+                          {info.label}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-semibold rounded-full px-2.5 py-0.5" style={{ color: "var(--color-muted)", background: "var(--color-canvas)" }}>
+                          Belum dibayar
+                        </span>
+                      );
+                    })()
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]" style={{ color: "var(--color-muted)" }}>
                   <span className="inline-flex items-center gap-1.5">
                     <Icon name="calendar" size={12} />
                     {doc.dateIssued ? format(new Date(doc.dateIssued), "d MMM yyyy") : "—"}
                   </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Icon name="clock" size={12} />
-                    Saved {format(new Date(doc.savedAt), "d MMM yyyy, HH:mm")}
-                  </span>
+                  {doc.dueDate && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Icon name="clock" size={12} />
+                      Tempo {format(new Date(doc.dueDate), "d MMM yyyy")}
+                    </span>
+                  )}
                 </div>
               </div>
               <p className="text-[15px] font-semibold flex-shrink-0" style={{ color: "var(--color-primary)" }}>
                 {fmtIDR(doc.total)}
               </p>
+              {doc.type === "invoice" && (
+                <button
+                  onClick={() => setDocStatus(doc.id, doc.status === "paid" ? "unpaid" : "paid")}
+                  className="text-[11px] font-semibold rounded-full px-3 py-1.5 whitespace-nowrap transition-opacity hover:opacity-80 flex-shrink-0"
+                  style={
+                    doc.status === "paid"
+                      ? { background: "var(--color-canvas)", color: "var(--color-muted)", border: "1px solid var(--color-hairline)" }
+                      : { background: "var(--color-primary)", color: "var(--color-on-primary)" }
+                  }
+                >
+                  {doc.status === "paid" ? "Set Belum Bayar" : "Tandai Lunas"}
+                </button>
+              )}
               <button
                 onClick={() => deleteDoc(doc.id)}
                 className="p-2 rounded-lg hover:bg-red-50 transition-colors flex-shrink-0"

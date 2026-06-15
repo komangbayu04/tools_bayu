@@ -94,11 +94,15 @@ export const useProjectStore = create<ProjectStore>()(
 )
 
 // ─── Invoice History store ────────────────────────────────────────
+export type PaymentStatus = "unpaid" | "paid"
+
 export interface SavedDoc {
   id: string
   type: "invoice" | "quotation"
   clientName: string
   dateIssued: string
+  dueDate?: string          // ISO date — when payment is due (invoices)
+  status?: PaymentStatus    // payment tracking (invoices); default "unpaid"
   total: number
   savedAt: number
   snapshot: unknown
@@ -108,6 +112,7 @@ interface InvoiceHistoryStore {
   history: SavedDoc[]
   saveDoc: (doc: Omit<SavedDoc, "id" | "savedAt">) => string
   deleteDoc: (id: string) => void
+  setDocStatus: (id: string, status: PaymentStatus) => void
 }
 
 export const useInvoiceHistoryStore = create<InvoiceHistoryStore>()(
@@ -116,10 +121,11 @@ export const useInvoiceHistoryStore = create<InvoiceHistoryStore>()(
       history: [],
       saveDoc: (doc) => {
         const id = crypto.randomUUID()
-        set((s) => ({ history: [{ ...doc, id, savedAt: Date.now() }, ...s.history] }))
+        set((s) => ({ history: [{ status: "unpaid", ...doc, id, savedAt: Date.now() }, ...s.history] }))
         return id
       },
       deleteDoc: (id) => set((s) => ({ history: s.history.filter(d => d.id !== id) })),
+      setDocStatus: (id, status) => set((s) => ({ history: s.history.map(d => d.id === id ? { ...d, status } : d) })),
     }),
     { name: "invoice-history-storage", storage: cloud() }
   )

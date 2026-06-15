@@ -214,17 +214,77 @@ export default function FinanceEvaluatePage() {
 
   const maxNet = Math.max(1, ...netTrend.map((m) => Math.abs(m.net)));
 
+  // Estimasi pajak: PPh Final UMKM 0,5% dari omzet bruto (PP 55/2022).
+  const TAX_RATE = 0.005;
+  const taxEstimate = Math.round(income * TAX_RATE);
+
   return (
     <ShellLayout>
       <PageHeader
         title="Evaluasi Keuangan"
         subtitle={monthLabel(selectedMonth)}
         actions={
-          <Button variant="outline" onClick={() => router.push("/finance")}>
-            <Icon name="arrow-left" size={15} /> Kembali ke Finance
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => router.push("/finance")}>
+              <Icon name="arrow-left" size={15} /> Kembali
+            </Button>
+            <Button onClick={() => window.print()}>
+              <Icon name="download" size={15} /> Export Laporan PDF
+            </Button>
+          </div>
         }
       />
+
+      {/* ── Printable monthly report ── */}
+      <div className="printable rounded-[18px] border mb-6 overflow-hidden" style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface-card)" }}>
+        <div className="px-6 py-5" style={{ borderBottom: "1px solid var(--color-hairline)" }}>
+          <p className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--color-muted)" }}>Laporan Keuangan Bulanan</p>
+          <h2 className="text-[22px] font-bold mt-0.5" style={{ color: "var(--color-ink)" }}>{monthLabel(selectedMonth)}</h2>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-[var(--color-hairline)]">
+          {[
+            { label: "Pemasukan", value: fmtIDR(income), color: "#5DB872" },
+            { label: "Pengeluaran", value: fmtIDR(expense), color: "#D85A4A" },
+            { label: "Saldo Bersih", value: fmtIDR(balance), color: balance >= 0 ? "var(--color-primary)" : "#D85A4A" },
+            { label: "Savings Rate", value: `${savingsRate}%`, color: savingsRate >= 20 ? "#5DB872" : "#E8A55A" },
+          ].map((k) => (
+            <div key={k.label} className="px-6 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--color-muted)" }}>{k.label}</p>
+              <p className="text-[18px] font-bold" style={{ color: k.color }}>{k.value}</p>
+            </div>
+          ))}
+        </div>
+        {/* Tax estimate */}
+        <div className="px-6 py-4 flex items-start gap-3" style={{ borderTop: "1px solid var(--color-hairline)", background: "rgba(217,154,60,0.06)" }}>
+          <Icon name="receipt" size={16} style={{ color: "#D99A3C", marginTop: 2, flexShrink: 0 }} />
+          <div className="flex-1">
+            <div className="flex items-baseline justify-between gap-3 flex-wrap">
+              <p className="text-[13px] font-bold" style={{ color: "var(--color-ink)" }}>Estimasi Pajak (PPh Final UMKM 0,5%)</p>
+              <p className="text-[16px] font-bold" style={{ color: "#D99A3C" }}>{fmtIDR(taxEstimate)}</p>
+            </div>
+            <p className="text-[11.5px] mt-1 leading-relaxed" style={{ color: "var(--color-muted)" }}>
+              Perkiraan dari omzet bruto bulan ini ({fmtIDR(income)} × 0,5%) sesuai PP 55/2022 untuk UMKM/freelancer beromzet &lt; Rp4,8 M/tahun. Konsultasikan ke konsultan pajak untuk angka final.
+            </p>
+          </div>
+        </div>
+        {/* Expense breakdown */}
+        {expByCat.length > 0 && (
+          <div className="px-6 py-4" style={{ borderTop: "1px solid var(--color-hairline)" }}>
+            <p className="text-[12px] font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--color-muted)" }}>Rincian Pengeluaran</p>
+            <div className="flex flex-col gap-2">
+              {expByCat.map((c) => (
+                <div key={c.id} className="flex items-center justify-between text-[13px]">
+                  <span className="flex items-center gap-2" style={{ color: "var(--color-body)" }}>
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: c.color }} />
+                    {c.name}
+                  </span>
+                  <span className="font-semibold" style={{ color: "var(--color-ink)" }}>{fmtIDR(c.total)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Month picker chips */}
       <div className="flex flex-wrap items-center gap-2 mb-7">

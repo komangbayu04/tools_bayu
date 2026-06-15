@@ -39,28 +39,6 @@ interface QuoteItem {
 const newLineItem = (): LineItem => ({ id: crypto.randomUUID(), date: "", title: "", tasks: "", project: "", hours: 0 });
 const newQuoteItem = (): QuoteItem => ({ id: crypto.randomUUID(), service: "", description: "", packageItems: "", includes: "", price: 0, qty: 1 });
 
-const SAMPLE_ITEMS: LineItem[] = [
-  { id: "1", date: "2026-04-26", title: "Refine & Created UX flow", tasks: "Bathing (desktop & mobile)\nDining & Packages (desktop & mobile)\nGift cards (Desktop)", project: "Velo Studio", hours: 6 },
-  { id: "2", date: "2026-04-27", title: "", tasks: "Create mobile version for gift cards & check out\nNavbar refinement\nHero page option + first section", project: "Velo Studio", hours: 6 },
-  { id: "3", date: "2026-04-30", title: "", tasks: "Refine ux booking flow\nSitemap design", project: "Velo Studio", hours: 2 },
-  { id: "4", date: "2026-05-02", title: "", tasks: "Local pass flow & guest pass flow", project: "Velo Studio", hours: 5 },
-  { id: "5", date: "2026-05-09", title: "", tasks: "Content structure, UX Copy + Wireframe", project: "Velo Studio", hours: 6 },
-  { id: "6", date: "2026-06-09", title: "", tasks: "Mira Health GTM create V1 clinic receptionist & super admin", project: "Mira Health", hours: 3 },
-  { id: "7", date: "2026-06-13", title: "", tasks: "Mira Health GTM, Mapping design & refinement\nCreate for owner view", project: "Mira Health", hours: 5 },
-];
-
-const SAMPLE_QUOTE_ITEMS: QuoteItem[] = [
-  {
-    id: "q1",
-    service: "Website",
-    description: "Velo Website – Design & Webflow Dev",
-    packageItems: "Homepage Refinement\nResponsive Homepage\nSolution Page Template\nResponsive Solution Template\nServices Template\nResponsive Service Template\nAbout Page + Responsive\nContact + Responsive\nArticle + Responsive\nGallery + Responsive\nPopup Card",
-    includes: "Interaction & animation setup\nCross-device responsive QA\nRevision included (no additional charge)",
-    price: 4000000,
-    qty: 1,
-  },
-];
-
 const fmtIDR = (n: number) => "IDR " + new Intl.NumberFormat("en-US").format(n);
 const bullets = (text: string) => text.split("\n").map(t => t.trim()).filter(Boolean);
 const FIELD_LABEL = "block text-[11px] font-semibold uppercase tracking-wider mb-1.5";
@@ -75,20 +53,21 @@ export default function InvoicePage() {
   // Shared fields
   const [fromName, setFromName] = useState("Bayu Krisnayana");
   const [fromAddress, setFromAddress] = useState("Jln. Dewi Sartika No.19, Semarapura Kaja, Klungkung\nBali, Indonesia, 80711");
-  const [clientName, setClientName] = useState("Artivo Studio");
-  const [dateIssued, setDateIssued] = useState("2026-06-15");
+  const [clientName, setClientName] = useState("");
+  const [dateIssued, setDateIssued] = useState(() => new Date().toISOString().slice(0, 10));
 
   // Invoice-only
   const [paymentStatus, setPaymentStatus] = useState("Waiting for payment");
+  const [dueDate, setDueDate] = useState("");
   const [rate, setRate] = useState(100000);
-  const [totalTasks, setTotalTasks] = useState(28);
-  const [items, setItems] = useState<LineItem[]>(SAMPLE_ITEMS);
+  const [totalTasks, setTotalTasks] = useState(1);
+  const [items, setItems] = useState<LineItem[]>(() => [newLineItem()]);
 
   // Quotation-only
-  const [companyName, setCompanyName] = useState("Lumina Co.");
-  const [projectName, setProjectName] = useState("Website Design & Development");
+  const [companyName, setCompanyName] = useState("");
+  const [projectName, setProjectName] = useState("");
   const [docNo, setDocNo] = useState("BK/Q/2026/0001");
-  const [quoteItems, setQuoteItems] = useState<QuoteItem[]>(SAMPLE_QUOTE_ITEMS);
+  const [quoteItems, setQuoteItems] = useState<QuoteItem[]>(() => [newQuoteItem()]);
 
   // Payment info
   const [bankName, setBankName] = useState("BCA (Bank Central Asia)");
@@ -132,7 +111,7 @@ export default function InvoicePage() {
   const [shareBusy, setShareBusy] = useState(false);
 
   const buildSnapshot = () => ({
-    docType, fromName, fromAddress, clientName, dateIssued, paymentStatus, rate, totalTasks,
+    docType, fromName, fromAddress, clientName, dateIssued, dueDate, paymentStatus, rate, totalTasks,
     items, companyName, projectName, docNo, quoteItems,
     bankName, bankAddress, bankCountry, accHolder, accAddress, accNo, swift, bankCode, branchCode,
     contactName, contactEmail, contactPhone,
@@ -143,6 +122,8 @@ export default function InvoicePage() {
       type: docType,
       clientName: docType === "quotation" ? companyName : clientName,
       dateIssued,
+      dueDate: docType === "invoice" ? dueDate || undefined : undefined,
+      status: "unpaid",
       total,
       snapshot: buildSnapshot(),
     });
@@ -276,14 +257,18 @@ export default function InvoicePage() {
                       <Input type="date" value={dateIssued} onChange={e => setDateIssued(e.target.value)} className="bg-[var(--color-surface)]" />
                     </div>
                     <div>
-                      <label className={FIELD_LABEL} style={labelStyle}>Payment Status</label>
-                      <Select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)} className="bg-[var(--color-surface)]">
-                        <option>Waiting for payment</option>
-                        <option>Paid</option>
-                        <option>Overdue</option>
-                        <option>Partially paid</option>
-                      </Select>
+                      <label className={FIELD_LABEL} style={labelStyle}>Jatuh Tempo</label>
+                      <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="bg-[var(--color-surface)]" />
                     </div>
+                  </div>
+                  <div>
+                    <label className={FIELD_LABEL} style={labelStyle}>Payment Status</label>
+                    <Select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)} className="bg-[var(--color-surface)]">
+                      <option>Waiting for payment</option>
+                      <option>Paid</option>
+                      <option>Overdue</option>
+                      <option>Partially paid</option>
+                    </Select>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -400,7 +385,7 @@ export default function InvoicePage() {
 
         {/* ── RIGHT: LIVE PREVIEW ── */}
         <div className="rounded-[14px] border overflow-hidden shadow-sm sticky top-6" style={{ borderColor: "var(--color-hairline)", maxHeight: "calc(100vh - 48px)", overflowY: "auto" }}>
-          <div id="invoice-print-area" className="bg-white text-[#1A1A1A] px-10 py-12">
+          <div id="invoice-print-area" className="printable bg-white text-[#1A1A1A] px-10 py-12">
             {docType === "invoice" ? (
               <InvoicePreview
                 fromName={fromName} fromAddress={fromAddress} clientName={clientName}

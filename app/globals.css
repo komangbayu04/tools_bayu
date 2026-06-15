@@ -197,9 +197,9 @@ body {
 
 /* ─── Print / PDF export ───────────────────────────────────────── */
 @media print {
-  /* Hide everything except the invoice preview area */
-  body > * { display: none !important; }
-  #invoice-print-area { display: block !important; }
+  /* Only the element marked .printable (and its children) is visible. */
+  body * { visibility: hidden !important; }
+  .printable, .printable * { visibility: visible !important; }
 
   body {
     margin: 0;
@@ -209,12 +209,17 @@ body {
     print-color-adjust: exact;
   }
 
-  #invoice-print-area {
-    position: fixed;
-    inset: 0;
+  .printable {
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    width: 100%;
     padding: 0;
     margin: 0;
     background: #fff;
     color: #1a1a1a;
   }
+
+  /* Hide interactive controls inside printable areas. */
+  .print-hide { display: none !important; }
 }

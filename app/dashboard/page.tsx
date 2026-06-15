@@ -3,7 +3,7 @@
 import { ShellLayout } from "@/components/shell/Layout";
 import { Icon } from "@/components/ui/icon";
 import { GlowCard, GlowStat } from "@/components/ui/glowing-card";
-import { format, isSameDay, startOfWeek, addDays } from "date-fns";
+import { format, isSameDay, startOfWeek, addDays, differenceInCalendarDays } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import Link from "next/link";
 import { useState } from "react";
@@ -40,7 +40,14 @@ export default function DashboardPage() {
   const { transactions } = useFinanceStore();
   const { history } = useInvoiceHistoryStore();
   const { items: moodItems } = useMoodStore();
-  void transactions; void history; void moodItems;
+  void transactions; void moodItems;
+
+  // Invoice reminders: unpaid invoices due within 7 days or overdue.
+  const invoiceReminders = history
+    .filter((d) => d.type === "invoice" && d.status !== "paid" && d.dueDate)
+    .map((d) => ({ doc: d, days: differenceInCalendarDays(new Date(d.dueDate! + "T00:00:00"), new Date()) }))
+    .filter((r) => r.days <= 7)
+    .sort((a, b) => a.days - b.days);
 
   const project = (id: string) => projects.find((p) => p.id === id);
   const projectName = (id: string) => project(id)?.name ?? "—";
@@ -116,6 +123,31 @@ export default function DashboardPage() {
           <GlowStat icon="folder-open" value={String(activeProjects.length)} label="Active Projects" />
         </div>
       </GlowCard>
+
+      {/* ── Invoice reminders ── */}
+      {invoiceReminders.length > 0 && (
+        <Link
+          href="/invoice/history"
+          className="flex items-center gap-3 mb-6 rounded-[18px] px-5 py-4 transition-colors hover:opacity-90"
+          style={{ background: "rgba(217,154,60,0.08)", border: "1px solid rgba(217,154,60,0.3)" }}
+        >
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(217,154,60,0.16)" }}>
+            <Icon name="alert-triangle" size={16} style={{ color: "#D99A3C" }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[14px] font-bold" style={{ color: "var(--color-ink)" }}>
+              {invoiceReminders.length} invoice perlu ditindaklanjuti
+            </p>
+            <p className="text-[12px] mt-0.5 truncate" style={{ color: "var(--color-muted)" }}>
+              {invoiceReminders.slice(0, 2).map(({ doc, days }) =>
+                `${doc.clientName || "—"} (${days < 0 ? `telat ${Math.abs(days)}h` : days === 0 ? "hari ini" : `${days}h lagi`})`
+              ).join(" · ")}
+              {invoiceReminders.length > 2 ? " …" : ""}
+            </p>
+          </div>
+          <Icon name="arrow-right" size={15} style={{ color: "var(--color-muted-soft)" }} />
+        </Link>
+      )}
 
       {/* ── My Tasks table ── */}
       <div

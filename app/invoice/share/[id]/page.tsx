@@ -1,7 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { InvoicePreview, QuotationPreview } from "@/app/invoice/_preview";
 import type { LineItem, QuoteItem } from "@/app/invoice/_preview";
+import { PrintButton } from "./PrintButton";
 
 // This page is public (no auth). We use the anon key — RLS allows select on shared_invoices.
 const supabase = createClient(
@@ -10,18 +12,31 @@ const supabase = createClient(
   { auth: { persistSession: false } }
 );
 
-export default async function SharePage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-
+async function getSnapshot(id: string): Promise<Record<string, unknown> | null> {
   const { data, error } = await supabase
     .from("shared_invoices")
     .select("snapshot")
     .eq("id", id)
     .maybeSingle();
+  if (error || !data) return null;
+  return data.snapshot as Record<string, unknown>;
+}
 
-  if (error || !data) notFound();
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const s = await getSnapshot(id);
+  if (!s) return { title: "Document not found" };
+  const title =
+    s.docType === "invoice"
+      ? `Invoice — ${s.clientName}`
+      : `Quotation ${s.docNo} — ${s.companyName}`;
+  return { title };
+}
 
-  const s = data.snapshot as Record<string, unknown>;
+export default async function SharePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const s = await getSnapshot(id);
+  if (!s) notFound();
 
   const docType = s.docType as "invoice" | "quotation";
   const paymentRows: [string, string][] = [
@@ -37,26 +52,10 @@ export default async function SharePage({ params }: { params: Promise<{ id: stri
   ];
 
   return (
-    <html lang="en">
-      <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>
-          {docType === "invoice"
-            ? `Invoice — ${s.clientName}`
-            : `Quotation ${s.docNo} — ${s.companyName}`}
-        </title>
-        <style>{`
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: #f4f4f4; }
-          .page { max-width: 860px; margin: 32px auto; background: #fff; padding: 48px 56px; border-radius: 8px; box-shadow: 0 2px 16px rgba(0,0,0,0.08); }
-          .print-btn { display: block; margin: 0 auto 24px; padding: 10px 28px; background: #4e7d2e; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
-          @media print { .print-btn { display: none; } body { background: #fff; } .page { box-shadow: none; margin: 0; border-radius: 0; } }
-        `}</style>
-      </head>
-      <body>
-        <button className="print-btn" onClick={() => window.print()}>🖨 Print / Save PDF</button>
-        <div className="page">
+    <div style={{ minHeight: "100vh", background: "#f4f4f4", padding: "32px 16px" }}>
+      <div style={{ maxWidth: 860, margin: "0 auto" }}>
+        <PrintButton />
+        <div className="printable" style={{ background: "#fff", color: "#1a1a1a", padding: "48px 56px", borderRadius: 8, boxShadow: "0 2px 16px rgba(0,0,0,0.08)" }}>
           {docType === "invoice" ? (
             <InvoicePreview
               fromName={s.fromName as string}
@@ -90,7 +89,7 @@ export default async function SharePage({ params }: { params: Promise<{ id: stri
             />
           )}
         </div>
-      </body>
-    </html>
+      </div>
+    </div>
   );
 }
