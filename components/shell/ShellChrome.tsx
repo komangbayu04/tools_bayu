@@ -11,7 +11,7 @@ import { PageTransition } from "./PageTransition";
 export function ShellChrome({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="flex h-screen overflow-hidden"
+      className="flex h-screen overflow-hidden md:pl-6 md:pt-4"
       style={{ background: "var(--color-global-bg)" }}
     >
       <Sidebar />
