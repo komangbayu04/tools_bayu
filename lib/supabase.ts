@@ -48,6 +48,8 @@ if (supabase) {
 
   supabase.auth.onAuthStateChange((_event, session) => {
     currentUserId = session?.user?.id ?? null;
+    // The cache belongs to a specific user; drop it so the next prime refetches.
+    cloudCache = null;
   });
 } else {
   resolveReady!();
@@ -59,6 +61,90 @@ const localStorageAvailable = () =>
 // localStorage mirror key is namespaced per-user so two accounts on the same
 // browser never see each other's cached data.
 const mirrorKey = (name: string) => `${currentUserId ?? "anon"}:${name}`;
+
+// ─── Bulk cloud cache ─────────────────────────────────────────────
+// All of a user's state lives in many `app_state` rows. Reading them one key
+// at a time means one network round-trip per store (14+) on every login, which
+// dominates load time. Instead we fetch every row in a SINGLE query up front
+// and serve subsequent per-store reads from this in-memory cache.
+let cloudCache: Map<string, string> | null = null;
+
+export function resetCloudCache() {
+  cloudCache = null;
+}
+
+export async function primeCloudCache(): Promise<void> {
+  await userReady;
+  const cache = new Map<string, string>();
+  if (!supabase || !currentUserId) {
+    cloudCache = cache;
+    return;
+  }
+  try {
+    const { data, error } = await supabase
+      .from("app_state")
+      .select("key, value")
+      .eq("user_id", currentUserId);
+    if (error) {
+      console.warn("[supabase] primeCloudCache failed, falling back to mirror:", error.message);
+      cloudCache = cache;
+      return;
+    }
+    for (const row of data ?? []) {
+      const serialized = JSON.stringify((row as { value: unknown }).value);
+      const k = (row as { key: string }).key;
+      cache.set(k, serialized);
+      if (localStorageAvailable()) window.localStorage.setItem(mirrorKey(k), serialized);
+    }
+  } catch (e) {
+    console.warn("[supabase] primeCloudCache threw, falling back to mirror:", e);
+  }
+  cloudCache = cache;
+}
+
+// ─── Debounced cloud writes ───────────────────────────────────────
+// The localStorage mirror is updated synchronously (instant local persistence),
+// while cloud upserts for the same key are coalesced so a burst of edits (e.g.
+// dragging a layer, typing) becomes a single network write.
+const WRITE_DEBOUNCE_MS = 500;
+const writeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const pendingWrites = new Map<string, string>();
+
+async function flushWrite(name: string): Promise<void> {
+  const value = pendingWrites.get(name);
+  writeTimers.delete(name);
+  pendingWrites.delete(name);
+  if (value === undefined || !supabase || !currentUserId) return;
+  try {
+    const { error } = await supabase.from("app_state").upsert(
+      {
+        user_id: currentUserId,
+        key: name,
+        value: JSON.parse(value),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,key" }
+    );
+    if (error) console.warn("[supabase] setItem failed:", error.message);
+  } catch (e) {
+    console.warn("[supabase] setItem threw:", e);
+  }
+}
+
+// Flush any queued writes before the tab is hidden/closed so nothing is lost.
+if (typeof window !== "undefined") {
+  const flushAll = () => {
+    for (const name of Array.from(pendingWrites.keys())) {
+      const t = writeTimers.get(name);
+      if (t) clearTimeout(t);
+      void flushWrite(name);
+    }
+  };
+  window.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushAll();
+  });
+  window.addEventListener("pagehide", flushAll);
+}
 
 /**
  * A Zustand StateStorage backed by a Supabase `app_state` (user_id + key →
@@ -75,6 +161,10 @@ export const supabaseStorage: StateStorage = {
     // Not signed in (or no backend): use the local mirror only.
     if (!supabase || !currentUserId) return mirror;
 
+    // Served from the single bulk fetch — no per-store network round-trip.
+    if (cloudCache) return cloudCache.get(name) ?? mirror;
+
+    // Cache not primed yet (rare): fall back to a single-key fetch.
     try {
       const { data, error } = await supabase
         .from("app_state")
@@ -101,30 +191,28 @@ export const supabaseStorage: StateStorage = {
   setItem: async (name: string, value: string): Promise<void> => {
     await userReady;
 
+    // Instant local persistence + keep the in-memory cache coherent.
     if (localStorageAvailable()) window.localStorage.setItem(mirrorKey(name), value);
+    cloudCache?.set(name, value);
 
     // Don't write to the cloud when there's no signed-in user.
     if (!supabase || !currentUserId) return;
 
-    try {
-      const { error } = await supabase.from("app_state").upsert(
-        {
-          user_id: currentUserId,
-          key: name,
-          value: JSON.parse(value),
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id,key" }
-      );
-      if (error) console.warn("[supabase] setItem failed:", error.message);
-    } catch (e) {
-      console.warn("[supabase] setItem threw:", e);
-    }
+    // Coalesce bursts of writes to the same key into one debounced upsert.
+    pendingWrites.set(name, value);
+    const existing = writeTimers.get(name);
+    if (existing) clearTimeout(existing);
+    writeTimers.set(name, setTimeout(() => void flushWrite(name), WRITE_DEBOUNCE_MS));
   },
 
   removeItem: async (name: string): Promise<void> => {
     await userReady;
     if (localStorageAvailable()) window.localStorage.removeItem(mirrorKey(name));
+    cloudCache?.delete(name);
+    const t = writeTimers.get(name);
+    if (t) clearTimeout(t);
+    writeTimers.delete(name);
+    pendingWrites.delete(name);
     if (!supabase || !currentUserId) return;
     try {
       await supabase.from("app_state").delete().eq("user_id", currentUserId).eq("key", name);

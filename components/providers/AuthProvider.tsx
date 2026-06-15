@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { supabase, supabaseEnabled } from "@/lib/supabase";
+import { supabase, supabaseEnabled, primeCloudCache } from "@/lib/supabase";
 import { rehydrateAllStores } from "@/lib/store";
 import { Icon } from "@/components/ui/icon";
 
@@ -34,18 +34,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(s);
       if (s) {
         setPhase("hydrating");
+        // One bulk fetch of all state, then rehydrate every store from cache.
+        await primeCloudCache();
         await rehydrateAllStores();
       }
       setPhase("ready");
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_e, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, s) => {
       setSession(s);
-      if (s) {
+      // Only re-hydrate when the user identity actually changes. Token refreshes
+      // (hourly) and user-metadata updates keep the same data, so skipping them
+      // avoids needlessly reloading every store and flashing the loading screen.
+      if (event === "SIGNED_IN" && s) {
         setPhase("hydrating");
+        await primeCloudCache();
         await rehydrateAllStores();
+        setPhase("ready");
+      } else if (event === "SIGNED_OUT") {
+        setPhase("ready");
       }
-      setPhase("ready");
     });
 
     return () => sub.subscription.unsubscribe();
