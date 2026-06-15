@@ -5,7 +5,7 @@ import "@fortawesome/fontawesome-svg-core/styles.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { IconProp } from "@fortawesome/fontawesome-svg-core";
 import {
-  faPlus, faTrashCan, faDownload, faFloppyDisk, faClockRotateLeft, faXmark,
+  faPlus, faMinus, faTrashCan, faDownload, faFloppyDisk, faClockRotateLeft, faXmark,
   faClock, faFileLines, faMagnifyingGlass, faUpload, faGripVertical, faCheck,
   faChevronLeft, faChevronRight, faChevronDown, faTableColumns, faSquareCheck,
   faImage, faGear, faMoon, faSun, faWallet, faArrowTrendUp, faArrowTrendDown,
@@ -22,7 +22,7 @@ import {
 config.autoAddCss = false;
 
 library.add(
-  faPlus, faTrashCan, faDownload, faFloppyDisk, faClockRotateLeft, faXmark,
+  faPlus, faMinus, faTrashCan, faDownload, faFloppyDisk, faClockRotateLeft, faXmark,
   faClock, faFileLines, faMagnifyingGlass, faUpload, faGripVertical, faCheck,
   faChevronLeft, faChevronRight, faChevronDown, faTableColumns, faSquareCheck,
   faImage, faGear, faMoon, faSun, faWallet, faArrowTrendUp, faArrowTrendDown,
@@ -38,6 +38,7 @@ library.add(
 // Map friendly names → Font Awesome icon definitions.
 const REGISTRY: Record<string, IconProp> = {
   plus: faPlus,
+  minus: faMinus,
   trash: faTrashCan,
   download: faDownload,
   save: faFloppyDisk,

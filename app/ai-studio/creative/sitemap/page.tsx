@@ -379,7 +379,13 @@ export default function SitemapGeneratorPage() {
   const [selectedType, setSelectedType] = useState<string>("saas");
   const [newPageDraft, setNewPageDraft] = useState("");
   const [copied, setCopied] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  const ZOOM_MIN = 0.4;
+  const ZOOM_MAX = 1.5;
+  const zoomBy = (delta: number) =>
+    setZoom((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((z + delta) * 100) / 100)));
 
   const active = sitemaps.find((s) => s.id === activeId) ?? null;
 
@@ -439,13 +445,35 @@ export default function SitemapGeneratorPage() {
           }
         />
 
-        {/* Canvas wrapper — horizontally scrollable */}
-        <div
-          ref={canvasRef}
-          className="overflow-x-auto overflow-y-auto pb-16"
-          style={{ minHeight: "70vh" }}
-        >
-          <div className="inline-flex flex-col items-center" style={{ minWidth: "max-content", paddingBottom: 64 }}>
+        {/* Canvas wrapper — distinct dotted background, scrollable + zoomable */}
+        <div className="relative rounded-2xl border overflow-hidden" style={{ borderColor: "var(--color-hairline)" }}>
+          <div
+            ref={canvasRef}
+            onWheel={(e) => {
+              if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                zoomBy(e.deltaY < 0 ? 0.1 : -0.1);
+              }
+            }}
+            className="overflow-auto"
+            style={{
+              minHeight: "72vh",
+              maxHeight: "calc(100vh - 220px)",
+              background: "var(--color-canvas)",
+              backgroundImage: "radial-gradient(var(--color-hairline) 1.1px, transparent 1.1px)",
+              backgroundSize: "22px 22px",
+            }}
+          >
+            <div
+              className="inline-flex flex-col items-center px-12 pt-10"
+              style={{
+                minWidth: "max-content",
+                paddingBottom: 96,
+                transform: `scale(${zoom})`,
+                transformOrigin: "top center",
+                transition: "transform 120ms ease-out",
+              }}
+            >
 
             {/* Root / Project node */}
             <div
@@ -548,6 +576,40 @@ export default function SitemapGeneratorPage() {
                 </div>
               </div>
             </div>
+            </div>
+          </div>
+
+          {/* Floating zoom control */}
+          <div
+            className="absolute bottom-4 right-4 flex items-center gap-1 rounded-xl border px-1.5 py-1 z-20"
+            style={{ background: "var(--color-surface)", borderColor: "var(--color-hairline)", boxShadow: "var(--shadow-pop)" }}
+          >
+            <button
+              onClick={() => zoomBy(-0.1)}
+              disabled={zoom <= ZOOM_MIN}
+              className="w-7 h-7 flex items-center justify-center rounded-lg disabled:opacity-30 hover:bg-[var(--color-canvas)]"
+              style={{ color: "var(--color-body)" }}
+              aria-label="Zoom out"
+            >
+              <Icon name="minus" size={14} />
+            </button>
+            <button
+              onClick={() => setZoom(1)}
+              className="min-w-[48px] text-center text-[12px] font-semibold tabular-nums hover:bg-[var(--color-canvas)] rounded-lg py-1"
+              style={{ color: "var(--color-body)" }}
+              aria-label="Reset zoom"
+            >
+              {Math.round(zoom * 100)}%
+            </button>
+            <button
+              onClick={() => zoomBy(0.1)}
+              disabled={zoom >= ZOOM_MAX}
+              className="w-7 h-7 flex items-center justify-center rounded-lg disabled:opacity-30 hover:bg-[var(--color-canvas)]"
+              style={{ color: "var(--color-body)" }}
+              aria-label="Zoom in"
+            >
+              <Icon name="plus" size={14} />
+            </button>
           </div>
         </div>
 
