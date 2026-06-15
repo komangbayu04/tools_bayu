@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { useRef, useState, useMemo } from "react";
 import { Icon } from "@/components/ui/icon";
 import { useMoodStore, type MoodCategory, type MediaType } from "@/lib/store";
+import { uploadMedia } from "@/lib/supabase";
 import { resolveCover } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,9 +74,11 @@ export default function MoodboardPage() {
   const [newTags, setNewTags] = useState("");
   const [newNote, setNewNote] = useState("");
   const [mediaData, setMediaData] = useState<string | null>(null);
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaType, setMediaType] = useState<MediaType | null>(null);
   const [mediaName, setMediaName] = useState("");
   const [dragActive, setDragActive] = useState(false);
+  const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
@@ -97,6 +100,7 @@ export default function MoodboardPage() {
     if (!isVideo && !isImage) return;
     const dataUrl = await readFileAsDataUrl(file);
     setMediaData(dataUrl);
+    setMediaFile(file);
     setMediaType(isVideo ? "video" : "image");
     setMediaName(file.name);
     if (!newTitle) setNewTitle(file.name.replace(/\.[^.]+$/, ""));
@@ -104,13 +108,23 @@ export default function MoodboardPage() {
 
   const resetForm = () => {
     setNewTitle(""); setNewUrl(""); setNewCategory("graphic_design");
-    setNewTags(""); setNewNote(""); setMediaData(null); setMediaType(null); setMediaName("");
+    setNewTags(""); setNewNote(""); setMediaData(null); setMediaFile(null); setMediaType(null); setMediaName("");
   };
 
-  const handleAddItem = () => {
-    if (!mediaData) return;
+  const handleAddItem = async () => {
+    if (!mediaData || saving) return;
+    setSaving(true);
     let domain = "";
     if (newUrl) { try { domain = new URL(newUrl).hostname.replace("www.", ""); } catch { domain = newUrl; } }
+
+    // Prefer a Storage URL (keeps the synced row tiny); fall back to inline
+    // base64 if the upload isn't available so nothing is ever lost.
+    let imageUrl = mediaData;
+    if (mediaFile) {
+      const uploaded = await uploadMedia(mediaFile);
+      if (uploaded) imageUrl = uploaded;
+    }
+
     addItem({
       url: newUrl,
       title: newTitle.trim() || "Untitled reference",
@@ -119,10 +133,11 @@ export default function MoodboardPage() {
       tags: newTags.split(",").map((t) => t.trim()).filter(Boolean),
       note: newNote,
       color: "linear-gradient(135deg,#6ba539,#2e4d1b)",
-      image_url: mediaData,
+      image_url: imageUrl,
       media_type: mediaType ?? "image",
       createdAt: Date.now(),
     });
+    setSaving(false);
     setShowModal(false);
     resetForm();
   };
@@ -372,7 +387,9 @@ export default function MoodboardPage() {
 
             <div className="flex gap-3 pt-1">
               <Button variant="outline" className="flex-1" onClick={() => { setShowModal(false); resetForm(); }}>Cancel</Button>
-              <Button className="flex-1" onClick={handleAddItem} disabled={!mediaData}>Add to Board</Button>
+              <Button className="flex-1" onClick={handleAddItem} disabled={!mediaData || saving}>
+                {saving ? <><Icon name="spinner" size={14} spin /> Menyimpan…</> : "Add to Board"}
+              </Button>
             </div>
           </div>
         </DialogContent>

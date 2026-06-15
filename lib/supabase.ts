@@ -58,6 +58,19 @@ if (supabase) {
 const localStorageAvailable = () =>
   typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 
+// Writing to the localStorage mirror must NEVER abort cloud persistence. A large
+// store (e.g. moodboard with base64 media) can exceed the ~5MB quota and throw
+// QuotaExceededError — if that bubbled up it would prevent the cloud write and
+// silently lose data. We swallow it: the cloud copy remains the source of truth.
+const safeLocalSet = (key: string, value: string): void => {
+  if (!localStorageAvailable()) return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch (e) {
+    console.warn("[supabase] localStorage mirror write skipped (quota?):", e);
+  }
+};
+
 // localStorage mirror key is namespaced per-user so two accounts on the same
 // browser never see each other's cached data.
 const mirrorKey = (name: string) => `${currentUserId ?? "anon"}:${name}`;
@@ -94,12 +107,40 @@ export async function primeCloudCache(): Promise<void> {
       const serialized = JSON.stringify((row as { value: unknown }).value);
       const k = (row as { key: string }).key;
       cache.set(k, serialized);
-      if (localStorageAvailable()) window.localStorage.setItem(mirrorKey(k), serialized);
+      safeLocalSet(mirrorKey(k), serialized);
     }
   } catch (e) {
     console.warn("[supabase] primeCloudCache threw, falling back to mirror:", e);
   }
   cloudCache = cache;
+}
+
+// ─── Media uploads (Supabase Storage) ─────────────────────────────
+// Large binary media (moodboard images/videos) must NOT live inside the
+// key-value JSON blob — it bloats every read and can exceed storage limits.
+// Upload it to a Storage bucket and keep only the public URL in app_state.
+// Returns null on any failure so callers can fall back to inline base64.
+const MEDIA_BUCKET = "moodboard";
+
+export async function uploadMedia(file: File): Promise<string | null> {
+  await userReady;
+  if (!supabase || !currentUserId) return null;
+  try {
+    const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const path = `${currentUserId}/${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage
+      .from(MEDIA_BUCKET)
+      .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+    if (error) {
+      console.warn("[supabase] uploadMedia failed, will fall back to base64:", error.message);
+      return null;
+    }
+    const { data } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(path);
+    return data?.publicUrl ?? null;
+  } catch (e) {
+    console.warn("[supabase] uploadMedia threw, will fall back to base64:", e);
+    return null;
+  }
 }
 
 // ─── Debounced cloud writes ───────────────────────────────────────
@@ -180,7 +221,7 @@ export const supabaseStorage: StateStorage = {
       if (!data) return mirror; // nothing in cloud yet → keep local/seed data
 
       const serialized = JSON.stringify(data.value);
-      if (localStorageAvailable()) window.localStorage.setItem(mirrorKey(name), serialized);
+      safeLocalSet(mirrorKey(name), serialized);
       return serialized;
     } catch (e) {
       console.warn("[supabase] getItem threw, using local mirror:", e);
@@ -192,7 +233,9 @@ export const supabaseStorage: StateStorage = {
     await userReady;
 
     // Instant local persistence + keep the in-memory cache coherent.
-    if (localStorageAvailable()) window.localStorage.setItem(mirrorKey(name), value);
+    // The in-memory cache always holds the full value even if the localStorage
+    // mirror is skipped due to quota, so reads within the session stay complete.
+    safeLocalSet(mirrorKey(name), value);
     cloudCache?.set(name, value);
 
     // Don't write to the cloud when there's no signed-in user.
