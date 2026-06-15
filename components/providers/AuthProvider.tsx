@@ -2,8 +2,34 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { supabase, supabaseEnabled } from "@/lib/supabase";
+import { supabase, supabaseEnabled, supabaseStorage } from "@/lib/supabase";
 import { Icon } from "@/components/ui/icon";
+
+// All cloud-persisted store keys — we wait for each to hydrate before
+// rendering the app so the UI never flashes stale/empty data on login.
+const CLOUD_STORE_KEYS = [
+  "tasks-storage-v2",
+  "projects-storage",
+  "invoice-history-storage",
+  "moodboard-storage",
+  "finance-storage",
+  "clients-storage",
+  "time-tracker-storage",
+  "ai-prompts-storage",
+  "ai-workflows-storage",
+  "ai-workflow-runs-storage",
+  "ai-sitemaps-storage",
+  "ai-assets-storage",
+  "saved-jobs-storage",
+];
+
+async function waitForHydration(): Promise<void> {
+  // Pre-fetch all store keys from Supabase in parallel so Zustand persist
+  // middleware picks them up from the mirror cache when it hydrates.
+  await Promise.allSettled(
+    CLOUD_STORE_KEYS.map((key) => supabaseStorage.getItem(key))
+  );
+}
 
 interface AuthContextValue {
   user: User | null;
@@ -19,45 +45,54 @@ export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  // "checking" = initial auth check; "hydrating" = loading store data post-login
+  const [phase, setPhase] = useState<"checking" | "hydrating" | "ready">("checking");
 
   useEffect(() => {
     if (!supabase) {
-      setLoading(false);
+      setPhase("ready");
       return;
     }
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+
+    supabase.auth.getSession().then(async ({ data }) => {
+      const s = data.session ?? null;
       setSession(s);
+      if (s) {
+        setPhase("hydrating");
+        await waitForHydration();
+      }
+      setPhase("ready");
     });
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_e, s) => {
+      setSession(s);
+      if (s) {
+        setPhase("hydrating");
+        await waitForHydration();
+      }
+      setPhase("ready");
+    });
+
     return () => sub.subscription.unsubscribe();
   }, []);
 
   const signOut = async () => {
     await supabase?.auth.signOut();
-    // Full reload so every Zustand store re-hydrates cleanly for the next user.
     if (typeof window !== "undefined") window.location.reload();
   };
 
-  // No backend configured → run the app without auth (local-only mode).
   if (!supabaseEnabled) {
     return (
       <AuthContext.Provider value={{ user: null, signOut }}>{children}</AuthContext.Provider>
     );
   }
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center" style={{ background: "var(--color-global-bg)" }}>
-        <div
-          className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
-          style={{ borderColor: "var(--color-primary)", borderTopColor: "transparent" }}
-        />
-      </div>
-    );
+  if (phase === "checking") {
+    return <LoadingScreen label="Memeriksa sesi…" />;
+  }
+
+  if (phase === "hydrating") {
+    return <LoadingScreen label="Memuat data…" />;
   }
 
   if (!session) {
@@ -66,6 +101,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user: session.user, signOut }}>{children}</AuthContext.Provider>
+  );
+}
+
+function LoadingScreen({ label }: { label: string }) {
+  return (
+    <div className="flex h-screen flex-col items-center justify-center gap-4" style={{ background: "var(--color-global-bg)" }}>
+      <div
+        className="w-10 h-10 rounded-full border-2 animate-spin"
+        style={{ borderColor: "var(--color-primary)", borderTopColor: "transparent" }}
+      />
+      <p className="text-[13px] font-medium" style={{ color: "var(--color-muted)" }}>{label}</p>
+    </div>
   );
 }
 

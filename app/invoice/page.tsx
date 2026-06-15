@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useInvoiceHistoryStore, useInvoicePrefillStore } from "@/lib/store";
+import { useInvoiceHistoryStore, useInvoicePrefillStore, useTaskStore, useProjectStore } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
+import { AnimatePresence, motion } from "framer-motion";
 
 type DocumentType = "invoice" | "quotation";
 
@@ -75,6 +76,43 @@ export default function InvoicePage() {
     if (prefill) useInvoicePrefillStore.getState().setPrefill(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Task picker
+  const { tasks } = useTaskStore();
+  const { projects } = useProjectStore();
+  const [taskPickerOpen, setTaskPickerOpen] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+  const linkedTaskIds = tasks.filter((t) => t.invoiceLinked).map((t) => t.id);
+
+  const billableTasks = tasks.filter(
+    (t) => t.invoiceLinked && t.hours && t.hours > 0
+  );
+
+  const toggleTaskSel = (id: string) =>
+    setSelectedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+
+  const importSelectedTasks = () => {
+    const toImport = billableTasks.filter((t) => selectedTaskIds.has(t.id));
+    const newItems: LineItem[] = toImport.map((t) => {
+      const project = projects.find((p) => p.id === t.projectId);
+      return {
+        id: crypto.randomUUID(),
+        date: t.deadline ?? new Date().toISOString().slice(0, 10),
+        title: t.title,
+        tasks: t.description ?? t.title,
+        project: project?.name ?? "",
+        hours: t.hours ?? 0,
+      };
+    });
+    setItems((prev) => [...prev.filter((i) => i.title !== "" || i.tasks !== "" || i.hours > 0), ...newItems]);
+    setTotalTasks((n) => n + newItems.length);
+    setSelectedTaskIds(new Set());
+    setTaskPickerOpen(false);
+  };
 
   // Quotation-only
   const [companyName, setCompanyName] = useState("");
@@ -323,9 +361,16 @@ export default function InvoicePage() {
                       <Textarea value={item.tasks} onChange={e => updateItem(item.id, "tasks", e.target.value)} rows={3} placeholder="One task per line" className="bg-[var(--color-surface-card)]" />
                     </div>
                   ))}
-                  <button onClick={addItem} className="flex items-center gap-2 text-sm font-semibold mt-1 hover:opacity-70 w-fit" style={{ color: "var(--color-primary)" }}>
-                    <Icon name="plus" size={14} /> Add Item
-                  </button>
+                  <div className="flex items-center gap-3 mt-1">
+                    <button onClick={addItem} className="flex items-center gap-2 text-sm font-semibold hover:opacity-70" style={{ color: "var(--color-primary)" }}>
+                      <Icon name="plus" size={14} /> Add Item
+                    </button>
+                    {billableTasks.length > 0 && (
+                      <button onClick={() => setTaskPickerOpen(true)} className="flex items-center gap-2 text-sm font-semibold hover:opacity-70" style={{ color: "var(--color-muted)" }}>
+                        <Icon name="list-check" size={14} /> Import dari Task ({billableTasks.length})
+                      </button>
+                    )}
+                  </div>
                 </>
               ) : (
                 <>
@@ -417,6 +462,94 @@ export default function InvoicePage() {
           </div>
         </div>
       </div>
+
+      {/* ── TASK PICKER MODAL ── */}
+      <AnimatePresence>
+        {taskPickerOpen && (
+          <>
+            <motion.div
+              key="backdrop"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+              onClick={() => setTaskPickerOpen(false)}
+            />
+            <motion.div
+              key="modal"
+              initial={{ opacity: 0, y: 20, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.97 }}
+              transition={{ duration: 0.18 }}
+              className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-[18px] border shadow-2xl overflow-hidden"
+              style={{ background: "var(--color-surface)", borderColor: "var(--color-hairline)" }}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-5 border-b" style={{ borderColor: "var(--color-hairline)" }}>
+                <div>
+                  <h2 className="text-[16px] font-semibold" style={{ color: "var(--color-ink)" }}>Import dari Task</h2>
+                  <p className="text-[12.5px] mt-0.5" style={{ color: "var(--color-muted)" }}>Pilih task yang sudah "Linked to Invoice" dan punya jam kerja</p>
+                </div>
+                <button onClick={() => setTaskPickerOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-70" style={{ background: "var(--color-canvas)", color: "var(--color-muted)" }}>
+                  <Icon name="x" size={15} />
+                </button>
+              </div>
+
+              {/* Task list */}
+              <div className="max-h-[50vh] overflow-y-auto divide-y" style={{ borderColor: "var(--color-hairline)" }}>
+                {billableTasks.length === 0 ? (
+                  <p className="py-10 text-center text-[13px]" style={{ color: "var(--color-muted)" }}>Belum ada task dengan "Linked to Invoice" dan jam kerja.</p>
+                ) : billableTasks.map((t) => {
+                  const project = projects.find((p) => p.id === t.projectId);
+                  const isSel = selectedTaskIds.has(t.id);
+                  const value = (t.hours ?? 0) * rate;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => toggleTaskSel(t.id)}
+                      className="w-full flex items-center gap-3 px-6 py-4 text-left transition-colors"
+                      style={{ background: isSel ? "var(--color-primary-light)" : undefined }}
+                    >
+                      <div className="w-5 h-5 rounded-[6px] border flex items-center justify-center flex-shrink-0 transition-colors"
+                        style={isSel ? { background: "var(--color-primary)", borderColor: "var(--color-primary)" } : { borderColor: "var(--color-hairline)" }}>
+                        {isSel && <Icon name="check" size={11} style={{ color: "var(--color-on-primary)" }} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13.5px] font-medium truncate" style={{ color: "var(--color-ink)" }}>{t.title}</p>
+                        <p className="text-[12px]" style={{ color: "var(--color-muted)" }}>
+                          {project?.name ?? "–"}{t.deadline ? ` · ${format(new Date(t.deadline), "d MMM")}` : ""}
+                        </p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-[13px] font-semibold tabular-nums" style={{ color: "var(--color-ink)" }}>{t.hours} jam</p>
+                        <p className="text-[11.5px]" style={{ color: "var(--color-muted)" }}>IDR {new Intl.NumberFormat("en-US").format(value)}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between gap-3 px-6 py-4 border-t" style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface-card)" }}>
+                <p className="text-[12.5px]" style={{ color: "var(--color-muted)" }}>
+                  {selectedTaskIds.size > 0 ? `${selectedTaskIds.size} task dipilih` : "Pilih task di atas"}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setTaskPickerOpen(false)} className="px-4 py-2 text-[13px] font-semibold rounded-[9px] hover:opacity-70" style={{ color: "var(--color-muted)" }}>
+                    Batal
+                  </button>
+                  <button
+                    onClick={importSelectedTasks}
+                    disabled={selectedTaskIds.size === 0}
+                    className="px-4 py-2 text-[13px] font-semibold rounded-[9px] transition-opacity disabled:opacity-40"
+                    style={{ background: "var(--color-primary)", color: "var(--color-on-primary)" }}
+                  >
+                    Import {selectedTaskIds.size > 0 ? `(${selectedTaskIds.size})` : ""}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </ShellLayout>
   );
 }
