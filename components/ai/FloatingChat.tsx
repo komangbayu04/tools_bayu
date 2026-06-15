@@ -3,9 +3,22 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Icon } from "@/components/ui/icon";
-import { useSitemapStore, type SitemapPage } from "@/lib/aiStore";
-import { useFinanceStore } from "@/lib/store";
+import { Icon, type IconName } from "@/components/ui/icon";
+import {
+  useSitemapStore,
+  usePromptStore,
+  useWorkflowStore,
+  useExperimentStore,
+  useAssetStore,
+  type SitemapPage,
+} from "@/lib/aiStore";
+import {
+  useFinanceStore,
+  useTaskStore,
+  useProjectStore,
+  useInvoiceHistoryStore,
+  useMoodStore,
+} from "@/lib/store";
 
 // ─── Types ────────────────────────────────────────────────────────
 type Role = "user" | "assistant";
@@ -25,12 +38,133 @@ interface SitemapPayload {
   pages: { name: string; sections: { name: string; description: string }[] }[];
 }
 
+interface TaskPayload {
+  title: string;
+  description?: string;
+  priority: "high" | "medium" | "low";
+  deadline?: string;
+  projectName?: string;
+}
+interface ProjectPayload {
+  name: string;
+  client: string;
+  description?: string;
+  status: "active" | "completed" | "paused";
+}
+interface InvoicePayload {
+  docType: "invoice" | "quotation";
+  clientName: string;
+  total: number;
+  dateIssued: string;
+  dueDate?: string;
+  note?: string;
+}
+interface MoodPayload {
+  title: string;
+  url: string;
+  note?: string;
+  category: "graphic_design" | "product_design" | "3d" | "motion";
+  tags: string[];
+}
+interface PromptPayload {
+  title: string;
+  content: string;
+  category: string;
+  tags: string[];
+}
+interface WorkflowPayload {
+  name: string;
+  description: string;
+  steps: { title: string; prompt: string; note?: string }[];
+}
+interface ExperimentPayload {
+  title: string;
+  model: string;
+  prompt: string;
+  result: string;
+  status: "idea" | "running" | "success" | "failed";
+}
+interface AssetPayload {
+  title: string;
+  url: string;
+  type: "image" | "video" | "text" | "audio";
+  prompt: string;
+  model: string;
+  tags: string[];
+}
+
 interface ChatAction {
-  type: "navigate" | "add_transaction" | "add_sitemap";
+  type:
+    | "navigate"
+    | "add_transaction"
+    | "add_sitemap"
+    | "create_task"
+    | "create_project"
+    | "create_invoice"
+    | "add_moodboard"
+    | "save_prompt"
+    | "create_workflow"
+    | "add_experiment"
+    | "add_asset";
   url?: string;
   transaction?: TransactionPayload;
   sitemap?: SitemapPayload;
+  task?: TaskPayload;
+  project?: ProjectPayload;
+  invoice?: InvoicePayload;
+  item?: MoodPayload;
+  prompt?: PromptPayload;
+  workflow?: WorkflowPayload;
+  experiment?: ExperimentPayload;
+  asset?: AssetPayload;
 }
+
+// Generic confirmation card descriptors keyed by action type.
+const SIMPLE_CARD: Record<
+  string,
+  { icon: IconName; label: string; url: string; cta: string; getTitle: (a: ChatAction) => string; getSub?: (a: ChatAction) => string }
+> = {
+  create_task: {
+    icon: "list-check", label: "Task Dibuat", url: "/todo", cta: "Buka Todo",
+    getTitle: (a) => a.task?.title ?? "",
+    getSub: (a) => [a.task?.priority && `Prioritas ${a.task.priority}`, a.task?.deadline && `Deadline ${a.task.deadline}`].filter(Boolean).join(" · "),
+  },
+  create_project: {
+    icon: "folder", label: "Proyek Dibuat", url: "/todo", cta: "Buka Proyek",
+    getTitle: (a) => a.project?.name ?? "",
+    getSub: (a) => a.project?.client ? `Klien: ${a.project.client}` : "",
+  },
+  create_invoice: {
+    icon: "receipt", label: "Invoice Dibuat", url: "/invoice/history", cta: "Buka Invoice",
+    getTitle: (a) => a.invoice?.clientName ?? "",
+    getSub: (a) => a.invoice ? new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(a.invoice.total) : "",
+  },
+  add_moodboard: {
+    icon: "image", label: "Moodboard Ditambah", url: "/moodboard", cta: "Buka Moodboard",
+    getTitle: (a) => a.item?.title ?? "",
+    getSub: (a) => a.item?.category ?? "",
+  },
+  save_prompt: {
+    icon: "file-text", label: "Prompt Disimpan", url: "/ai-studio/prompts", cta: "Buka Prompt",
+    getTitle: (a) => a.prompt?.title ?? "",
+    getSub: (a) => a.prompt?.category ?? "",
+  },
+  create_workflow: {
+    icon: "workflow", label: "Workflow Dibuat", url: "/ai-studio/workflows", cta: "Buka Workflow",
+    getTitle: (a) => a.workflow?.name ?? "",
+    getSub: (a) => a.workflow ? `${a.workflow.steps.length} step` : "",
+  },
+  add_experiment: {
+    icon: "flask", label: "Eksperimen Dicatat", url: "/ai-studio/experiments", cta: "Buka Experiments",
+    getTitle: (a) => a.experiment?.title ?? "",
+    getSub: (a) => a.experiment?.model ?? "",
+  },
+  add_asset: {
+    icon: "layers", label: "Aset Disimpan", url: "/ai-studio/assets", cta: "Buka Assets",
+    getTitle: (a) => a.asset?.title ?? "",
+    getSub: (a) => a.asset?.type ?? "",
+  },
+};
 
 interface Message {
   id: string;
@@ -129,6 +263,38 @@ function ActionCard({ action, onNavigate }: { action: ChatAction; onNavigate: (u
     );
   }
 
+  // Generic confirmation card for all other create/add actions
+  const card = SIMPLE_CARD[action.type];
+  if (card) {
+    const title = card.getTitle(action);
+    const sub = card.getSub?.(action);
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="rounded-2xl border overflow-hidden"
+        style={{ borderColor: "var(--color-primary)", background: "var(--color-primary-light)" }}
+      >
+        <div className="flex items-center gap-2 px-3.5 py-2.5 border-b" style={{ borderColor: "var(--color-primary)" }}>
+          <Icon name={card.icon} size={14} style={{ color: "var(--color-primary-ink)" }} />
+          <span className="text-[12px] font-bold" style={{ color: "var(--color-primary-ink)" }}>{card.label} ✓</span>
+        </div>
+        <div className="px-3.5 py-2.5">
+          {title && <p className="text-[14px] font-bold mb-0.5" style={{ color: "var(--color-primary-ink)" }}>{title}</p>}
+          {sub && <p className="text-[12px]" style={{ color: "var(--color-primary-ink)" }}>{sub}</p>}
+        </div>
+        <button
+          onClick={() => onNavigate(card.url)}
+          className="flex items-center gap-1.5 px-3.5 py-2 w-full text-[12px] font-semibold border-t transition hover:opacity-80"
+          style={{ borderColor: "var(--color-primary)", color: "var(--color-primary-ink)" }}
+        >
+          <Icon name="arrow-right" size={11} /> {card.cta}
+        </button>
+      </motion.div>
+    );
+  }
+
   if (action.type === "navigate" && action.url) {
     return (
       <motion.button
@@ -150,9 +316,10 @@ function ActionCard({ action, onNavigate }: { action: ChatAction; onNavigate: (u
 // ─── Suggestions ──────────────────────────────────────────────────
 const SUGGESTIONS = [
   "Tambah pengeluaran makan siang 35rb",
-  "Catat pemasukan freelance 2jt",
+  "Buat task desain logo prioritas tinggi deadline besok",
+  "Buatkan invoice klien Acme 5jt untuk desain web",
+  "Buatkan workflow riset → outline → artikel",
   "Buatkan sitemap untuk coffee shop",
-  "Apa saja yang bisa kamu lakukan?",
 ];
 
 // ─── Message bubble ───────────────────────────────────────────────
@@ -215,7 +382,7 @@ export function FloatingChat() {
     {
       id: "welcome",
       role: "assistant",
-      content: "Hei! Saya asisten AI kamu 👋 Saya bisa langsung catat pengeluaran, buat sitemap, dan lainnya. Cukup ketik apa yang kamu mau.",
+      content: "Hei! Saya asisten AI kamu 👋 Saya bisa langsung eksekusi semua fitur — catat keuangan, buat task, invoice, sitemap, workflow, moodboard, dan lainnya. Cukup ketik apa yang kamu mau.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -226,6 +393,14 @@ export function FloatingChat() {
   const router = useRouter();
   const { addSitemap } = useSitemapStore();
   const { addTransaction } = useFinanceStore();
+  const { addTask } = useTaskStore();
+  const { addProject } = useProjectStore();
+  const { saveDoc } = useInvoiceHistoryStore();
+  const { addItem } = useMoodStore();
+  const { addPrompt } = usePromptStore();
+  const { addWorkflow, addStep } = useWorkflowStore();
+  const { addExperiment } = useExperimentStore();
+  const { addAsset } = useAssetStore();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -272,16 +447,104 @@ export function FloatingChat() {
         );
       } else {
         // Execute actions client-side immediately
-        if (data.action?.type === "add_transaction" && data.action.transaction) {
-          addTransaction({ ...data.action.transaction, month: data.action.transaction.date.slice(0, 7) });
-        }
-        if (data.action?.type === "add_sitemap" && data.action.sitemap) {
-          const pages: SitemapPage[] = data.action.sitemap.pages.map((p) => ({
+        const a = data.action;
+        if (a?.type === "add_transaction" && a.transaction) {
+          addTransaction({ ...a.transaction, month: a.transaction.date.slice(0, 7) });
+        } else if (a?.type === "add_sitemap" && a.sitemap) {
+          const pages: SitemapPage[] = a.sitemap.pages.map((p) => ({
             id: crypto.randomUUID(),
             name: p.name,
             sections: p.sections.map((s) => ({ id: crypto.randomUUID(), name: s.name, description: s.description })),
           }));
-          addSitemap(data.action.sitemap.name, pages);
+          addSitemap(a.sitemap.name, pages);
+        } else if (a?.type === "create_task" && a.task) {
+          // Resolve / create the project for this task
+          let projects = useProjectStore.getState().projects;
+          let projectId: string;
+          const found = a.task.projectName
+            ? projects.find((p) => p.name.toLowerCase() === a.task!.projectName!.toLowerCase())
+            : undefined;
+          if (found) {
+            projectId = found.id;
+          } else if (a.task.projectName) {
+            addProject({ name: a.task.projectName, client: "", color: "#4e7d2e", status: "active" });
+            projects = useProjectStore.getState().projects;
+            projectId = projects.find((p) => p.name.toLowerCase() === a.task!.projectName!.toLowerCase())?.id ?? projects[0]?.id ?? "";
+          } else if (projects.length) {
+            projectId = projects[0].id;
+          } else {
+            addProject({ name: "Umum", client: "", color: "#4e7d2e", status: "active" });
+            projectId = useProjectStore.getState().projects[0]?.id ?? "";
+          }
+          addTask({
+            title: a.task.title,
+            description: a.task.description,
+            projectId,
+            priority: a.task.priority,
+            status: "todo",
+            deadline: a.task.deadline,
+            source: "manual",
+          });
+        } else if (a?.type === "create_project" && a.project) {
+          addProject({
+            name: a.project.name,
+            client: a.project.client,
+            description: a.project.description,
+            color: "#4e7d2e",
+            status: a.project.status,
+          });
+        } else if (a?.type === "create_invoice" && a.invoice) {
+          saveDoc({
+            type: a.invoice.docType,
+            clientName: a.invoice.clientName,
+            dateIssued: a.invoice.dateIssued,
+            dueDate: a.invoice.dueDate,
+            status: "unpaid",
+            total: a.invoice.total,
+            snapshot: { note: a.invoice.note, createdViaChat: true },
+          });
+        } else if (a?.type === "add_moodboard" && a.item) {
+          let domain = "";
+          try { domain = a.item.url ? new URL(a.item.url).hostname.replace("www.", "") : ""; } catch { domain = ""; }
+          addItem({
+            url: a.item.url,
+            title: a.item.title,
+            source_domain: domain,
+            category: a.item.category,
+            tags: a.item.tags,
+            note: a.item.note,
+            color: "#4e7d2e",
+            createdAt: Date.now(),
+          });
+        } else if (a?.type === "save_prompt" && a.prompt) {
+          addPrompt({
+            title: a.prompt.title,
+            content: a.prompt.content,
+            category: a.prompt.category,
+            tags: a.prompt.tags,
+            favorite: false,
+          });
+        } else if (a?.type === "create_workflow" && a.workflow) {
+          const id = addWorkflow({ name: a.workflow.name, description: a.workflow.description });
+          a.workflow.steps.forEach((s) => addStep(id, { title: s.title, prompt: s.prompt, note: s.note ?? "" }));
+        } else if (a?.type === "add_experiment" && a.experiment) {
+          addExperiment({
+            title: a.experiment.title,
+            model: a.experiment.model,
+            prompt: a.experiment.prompt,
+            result: a.experiment.result,
+            rating: 0,
+            status: a.experiment.status,
+          });
+        } else if (a?.type === "add_asset" && a.asset) {
+          addAsset({
+            title: a.asset.title,
+            url: a.asset.url,
+            type: a.asset.type,
+            prompt: a.asset.prompt,
+            model: a.asset.model,
+            tags: a.asset.tags,
+          });
         }
 
         setMessages((prev) =>
@@ -300,7 +563,7 @@ export function FloatingChat() {
     } finally {
       setLoading(false);
     }
-  }, [loading, messages, open, addTransaction, addSitemap]);
+  }, [loading, messages, open, addTransaction, addSitemap, addTask, addProject, saveDoc, addItem, addPrompt, addWorkflow, addStep, addExperiment, addAsset]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
