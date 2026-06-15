@@ -17,6 +17,7 @@ import {
   faDesktop, faRobot, faFlask, faCopy, faDatabase, faPenRuler,
   faDiagramProject, faLayerGroup, faLightbulb, faStar, faClone,
   faBriefcase, faPause, faStop, faPaperPlane, faLocationDot, faMoneyBillWave,
+  faFilm, faVideo, faPalette, faShapes, faFont, faSquare, faRotateRight, faExpand,
 } from "@fortawesome/free-solid-svg-icons";
 
 // Prevent Font Awesome from adding its CSS since we import it manually (SSR-safe)
@@ -35,6 +36,7 @@ library.add(
   faDesktop, faRobot, faFlask, faCopy, faDatabase, faPenRuler,
   faDiagramProject, faLayerGroup, faLightbulb, faStar, faClone,
   faBriefcase, faPause, faStop, faPaperPlane, faLocationDot, faMoneyBillWave,
+  faFilm, faVideo, faPalette, faShapes, faFont, faSquare, faRotateRight, faExpand,
 );
 
 // Map friendly names → Font Awesome icon definitions.
@@ -112,6 +114,14 @@ const REGISTRY: Record<string, IconProp> = {
   send: faPaperPlane,
   "map-pin": faLocationDot,
   "money-bill": faMoneyBillWave,
+  film: faFilm,
+  video: faVideo,
+  palette: faPalette,
+  shapes: faShapes,
+  type: faFont,
+  square: faSquare,
+  rotate: faRotateRight,
+  expand: faExpand,
 };
 
 export type IconName = keyof typeof REGISTRY;

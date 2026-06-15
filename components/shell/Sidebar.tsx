@@ -51,6 +51,17 @@ const navItems: (NavItem | { group: NavGroup })[] = [
   { label: "Moodboard", href: "/moodboard", icon: "image" },
   {
     group: {
+      label: "Creative Tools",
+      icon: "palette",
+      children: [
+        { label: "Image Generator", href: "/creative-tools/image", icon: "image" },
+        { label: "Video Generator", href: "/creative-tools/video", icon: "film" },
+        { label: "Motion Editor", href: "/creative-tools/motion", icon: "shapes" },
+      ],
+    },
+  },
+  {
+    group: {
       label: "AI Studio",
       icon: "robot",
       children: [
