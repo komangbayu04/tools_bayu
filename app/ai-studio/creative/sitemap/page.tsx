@@ -704,94 +704,87 @@ export default function SitemapGeneratorPage() {
           })}
         </div>
 
-        <div className="p-6">
+        <div className="p-5">
           {genMode === "template" ? (
             <>
-              <label className="block text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted-soft)" }}>
-                Nama Website / Proyek
-              </label>
-              <input
-                placeholder="mis. Studio Kamarupa"
-                value={siteName}
-                onChange={(e) => setSiteName(e.target.value)}
-                className={`${inputBase} w-full mb-6`}
-                style={inputStyle}
-              />
+              <div className="flex gap-3 mb-4">
+                <div className="flex-1">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted-soft)" }}>
+                    Nama Website
+                  </label>
+                  <input
+                    placeholder="mis. Studio Kamarupa"
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
+                    className={`${inputBase} w-full`}
+                    style={inputStyle}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={handleGenerate} size="md">
+                    <Icon name="layout-grid" size={14} /> Generate
+                  </Button>
+                </div>
+              </div>
 
-              <label className="block text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: "var(--color-muted-soft)" }}>
+              <label className="block text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted-soft)" }}>
                 Tipe Website
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+              <div className="flex flex-wrap gap-2">
                 {SITE_TYPES.map((type) => {
                   const selected = selectedType === type.id;
                   return (
                     <button
                       key={type.id}
                       onClick={() => setSelectedType(type.id)}
-                      className="text-left rounded-2xl border p-4 transition"
+                      className="flex items-center gap-2 rounded-xl border px-3 py-2 transition"
                       style={{
                         borderColor: selected ? "var(--color-primary)" : "var(--color-hairline)",
                         background: selected ? "var(--color-primary-light)" : "var(--color-surface)",
                         boxShadow: selected ? "0 0 0 1px var(--color-primary)" : "none",
                       }}
                     >
-                      <div className="flex items-center gap-2.5 mb-1.5">
-                        <div
-                          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                          style={{ background: selected ? "var(--color-primary)" : "var(--color-canvas)" }}
-                        >
-                          <Icon name={type.icon} size={16} style={{ color: selected ? "var(--color-on-primary)" : "var(--color-muted)" }} />
-                        </div>
-                        <span className="text-[14px] font-bold" style={{ color: "var(--color-ink)" }}>{type.label}</span>
-                      </div>
-                      <p className="text-[12px] leading-snug" style={{ color: "var(--color-muted)" }}>{type.description}</p>
-                      <p className="text-[11px] mt-2 font-medium" style={{ color: "var(--color-muted-soft)" }}>
-                        {type.pages.length} halaman
-                      </p>
+                      <Icon name={type.icon} size={13} style={{ color: selected ? "var(--color-primary-ink)" : "var(--color-muted)" }} />
+                      <span className="text-[12.5px] font-semibold" style={{ color: selected ? "var(--color-primary-ink)" : "var(--color-ink)" }}>{type.label}</span>
+                      <span className="text-[11px]" style={{ color: selected ? "var(--color-primary-ink)" : "var(--color-muted-soft)" }}>{type.pages.length}p</span>
                     </button>
                   );
                 })}
               </div>
-
-              <Button onClick={handleGenerate} size="lg">
-                <Icon name="layout-grid" size={16} /> Generate dari Template
-              </Button>
             </>
           ) : (
             <>
-              <div className="flex items-start gap-3 mb-4 rounded-xl px-4 py-3" style={{ background: "var(--color-primary-light)" }}>
-                <Icon name="sparkles" size={14} style={{ color: "var(--color-primary-ink)", flexShrink: 0, marginTop: 2 }} />
-                <p className="text-[13px]" style={{ color: "var(--color-primary-ink)" }}>
-                  Deskripsikan website kamu — bisnis, target audience, fitur utama. GPT-4o akan membuat struktur halaman dan sections yang paling sesuai.
-                </p>
+              <label className="block text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted-soft)" }}>
+                Deskripsikan Website / Bisnis Kamu
+              </label>
+              <div className="flex gap-3 items-start">
+                <textarea
+                  placeholder={`Contoh: "Saya punya klinik kecantikan di Bali yang menawarkan perawatan kulit, laser, dan body treatment. Target klien wanita 25–45 tahun, ingin website elegan dengan fitur booking online."`}
+                  value={aiDesc}
+                  onChange={(e) => setAiDesc(e.target.value)}
+                  rows={3}
+                  className={`${inputBase} flex-1 resize-none`}
+                  style={inputStyle}
+                />
+                <Button onClick={handleAiGenerate} disabled={!aiDesc.trim() || aiLoading} size="md" className="flex-shrink-0 self-stretch">
+                  {aiLoading ? (
+                    <><Icon name="spinner" size={14} spin /> Generating…</>
+                  ) : (
+                    <><Icon name="sparkles" size={14} /> Generate</>
+                  )}
+                </Button>
               </div>
 
-              <label className="block text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted-soft)" }}>
-                Deskripsi Website / Bisnis
-              </label>
-              <textarea
-                placeholder={`Contoh:\n"Saya punya klinik kecantikan di Bali yang menawarkan perawatan kulit, laser, dan body treatment. Target klien wanita 25-45 tahun. Saya ingin website yang elegan dan bisa booking online."`}
-                value={aiDesc}
-                onChange={(e) => setAiDesc(e.target.value)}
-                rows={5}
-                className={`${inputBase} w-full mb-4 resize-none`}
-                style={inputStyle}
-              />
-
               {aiError && (
-                <div className="flex items-start gap-2.5 rounded-xl px-4 py-3 mb-4" style={{ background: "#fef2f2" }}>
+                <div className="flex items-start gap-2.5 rounded-xl px-4 py-3 mt-3" style={{ background: "#fef2f2" }}>
                   <Icon name="alert-triangle" size={13} style={{ color: "#dc2626", flexShrink: 0, marginTop: 1 }} />
                   <p className="text-[13px]" style={{ color: "#991b1b" }}>{aiError}</p>
                 </div>
               )}
 
-              <Button onClick={handleAiGenerate} disabled={!aiDesc.trim() || aiLoading} size="lg">
-                {aiLoading ? (
-                  <><Icon name="spinner" size={16} spin /> AI sedang membuat sitemap…</>
-                ) : (
-                  <><Icon name="sparkles" size={16} /> Generate dengan AI</>
-                )}
-              </Button>
+              <p className="text-[11.5px] mt-3" style={{ color: "var(--color-muted-soft)" }}>
+                💡 Semakin detail deskripsinya, semakin relevan sitemap yang dihasilkan.
+              </p>
             </>
           )}
         </div>
