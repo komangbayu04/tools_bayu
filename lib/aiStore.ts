@@ -126,6 +126,7 @@ export const useExperimentStore = create<ExperimentStore>()(
 export interface SitemapSection {
   id: string;
   name: string;
+  description: string;
 }
 export interface SitemapPage {
   id: string;
@@ -149,8 +150,8 @@ interface SitemapStore {
   addPage: (sitemapId: string, name: string) => void;
   renamePage: (sitemapId: string, pageId: string, name: string) => void;
   deletePage: (sitemapId: string, pageId: string) => void;
-  addSection: (sitemapId: string, pageId: string, name: string) => void;
-  renameSection: (sitemapId: string, pageId: string, sectionId: string, name: string) => void;
+  addSection: (sitemapId: string, pageId: string, name: string, description?: string) => void;
+  updateSection: (sitemapId: string, pageId: string, sectionId: string, patch: Partial<Pick<SitemapSection, "name" | "description">>) => void;
   deleteSection: (sitemapId: string, pageId: string, sectionId: string) => void;
   moveSection: (sitemapId: string, pageId: string, sectionId: string, dir: -1 | 1) => void;
 }
@@ -192,23 +193,23 @@ export const useSitemapStore = create<SitemapStore>()(
           ),
         })),
 
-      addSection: (sitemapId, pageId, name) =>
+      addSection: (sitemapId, pageId, name, description = "") =>
         set((s) => ({
           sitemaps: s.sitemaps.map((sm) =>
             mapPages(sm, sitemapId, (pages) =>
               pages.map((p) =>
-                p.id === pageId ? { ...p, sections: [...p.sections, { id: sId(), name }] } : p
+                p.id === pageId ? { ...p, sections: [...p.sections, { id: sId(), name, description }] } : p
               )
             )
           ),
         })),
-      renameSection: (sitemapId, pageId, sectionId, name) =>
+      updateSection: (sitemapId, pageId, sectionId, patch) =>
         set((s) => ({
           sitemaps: s.sitemaps.map((sm) =>
             mapPages(sm, sitemapId, (pages) =>
               pages.map((p) =>
                 p.id === pageId
-                  ? { ...p, sections: p.sections.map((sec) => (sec.id === sectionId ? { ...sec, name } : sec)) }
+                  ? { ...p, sections: p.sections.map((sec) => (sec.id === sectionId ? { ...sec, ...patch } : sec)) }
                   : p
               )
             )
