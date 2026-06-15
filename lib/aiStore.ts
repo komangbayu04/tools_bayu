@@ -127,38 +127,6 @@ export const useWorkflowStore = create<WorkflowStore>()(
   )
 );
 
-// ─── AI Experiments ───────────────────────────────────────────────
-export type ExperimentStatus = "idea" | "running" | "success" | "failed";
-export interface Experiment {
-  id: string;
-  title: string;
-  model: string;
-  prompt: string;
-  result: string;
-  rating: number; // 0-5
-  status: ExperimentStatus;
-  createdAt: number;
-}
-
-interface ExperimentStore {
-  experiments: Experiment[];
-  addExperiment: (e: Omit<Experiment, "id" | "createdAt">) => void;
-  updateExperiment: (id: string, patch: Partial<Experiment>) => void;
-  deleteExperiment: (id: string) => void;
-}
-
-export const useExperimentStore = create<ExperimentStore>()(
-  persist(
-    (set) => ({
-      experiments: [],
-      addExperiment: (e) => set((s) => ({ experiments: [{ ...e, id: crypto.randomUUID(), createdAt: Date.now() }, ...s.experiments] })),
-      updateExperiment: (id, patch) => set((s) => ({ experiments: s.experiments.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
-      deleteExperiment: (id) => set((s) => ({ experiments: s.experiments.filter((e) => e.id !== id) })),
-    }),
-    { name: "ai-experiments-storage", storage: cloud() }
-  )
-);
-
 // ─── Sitemap Generator ────────────────────────────────────────────
 export interface SitemapSection {
   id: string;

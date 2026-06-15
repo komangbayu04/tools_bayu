@@ -19,9 +19,8 @@ SEMUA FITUR & TOOL YANG BISA KAMU EKSEKUSI:
 5. Moodboard → add_moodboard (simpan inspirasi visual)
 6. Prompt Library → save_prompt (simpan prompt)
 7. Workflow Runner → create_workflow (buat pipeline AI multi-step)
-8. AI Experiments → add_experiment (catat eksperimen AI)
-9. AI Assets → add_asset (simpan aset AI)
-10. navigate → arahkan user ke halaman tertentu (hanya jika user memang ingin pindah halaman)
+8. AI Assets → add_asset (simpan aset AI)
+9. navigate → arahkan user ke halaman tertentu (hanya jika user memang ingin pindah halaman)
 
 KATEGORI KEUANGAN:
 c1 Freelance(income), c2 Project Bonus(income), c3 Software & Tools, c4 Food & Beverage(makan/jajan),
@@ -186,24 +185,6 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
-      name: "add_experiment",
-      description: "Catat eksperimen AI ke AI Experiments",
-      parameters: {
-        type: "object",
-        properties: {
-          title: { type: "string" },
-          model: { type: "string" },
-          prompt: { type: "string" },
-          result: { type: "string" },
-          status: { type: "string", enum: ["idea", "running", "success", "failed"] },
-        },
-        required: ["title"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "add_asset",
       description: "Simpan aset AI (gambar/video/teks/audio) ke AI Assets",
       parameters: {
@@ -352,18 +333,6 @@ async function buildAction(fnName: string, args: Record<string, unknown>) {
           name: args.name as string,
           description: (args.description as string) || "",
           steps: (args.steps as { title: string; prompt: string; note?: string }[]) || [],
-        },
-      };
-
-    case "add_experiment":
-      return {
-        type: "add_experiment",
-        experiment: {
-          title: args.title as string,
-          model: (args.model as string) || "gpt-4o",
-          prompt: (args.prompt as string) || "",
-          result: (args.result as string) || "",
-          status: (args.status as string) || "idea",
         },
       };
 

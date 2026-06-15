@@ -8,7 +8,6 @@ import {
   useSitemapStore,
   usePromptStore,
   useWorkflowStore,
-  useExperimentStore,
   useAssetStore,
   type SitemapPage,
 } from "@/lib/aiStore";
@@ -77,13 +76,6 @@ interface WorkflowPayload {
   description: string;
   steps: { title: string; prompt: string; note?: string }[];
 }
-interface ExperimentPayload {
-  title: string;
-  model: string;
-  prompt: string;
-  result: string;
-  status: "idea" | "running" | "success" | "failed";
-}
 interface AssetPayload {
   title: string;
   url: string;
@@ -104,7 +96,6 @@ interface ChatAction {
     | "add_moodboard"
     | "save_prompt"
     | "create_workflow"
-    | "add_experiment"
     | "add_asset";
   url?: string;
   transaction?: TransactionPayload;
@@ -115,7 +106,6 @@ interface ChatAction {
   item?: MoodPayload;
   prompt?: PromptPayload;
   workflow?: WorkflowPayload;
-  experiment?: ExperimentPayload;
   asset?: AssetPayload;
 }
 
@@ -153,11 +143,6 @@ const SIMPLE_CARD: Record<
     icon: "workflow", label: "Workflow Dibuat", url: "/ai-studio/workflows", cta: "Buka Workflow",
     getTitle: (a) => a.workflow?.name ?? "",
     getSub: (a) => a.workflow ? `${a.workflow.steps.length} step` : "",
-  },
-  add_experiment: {
-    icon: "flask", label: "Eksperimen Dicatat", url: "/ai-studio/experiments", cta: "Buka Experiments",
-    getTitle: (a) => a.experiment?.title ?? "",
-    getSub: (a) => a.experiment?.model ?? "",
   },
   add_asset: {
     icon: "layers", label: "Aset Disimpan", url: "/ai-studio/assets", cta: "Buka Assets",
@@ -399,7 +384,6 @@ export function FloatingChat() {
   const { addItem } = useMoodStore();
   const { addPrompt } = usePromptStore();
   const { addWorkflow, addStep } = useWorkflowStore();
-  const { addExperiment } = useExperimentStore();
   const { addAsset } = useAssetStore();
 
   useEffect(() => {
@@ -527,15 +511,6 @@ export function FloatingChat() {
         } else if (a?.type === "create_workflow" && a.workflow) {
           const id = addWorkflow({ name: a.workflow.name, description: a.workflow.description });
           a.workflow.steps.forEach((s) => addStep(id, { title: s.title, prompt: s.prompt, note: s.note ?? "" }));
-        } else if (a?.type === "add_experiment" && a.experiment) {
-          addExperiment({
-            title: a.experiment.title,
-            model: a.experiment.model,
-            prompt: a.experiment.prompt,
-            result: a.experiment.result,
-            rating: 0,
-            status: a.experiment.status,
-          });
         } else if (a?.type === "add_asset" && a.asset) {
           addAsset({
             title: a.asset.title,
@@ -563,7 +538,7 @@ export function FloatingChat() {
     } finally {
       setLoading(false);
     }
-  }, [loading, messages, open, addTransaction, addSitemap, addTask, addProject, saveDoc, addItem, addPrompt, addWorkflow, addStep, addExperiment, addAsset]);
+  }, [loading, messages, open, addTransaction, addSitemap, addTask, addProject, saveDoc, addItem, addPrompt, addWorkflow, addStep, addAsset]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {

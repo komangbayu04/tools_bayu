@@ -48,7 +48,6 @@ const navItems: (NavItem | { group: NavGroup })[] = [
         { label: "Template Generator", href: "/ai-studio/templates", icon: "clone" },
         { label: "Design Assistant", href: "/ai-studio/design-assistant", icon: "pen-ruler" },
         { label: "AI Workflow Builder", href: "/ai-studio/workflows", icon: "workflow" },
-        { label: "AI Experiments", href: "/ai-studio/experiments", icon: "flask" },
         { label: "AI Assets Library", href: "/ai-studio/assets", icon: "layers" },
       ],
     },
