@@ -387,10 +387,10 @@ function ProjectTimeline({ tasks, color, onOpen }: { tasks: Task[]; color: strin
               </div>
             </div>
 
-            {/* CENTER: dot + vertical line */}
+            {/* CENTER: dot + vertical line — dot aligned to the date label */}
             <div className="flex flex-col items-center flex-shrink-0" style={{ width: 32 }}>
-              {/* top connector */}
-              <div className="w-px flex-1" style={{ background: gi === 0 ? "transparent" : "var(--color-hairline)", minHeight: 12 }} />
+              {/* top connector — fixed so the dot lines up with the date row */}
+              <div className="w-px" style={{ background: gi === 0 ? "transparent" : "var(--color-hairline)", height: 14 }} />
               {/* dot node */}
               <div
                 className="relative z-10 w-[18px] h-[18px] rounded-full flex items-center justify-center flex-shrink-0"
@@ -407,10 +407,8 @@ function ProjectTimeline({ tasks, color, onOpen }: { tasks: Task[]; color: strin
                   <span className="w-[6px] h-[6px] rounded-full animate-pulse" style={{ background: dotColor }} />
                 )}
               </div>
-              {/* bottom connector */}
-              {!isLast && (
-                <div className="w-px flex-1" style={{ background: "var(--color-hairline)", minHeight: 16 }} />
-              )}
+              {/* bottom connector — fills remaining height down to the next group */}
+              <div className="w-px flex-1" style={{ background: isLast ? "transparent" : "var(--color-hairline)", minHeight: 16 }} />
             </div>
 
             {/* RIGHT: stacked task cards for this date */}
