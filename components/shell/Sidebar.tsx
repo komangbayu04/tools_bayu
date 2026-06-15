@@ -135,6 +135,7 @@ export function Sidebar() {
   };
 
   const settingsActive = pathname === "/settings";
+  const integrationsActive = pathname === "/integrations";
 
   const renderNavItem = (item: NavItem, indent = false) => {
     const active = hrefActive(pathname, item.href);
@@ -366,6 +367,35 @@ export function Sidebar() {
                 style={{ background: "var(--color-ink)", color: "var(--color-canvas)", transition: "opacity 120ms" }}
               >
                 Settings
+              </div>
+            )}
+          </div>
+
+          {/* Integrations */}
+          <div className="relative group">
+            <Link
+              href="/integrations"
+              className={cn(
+                "relative flex items-center gap-3 py-2.5 rounded-xl text-[13px] font-semibold",
+                collapsed ? "justify-center px-0" : "px-3"
+              )}
+              style={integrationsActive ? { color: "var(--color-primary-ink)" } : { color: "var(--color-muted)" }}
+            >
+              {integrationsActive && <ActiveHighlight />}
+              <Icon
+                name="link"
+                size={17}
+                className="relative z-10"
+                style={{ flexShrink: 0, color: integrationsActive ? "var(--color-primary)" : "var(--color-muted-soft)" }}
+              />
+              {!collapsed && <span className="relative z-10 whitespace-nowrap overflow-hidden">Integrasi</span>}
+            </Link>
+            {collapsed && (
+              <div
+                className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 z-50"
+                style={{ background: "var(--color-ink)", color: "var(--color-canvas)", transition: "opacity 120ms" }}
+              >
+                Integrasi
               </div>
             )}
           </div>

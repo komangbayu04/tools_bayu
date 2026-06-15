@@ -373,6 +373,34 @@ interface SavedJobStore {
   removeJob: (id: string) => void
 }
 
+// ─── Integration settings (localStorage only) ─────────────────────
+export interface IntegrationSettings {
+  remotive: boolean
+  linkedin: boolean
+  linkedinLocation: string  // e.g. "Remote", "Indonesia", "United States"
+  openaiKeyMasked: string   // display only, never stored in full
+}
+
+interface IntegrationStore {
+  settings: IntegrationSettings
+  update: (patch: Partial<IntegrationSettings>) => void
+}
+
+export const useIntegrationStore = create<IntegrationStore>()(
+  persist(
+    (set) => ({
+      settings: {
+        remotive: true,
+        linkedin: true,
+        linkedinLocation: "Remote",
+        openaiKeyMasked: "",
+      },
+      update: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
+    }),
+    { name: "integrations-storage" }  // localStorage is fine — no sensitive data
+  )
+)
+
 export const useSavedJobStore = create<SavedJobStore>()(
   persist(
     (set) => ({
