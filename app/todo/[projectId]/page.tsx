@@ -360,8 +360,8 @@ function ProjectTimeline({ tasks, color, onOpen }: { tasks: Task[]; color: strin
 
         return (
           <div key={group.key} className="flex gap-0 items-stretch">
-            {/* LEFT: timeline rail — date shown once per group */}
-            <div className="flex flex-col items-center" style={{ width: 160, minWidth: 160, flexShrink: 0 }}>
+            {/* LEFT: timeline rail — hidden on mobile, shown from sm up */}
+            <div className="hidden sm:flex flex-col items-center" style={{ width: 160, minWidth: 160, flexShrink: 0 }}>
               <div className="pt-3 pb-2 text-right pr-4 w-full">
                 <p
                   className="text-[12px] font-bold tabular-nums leading-tight"
@@ -387,7 +387,7 @@ function ProjectTimeline({ tasks, color, onOpen }: { tasks: Task[]; color: strin
               </div>
             </div>
 
-            {/* CENTER: dot + vertical line — dot aligned to the date label */}
+            {/* CENTER: dot + vertical line */}
             <div className="flex flex-col items-center flex-shrink-0" style={{ width: 32 }}>
               {/* top connector — fixed so the dot lines up with the date row */}
               <div className="w-px" style={{ background: gi === 0 ? "transparent" : "var(--color-hairline)", height: 14 }} />
@@ -412,7 +412,26 @@ function ProjectTimeline({ tasks, color, onOpen }: { tasks: Task[]; color: strin
             </div>
 
             {/* RIGHT: stacked task cards for this date */}
-            <div className="flex-1 min-w-0 py-3 pl-4 pr-0 pb-5 flex flex-col gap-2.5">
+            <div className="flex-1 min-w-0 py-3 pl-3 sm:pl-4 pr-0 pb-5 flex flex-col gap-2.5">
+              {/* Mobile-only date label above first card in group */}
+              <div className="flex sm:hidden items-center gap-2 mb-1">
+                <p
+                  className="text-[12px] font-bold tabular-nums"
+                  style={{ color: group.deadline ? "var(--color-ink)" : "var(--color-muted-soft)" }}
+                >
+                  {group.deadline
+                    ? format(new Date(group.deadline), "d MMM yyyy", { locale: idLocale })
+                    : "Tanpa tanggal"}
+                </p>
+                {group.tasks.length > 1 && (
+                  <span
+                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                    style={{ background: `color-mix(in srgb, ${dotColor} 14%, transparent)`, color: dotColor }}
+                  >
+                    {group.tasks.length} task
+                  </span>
+                )}
+              </div>
               {group.tasks.map((task) => {
                 const meta = STATUS_META[task.status];
                 const rem = remainingMeta(task);
