@@ -25,11 +25,7 @@ interface PromptStore {
 export const usePromptStore = create<PromptStore>()(
   persist(
     (set) => ({
-      prompts: [
-        { id: "p1", title: "UI Component Generator", content: "Buatkan komponen React + Tailwind untuk {{komponen}} dengan style minimalis, dark mode support, dan props yang reusable. Sertakan TypeScript types.", category: "Coding", tags: ["react", "ui"], favorite: true, createdAt: Date.now() - 5 * 86400000 },
-        { id: "p2", title: "Brand Voice Copywriter", content: "Tulis copy untuk {{produk}} dengan tone {{tone}}. Target audiens: {{audiens}}. Buat 3 variasi headline + body singkat.", category: "Marketing", tags: ["copywriting"], favorite: false, createdAt: Date.now() - 3 * 86400000 },
-        { id: "p3", title: "Design Critique", content: "Analisis desain ini dari segi hierarki visual, kontras, spacing, dan accessibility. Berikan 5 saran konkret yang bisa langsung diterapkan.", category: "Design", tags: ["ux", "review"], favorite: true, createdAt: Date.now() - 86400000 },
-      ],
+      prompts: [],
       addPrompt: (p) => set((s) => ({ prompts: [{ ...p, id: crypto.randomUUID(), createdAt: Date.now() }, ...s.prompts] })),
       updatePrompt: (id, patch) => set((s) => ({ prompts: s.prompts.map((p) => (p.id === id ? { ...p, ...patch } : p)) })),
       deletePrompt: (id) => set((s) => ({ prompts: s.prompts.filter((p) => p.id !== id) })),
@@ -66,19 +62,7 @@ interface WorkflowStore {
 export const useWorkflowStore = create<WorkflowStore>()(
   persist(
     (set) => ({
-      workflows: [
-        {
-          id: "w1",
-          name: "Blog Post → Social",
-          description: "Ubah satu artikel jadi konten multi-platform",
-          steps: [
-            { id: "s1", title: "Ringkas artikel", tool: "Claude", note: "Ekstrak 3 poin utama" },
-            { id: "s2", title: "Buat thread Twitter", tool: "Claude", note: "5-7 tweet dari poin utama" },
-            { id: "s3", title: "Generate cover image", tool: "Image Gen", note: "Style: flat illustration" },
-          ],
-          createdAt: Date.now() - 4 * 86400000,
-        },
-      ],
+      workflows: [],
       addWorkflow: (w) => {
         const id = crypto.randomUUID();
         set((s) => ({ workflows: [{ ...w, id, steps: [], createdAt: Date.now() }, ...s.workflows] }));
@@ -129,10 +113,7 @@ interface ExperimentStore {
 export const useExperimentStore = create<ExperimentStore>()(
   persist(
     (set) => ({
-      experiments: [
-        { id: "e1", title: "Few-shot vs zero-shot untuk klasifikasi", model: "Claude Opus 4.8", prompt: "Klasifikasikan sentimen review dengan 3 contoh...", result: "Few-shot naik akurasi ~12% dibanding zero-shot.", rating: 4, status: "success", createdAt: Date.now() - 6 * 86400000 },
-        { id: "e2", title: "Generate UI dari sketsa tangan", model: "Vision", prompt: "Convert sketsa wireframe ke kode React", result: "Layout oke, tapi spacing perlu manual tweak.", rating: 3, status: "running", createdAt: Date.now() - 2 * 86400000 },
-      ],
+      experiments: [],
       addExperiment: (e) => set((s) => ({ experiments: [{ ...e, id: crypto.randomUUID(), createdAt: Date.now() }, ...s.experiments] })),
       updateExperiment: (id, patch) => set((s) => ({ experiments: s.experiments.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
       deleteExperiment: (id) => set((s) => ({ experiments: s.experiments.filter((e) => e.id !== id) })),
@@ -163,10 +144,7 @@ interface AssetStore {
 export const useAssetStore = create<AssetStore>()(
   persist(
     (set) => ({
-      assets: [
-        { id: "a1", title: "Hero gradient mesh", url: "", type: "image", prompt: "Abstract flowing gradient mesh, sage green & cream, soft", model: "Image Gen", tags: ["background", "gradient"], createdAt: Date.now() - 3 * 86400000 },
-        { id: "a2", title: "Brand tagline variations", url: "", type: "text", prompt: "10 tagline untuk studio desain minimalis", model: "Claude", tags: ["copy"], createdAt: Date.now() - 86400000 },
-      ],
+      assets: [],
       addAsset: (a) => set((s) => ({ assets: [{ ...a, id: crypto.randomUUID(), createdAt: Date.now() }, ...s.assets] })),
       deleteAsset: (id) => set((s) => ({ assets: s.assets.filter((a) => a.id !== id) })),
     }),

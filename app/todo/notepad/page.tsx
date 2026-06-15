@@ -39,26 +39,7 @@ const NOTE_COLORS = [
 const useNoteStore = create<NoteStore>()(
   persist(
     (set) => ({
-      notes: [
-        {
-          id: "n1",
-          title: "Ide desain Q3",
-          content: "- Eksplorasi dark mode untuk semua klien\n- Coba gradien oranye di hero section\n- Riset tipografi sans-serif baru",
-          color: NOTE_COLORS[1].bg,
-          pinned: true,
-          createdAt: Date.now() - 2 * 86400000,
-          updatedAt: Date.now() - 86400000,
-        },
-        {
-          id: "n2",
-          title: "Meeting notes — Artivo",
-          content: "Revisi deck selesai minggu ini.\nKirim ke klien Senin pagi.\nFeedback terkait warna header.",
-          color: NOTE_COLORS[0].bg,
-          pinned: false,
-          createdAt: Date.now() - 86400000,
-          updatedAt: Date.now() - 3600000,
-        },
-      ],
+      notes: [],
       addNote: (note) => {
         const id = crypto.randomUUID();
         set((s) => ({

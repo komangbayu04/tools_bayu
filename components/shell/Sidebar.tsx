@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 type NavItem = { label: string; href: string; icon: IconName };
 type NavGroup = { label: string; icon: IconName; children: NavItem[] };
@@ -83,6 +84,7 @@ function hrefActive(pathname: string, href: string) {
 export function Sidebar() {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
+  const { user, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState<boolean>(readCollapsed);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window !== "undefined") {
@@ -375,6 +377,40 @@ export function Sidebar() {
               </div>
             )}
           </div>
+
+          {/* Account + logout */}
+          {user && (
+            <div className="relative group">
+              <button
+                onClick={signOut}
+                className={cn(
+                  "flex items-center gap-3 py-2.5 rounded-xl text-[13px] font-semibold transition-colors duration-150 w-full hover:bg-[var(--color-hairline)]",
+                  collapsed ? "justify-center px-0" : "px-3 text-left"
+                )}
+                style={{ color: "var(--color-muted)" }}
+              >
+                <Icon name="arrow-right" size={17} style={{ flexShrink: 0, color: "var(--color-muted-soft)" }} />
+                {!collapsed && <span className="whitespace-nowrap overflow-hidden">Logout</span>}
+              </button>
+              {!collapsed && (
+                <p
+                  className="px-3 pt-1 text-[10.5px] truncate"
+                  style={{ color: "var(--color-muted-soft)" }}
+                  title={user.email ?? ""}
+                >
+                  {user.email}
+                </p>
+              )}
+              {collapsed && (
+                <div
+                  className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 z-50"
+                  style={{ background: "var(--color-ink)", color: "var(--color-canvas)", transition: "opacity 120ms" }}
+                >
+                  Logout
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </aside>
 

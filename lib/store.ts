@@ -37,14 +37,7 @@ interface TaskStore {
 export const useTaskStore = create<TaskStore>()(
   persist(
     (set) => ({
-      tasks: [
-        { id: "1", title: "Revisi cover slide deck Artivo ke light mode", description: "Client requested a lighter palette across all cover slides. Update gradient backgrounds and text contrast.", projectId: "p1", priority: "high", status: "in_progress", deadline: "2026-06-16", due: "16 Jun", source: "transcript", order: 0, hours: 2, createdAt: Date.now() - 3 * 86400000 },
-        { id: "2", title: "Build reusable email template Lumina", description: "Modular email template with header, hero, CTA, footer blocks.", projectId: "p2", priority: "high", status: "todo", deadline: "2026-06-18", due: "18 Jun", source: "manual", order: 1, hours: 4, createdAt: Date.now() - 2 * 86400000 },
-        { id: "3", title: 'Finalize "The Current" newsletter revision', description: "", projectId: "p2", priority: "medium", status: "todo", source: "transcript", order: 0, hours: 1.5, createdAt: Date.now() - 2 * 86400000 },
-        { id: "4", title: "Update brand deck transition slides", description: "Apply new branding to all transition slides for consistency.", projectId: "p1", priority: "medium", status: "todo", source: "transcript", order: 1, hours: 3, createdAt: Date.now() - 86400000 },
-        { id: "5", title: "Research competitor moodboards for Q3", description: "", projectId: "p3", priority: "low", status: "todo", source: "manual", order: 0, hours: 2, createdAt: Date.now() - 86400000 },
-        { id: "6", title: "Send revised deck to Ahmed", description: "Send after revisions complete.", projectId: "p1", priority: "high", status: "done", source: "transcript", order: 2, hours: 1, createdAt: Date.now() - 4 * 86400000 },
-      ],
+      tasks: [],
       addTask: (task) => set((s) => ({
         tasks: [...s.tasks, { ...task, id: crypto.randomUUID(), order: s.tasks.filter(t => t.priority === task.priority).length, createdAt: task.createdAt ?? Date.now() }]
       })),
@@ -91,11 +84,7 @@ interface ProjectStore {
 export const useProjectStore = create<ProjectStore>()(
   persist(
     (set) => ({
-      projects: [
-        { id: "p1", name: "Artivo", client: "Artivo Studio", color: "#4e7d2e", status: "active", createdAt: Date.now() - 14 * 86400000 },
-        { id: "p2", name: "Lumina", client: "Lumina Co.", color: "#6D8DF0", status: "active", createdAt: Date.now() - 7 * 86400000 },
-        { id: "p3", name: "Internal", client: "Internal", color: "#E8A55A", status: "active", createdAt: Date.now() - 3 * 86400000 },
-      ],
+      projects: [],
       addProject: (p) => set((s) => ({ projects: [{ ...p, id: crypto.randomUUID(), createdAt: Date.now() }, ...s.projects] })),
       updateProject: (id, patch) => set((s) => ({ projects: s.projects.map(p => p.id === id ? { ...p, ...patch } : p) })),
       deleteProject: (id) => set((s) => ({ projects: s.projects.filter(p => p.id !== id) })),
@@ -163,16 +152,7 @@ interface MoodStore {
 export const useMoodStore = create<MoodStore>()(
   persist(
     (set) => ({
-      items: [
-        { id: "1", url: "https://dribbble.com", title: "Minimal Brand Identity System", source_domain: "dribbble.com", category: "graphic_design", tags: ["branding", "minimal"], color: "linear-gradient(135deg,#4e7d2e,#2e4d1b)", note: "Love the whitespace handling", createdAt: Date.now() - 7 * 86400000 },
-        { id: "2", url: "https://behance.net", title: "Product UI Design Case Study", source_domain: "behance.net", category: "product_design", tags: ["ui", "dark mode"], color: "linear-gradient(135deg,#6D8DF0,#3A4FC4)", createdAt: Date.now() - 6 * 86400000 },
-        { id: "3", url: "https://are.na", title: "Brutalist Web Design Collection", source_domain: "are.na", category: "graphic_design", tags: ["brutalism", "typography"], color: "linear-gradient(135deg,#E8A55A,#C16A2E)", createdAt: Date.now() - 5 * 86400000 },
-        { id: "4", url: "https://vimeo.com", title: "Motion Graphics Showreel 2025", source_domain: "vimeo.com", category: "motion", tags: ["motion", "film"], color: "linear-gradient(135deg,#C77DD6,#7C4D9E)", createdAt: Date.now() - 4 * 86400000 },
-        { id: "5", url: "https://awwwards.com", title: "Experimental 3D Typography", source_domain: "awwwards.com", category: "3d", tags: ["3d", "type"], color: "linear-gradient(135deg,#5DB872,#2E7D4F)", createdAt: Date.now() - 3 * 86400000 },
-        { id: "6", url: "https://pinterest.com", title: "Packaging Design Inspiration", source_domain: "pinterest.com", category: "graphic_design", tags: ["packaging", "print"], color: "linear-gradient(135deg,#F0A07C,#D85A4A)", createdAt: Date.now() - 2 * 86400000 },
-        { id: "7", url: "https://behance.net", title: "Dark Mode App Design System", source_domain: "behance.net", category: "product_design", tags: ["system design"], color: "linear-gradient(135deg,#8C7DE8,#5240A8)", createdAt: Date.now() - 86400000 },
-        { id: "8", url: "https://motionographer.com", title: "Title Sequence Animation", source_domain: "motionographer.com", category: "motion", tags: ["film", "title"], color: "linear-gradient(135deg,#4DBFC4,#2A7E96)", createdAt: Date.now() },
-      ],
+      items: [],
       addItem: (item) => set((s) => ({ items: [{ ...item, id: crypto.randomUUID(), createdAt: item.createdAt ?? Date.now() }, ...s.items] })),
       deleteItem: (id) => set((s) => ({ items: s.items.filter(i => i.id !== id) })),
     }),
@@ -222,27 +202,10 @@ const DEFAULT_CATEGORIES: FinanceCategory[] = [
   { id: "c8", name: "Entertainment", color: "#D85A4A", type: "expense", icon: "play" },
 ]
 
-const now = new Date()
-const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
-const lastMonth = `${now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()}-${String(now.getMonth() === 0 ? 12 : now.getMonth()).padStart(2, "0")}`
-
-const SAMPLE_TRANSACTIONS: Transaction[] = [
-  { id: "t1", amount: 4500000, type: "income", categoryId: "c1", description: "Invoice Velo Studio", date: `${thisMonth}-05`, month: thisMonth, note: "UI/UX project" },
-  { id: "t2", amount: 3200000, type: "income", categoryId: "c1", description: "Invoice Mira Health", date: `${thisMonth}-10`, month: thisMonth },
-  { id: "t3", amount: 250000, type: "expense", categoryId: "c3", description: "Figma Pro", date: `${thisMonth}-01`, month: thisMonth },
-  { id: "t4", amount: 180000, type: "expense", categoryId: "c4", description: "Makan siang meeting", date: `${thisMonth}-06`, month: thisMonth },
-  { id: "t5", amount: 450000, type: "expense", categoryId: "c5", description: "Ojek & Grab bulan ini", date: `${thisMonth}-08`, month: thisMonth },
-  { id: "t6", amount: 1500000, type: "expense", categoryId: "c6", description: "Sewa kos", date: `${thisMonth}-01`, month: thisMonth },
-  { id: "t7", amount: 120000, type: "expense", categoryId: "c8", description: "Netflix + Spotify", date: `${thisMonth}-03`, month: thisMonth },
-  { id: "t8", amount: 3800000, type: "income", categoryId: "c1", description: "Invoice Artivo", date: `${lastMonth}-25`, month: lastMonth },
-  { id: "t9", amount: 350000, type: "expense", categoryId: "c3", description: "Adobe CC", date: `${lastMonth}-01`, month: lastMonth },
-  { id: "t10", amount: 1500000, type: "expense", categoryId: "c6", description: "Sewa kos", date: `${lastMonth}-01`, month: lastMonth },
-]
-
 export const useFinanceStore = create<FinanceStore>()(
   persist(
     (set) => ({
-      transactions: SAMPLE_TRANSACTIONS,
+      transactions: [],
       categories: DEFAULT_CATEGORIES,
       addTransaction: (t) => set((s) => ({ transactions: [{ ...t, id: crypto.randomUUID() }, ...s.transactions] })),
       deleteTransaction: (id) => set((s) => ({ transactions: s.transactions.filter(t => t.id !== id) })),
