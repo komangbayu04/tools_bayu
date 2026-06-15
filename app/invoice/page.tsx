@@ -2,14 +2,14 @@
 
 import { ShellLayout } from "@/components/shell/Layout";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useInvoiceHistoryStore } from "@/lib/store";
+import { useInvoiceHistoryStore, useInvoicePrefillStore } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
 
@@ -50,18 +50,31 @@ export default function InvoicePage() {
   const router = useRouter();
   const [docType, setDocType] = useState<DocumentType>("invoice");
 
+  // Optional data handed over from the Time Tracker ("Buat Invoice").
+  const prefill = useInvoicePrefillStore.getState().prefill;
+
   // Shared fields
   const [fromName, setFromName] = useState("Bayu Krisnayana");
   const [fromAddress, setFromAddress] = useState("Jln. Dewi Sartika No.19, Semarapura Kaja, Klungkung\nBali, Indonesia, 80711");
-  const [clientName, setClientName] = useState("");
+  const [clientName, setClientName] = useState(prefill?.clientName ?? "");
   const [dateIssued, setDateIssued] = useState(() => new Date().toISOString().slice(0, 10));
 
   // Invoice-only
   const [paymentStatus, setPaymentStatus] = useState("Waiting for payment");
   const [dueDate, setDueDate] = useState("");
-  const [rate, setRate] = useState(100000);
-  const [totalTasks, setTotalTasks] = useState(1);
-  const [items, setItems] = useState<LineItem[]>(() => [newLineItem()]);
+  const [rate, setRate] = useState(prefill?.rate ?? 100000);
+  const [totalTasks, setTotalTasks] = useState(prefill?.items.length || 1);
+  const [items, setItems] = useState<LineItem[]>(() =>
+    prefill?.items.length
+      ? prefill.items.map((it) => ({ id: crypto.randomUUID(), ...it }))
+      : [newLineItem()]
+  );
+
+  // Clear the prefill once consumed so a manual reload starts blank.
+  useEffect(() => {
+    if (prefill) useInvoicePrefillStore.getState().setPrefill(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Quotation-only
   const [companyName, setCompanyName] = useState("");

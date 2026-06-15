@@ -33,6 +33,17 @@ const navItems: (NavItem | { group: NavGroup })[] = [
       children: [
         { label: "Todolist", href: "/todo", icon: "list-check" },
         { label: "Notepad", href: "/todo/notepad", icon: "edit" },
+        { label: "Time Tracker", href: "/time-tracker", icon: "clock" },
+      ],
+    },
+  },
+  {
+    group: {
+      label: "Freelance",
+      icon: "briefcase",
+      children: [
+        { label: "Klien (CRM)", href: "/clients", icon: "user" },
+        { label: "Jobs", href: "/jobs", icon: "briefcase" },
       ],
     },
   },

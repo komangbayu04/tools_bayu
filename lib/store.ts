@@ -223,3 +223,167 @@ export const useFinanceStore = create<FinanceStore>()(
     { name: "finance-storage", storage: cloud() }
   )
 )
+
+// ─── Client CRM store ─────────────────────────────────────────────
+export type ClientStatus = "lead" | "negotiation" | "active" | "completed" | "lost"
+
+export interface Client {
+  id: string
+  name: string
+  company?: string
+  email?: string
+  phone?: string
+  status: ClientStatus
+  dealValue?: number       // estimated/agreed value (IDR)
+  rate?: number            // default hourly rate (IDR) for this client
+  notes?: string
+  followUpDate?: string    // ISO date — next follow-up reminder
+  createdAt: number
+}
+
+interface ClientStore {
+  clients: Client[]
+  addClient: (c: Omit<Client, "id" | "createdAt">) => string
+  updateClient: (id: string, patch: Partial<Omit<Client, "id">>) => void
+  deleteClient: (id: string) => void
+}
+
+export const useClientStore = create<ClientStore>()(
+  persist(
+    (set) => ({
+      clients: [],
+      addClient: (c) => {
+        const id = crypto.randomUUID()
+        set((s) => ({ clients: [{ ...c, id, createdAt: Date.now() }, ...s.clients] }))
+        return id
+      },
+      updateClient: (id, patch) => set((s) => ({ clients: s.clients.map(c => c.id === id ? { ...c, ...patch } : c) })),
+      deleteClient: (id) => set((s) => ({ clients: s.clients.filter(c => c.id !== id) })),
+    }),
+    { name: "clients-storage", storage: cloud() }
+  )
+)
+
+// ─── Time Tracker store ───────────────────────────────────────────
+export interface TimeEntry {
+  id: string
+  description: string
+  projectName?: string
+  clientName?: string
+  seconds: number          // total tracked duration
+  rate: number             // IDR per hour
+  date: string             // ISO date "2026-06-15"
+  billed: boolean          // already converted to an invoice
+  createdAt: number
+}
+
+// Active (running) timer — persisted so it survives navigation/reload.
+export interface ActiveTimer {
+  description: string
+  projectName?: string
+  clientName?: string
+  rate: number
+  startedAt: number        // epoch ms
+}
+
+interface TimeTrackerStore {
+  entries: TimeEntry[]
+  active: ActiveTimer | null
+  startTimer: (t: Omit<ActiveTimer, "startedAt">) => void
+  stopTimer: () => void
+  cancelTimer: () => void
+  addManualEntry: (e: Omit<TimeEntry, "id" | "createdAt" | "billed"> & { billed?: boolean }) => void
+  updateEntry: (id: string, patch: Partial<Omit<TimeEntry, "id">>) => void
+  deleteEntry: (id: string) => void
+  markBilled: (ids: string[]) => void
+}
+
+export const useTimeTrackerStore = create<TimeTrackerStore>()(
+  persist(
+    (set) => ({
+      entries: [],
+      active: null,
+      startTimer: (t) => set({ active: { ...t, startedAt: Date.now() } }),
+      stopTimer: () => set((s) => {
+        if (!s.active) return s
+        const seconds = Math.max(1, Math.round((Date.now() - s.active.startedAt) / 1000))
+        const entry: TimeEntry = {
+          id: crypto.randomUUID(),
+          description: s.active.description || "Untitled session",
+          projectName: s.active.projectName,
+          clientName: s.active.clientName,
+          seconds,
+          rate: s.active.rate,
+          date: new Date().toISOString().slice(0, 10),
+          billed: false,
+          createdAt: Date.now(),
+        }
+        return { active: null, entries: [entry, ...s.entries] }
+      }),
+      cancelTimer: () => set({ active: null }),
+      addManualEntry: (e) => set((s) => ({ entries: [{ ...e, billed: e.billed ?? false, id: crypto.randomUUID(), createdAt: Date.now() }, ...s.entries] })),
+      updateEntry: (id, patch) => set((s) => ({ entries: s.entries.map(e => e.id === id ? { ...e, ...patch } : e) })),
+      deleteEntry: (id) => set((s) => ({ entries: s.entries.filter(e => e.id !== id) })),
+      markBilled: (ids) => set((s) => ({ entries: s.entries.map(e => ids.includes(e.id) ? { ...e, billed: true } : e) })),
+    }),
+    { name: "time-tracker-storage", storage: cloud() }
+  )
+)
+
+// ─── Invoice prefill (transient hand-off) ─────────────────────────
+// Used to pass generated line items from the Time Tracker into the Invoice
+// builder. NOT persisted — it only lives long enough to seed the form once.
+export interface InvoicePrefillItem {
+  date: string
+  project: string
+  title: string
+  tasks: string
+  hours: number
+}
+export interface InvoicePrefill {
+  clientName: string
+  rate: number
+  items: InvoicePrefillItem[]
+}
+
+interface InvoicePrefillStore {
+  prefill: InvoicePrefill | null
+  setPrefill: (p: InvoicePrefill | null) => void
+}
+
+export const useInvoicePrefillStore = create<InvoicePrefillStore>((set) => ({
+  prefill: null,
+  setPrefill: (prefill) => set({ prefill }),
+}))
+
+// ─── Saved Jobs store ─────────────────────────────────────────────
+export interface SavedJob {
+  id: string             // original job id from the source feed
+  title: string
+  company: string
+  location: string
+  url: string
+  category?: string
+  savedAt: number
+}
+
+interface SavedJobStore {
+  jobs: SavedJob[]
+  toggleJob: (job: Omit<SavedJob, "savedAt">) => void
+  removeJob: (id: string) => void
+}
+
+export const useSavedJobStore = create<SavedJobStore>()(
+  persist(
+    (set) => ({
+      jobs: [],
+      toggleJob: (job) => set((s) => (
+        s.jobs.some((j) => j.id === job.id)
+          ? { jobs: s.jobs.filter((j) => j.id !== job.id) }
+          : { jobs: [{ ...job, savedAt: Date.now() }, ...s.jobs] }
+      )),
+      removeJob: (id) => set((s) => ({ jobs: s.jobs.filter((j) => j.id !== id) })),
+    }),
+    { name: "saved-jobs-storage", storage: cloud() }
+  )
+)
