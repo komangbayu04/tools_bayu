@@ -14,83 +14,14 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   useWorkflowStore,
   useWorkflowRunStore,
-  type WorkflowStep,
 } from "@/lib/aiStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMemo, useState } from "react";
 
-// ─── Template definitions ─────────────────────────────────────────────────────
-const TEMPLATES = [
-  {
-    name: "Content Brief → Caption → Hashtag",
-    description: "Dari brief, buat caption dan hashtag siap pakai.",
-    steps: [
-      {
-        title: "Content Brief",
-        prompt: "Berdasarkan topik berikut, buat content brief yang mencakup target audiens, pesan utama, dan tone of voice:\n\n{{input}}",
-        note: "Membuat brief konten dari input user",
-      },
-      {
-        title: "Caption",
-        prompt: "Berdasarkan content brief di atas, tulis caption media sosial yang menarik (maks. 150 kata).",
-        note: "Menulis caption dari brief",
-      },
-      {
-        title: "Hashtag",
-        prompt: "Berdasarkan caption di atas, buat 15–20 hashtag yang relevan dan optimal untuk jangkauan.",
-        note: "Menghasilkan hashtag dari caption",
-      },
-    ],
-  },
-  {
-    name: "Riset Topik → Outline → Draft",
-    description: "Riset topik, buat outline, lalu hasilkan draft artikel.",
-    steps: [
-      {
-        title: "Riset Topik",
-        prompt: "Lakukan riset mendalam tentang topik berikut, identifikasi poin-poin penting dan tren terkini:\n\n{{input}}",
-        note: "Riset mendalam tentang topik",
-      },
-      {
-        title: "Outline Artikel",
-        prompt: "Berdasarkan riset di atas, buat outline artikel blog yang terstruktur dengan H2 dan H3 yang jelas.",
-        note: "Membuat outline dari hasil riset",
-      },
-      {
-        title: "Draft Artikel",
-        prompt: "Tulis draft artikel blog lengkap berdasarkan outline di atas. Gunakan bahasa yang engaging dan informatif.",
-        note: "Menulis draft dari outline",
-      },
-    ],
-  },
-  {
-    name: "Analisis Kompetitor → SWOT → Rekomendasi",
-    description: "Analisis kompetitor, buat SWOT, lalu beri rekomendasi strategis.",
-    steps: [
-      {
-        title: "Analisis Kompetitor",
-        prompt: "Analisis kompetitor berikut secara mendalam: produk, harga, strategi marketing, dan posisi pasar:\n\n{{input}}",
-        note: "Analisis mendalam tentang kompetitor",
-      },
-      {
-        title: "Analisis SWOT",
-        prompt: "Berdasarkan analisis kompetitor di atas, buat analisis SWOT lengkap (Strengths, Weaknesses, Opportunities, Threats).",
-        note: "Membuat SWOT dari analisis",
-      },
-      {
-        title: "Rekomendasi Strategis",
-        prompt: "Berdasarkan analisis SWOT di atas, berikan 5–7 rekomendasi strategis yang actionable dan terukur.",
-        note: "Rekomendasi berdasarkan SWOT",
-      },
-    ],
-  },
-];
-
-// ─── Run step state ───────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface RunStepState {
   stepId: string;
   title: string;
@@ -98,17 +29,83 @@ interface RunStepState {
   output: string;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function formatDate(ts: number) {
-  return new Date(ts).toLocaleString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+// ─── Template definitions ─────────────────────────────────────────────────────
+const TEMPLATES = [
+  {
+    name: "Content Brief → Caption → Hashtag",
+    description: "Pipeline konten media sosial dari brief sampai hashtag.",
+    steps: [
+      {
+        title: "Content Brief",
+        prompt:
+          "Buat content brief singkat untuk topik: {{input}}. Sertakan target audience, pesan utama, dan tone of voice.",
+        note: "Membuat brief konten dari topik yang diberikan",
+      },
+      {
+        title: "Caption",
+        prompt:
+          "Berdasarkan content brief di atas, buat caption media sosial yang engaging (max 150 kata).",
+        note: "Menulis caption berdasarkan brief",
+      },
+      {
+        title: "Hashtag",
+        prompt:
+          "Berdasarkan caption yang sudah dibuat, rekomendasikan 15-20 hashtag relevan yang trending.",
+        note: "Menghasilkan hashtag relevan",
+      },
+    ],
+  },
+  {
+    name: "Riset Topik → Outline → Draft",
+    description: "Dari riset topik langsung ke draft artikel.",
+    steps: [
+      {
+        title: "Riset Topik",
+        prompt:
+          "Lakukan riset mendalam untuk topik: {{input}}. Temukan poin-poin penting, fakta menarik, dan sudut pandang unik yang bisa diangkat.",
+        note: "Mengumpulkan bahan riset dari topik",
+      },
+      {
+        title: "Outline",
+        prompt:
+          "Berdasarkan hasil riset di atas, buat outline artikel yang terstruktur dengan heading dan sub-heading yang logis.",
+        note: "Membuat kerangka artikel",
+      },
+      {
+        title: "Draft Artikel",
+        prompt:
+          "Tulis draft artikel lengkap berdasarkan outline di atas. Gunakan bahasa yang engaging, informatif, dan mudah dipahami.",
+        note: "Menulis draft artikel dari outline",
+      },
+    ],
+  },
+  {
+    name: "Analisis Kompetitor → SWOT → Rekomendasi",
+    description: "Analisis bisnis dari kompetitor sampai rekomendasi strategis.",
+    steps: [
+      {
+        title: "Analisis Kompetitor",
+        prompt:
+          "Lakukan analisis kompetitor untuk: {{input}}. Identifikasi pemain utama di industri ini, produk/layanan mereka, dan positioning di pasar.",
+        note: "Menganalisis kompetitor di industri",
+      },
+      {
+        title: "Analisis SWOT",
+        prompt:
+          "Berdasarkan analisis kompetitor di atas, buat analisis SWOT yang komprehensif untuk bisnis/produk yang dianalisis.",
+        note: "Menyusun SWOT dari analisis kompetitor",
+      },
+      {
+        title: "Rekomendasi Strategis",
+        prompt:
+          "Berdasarkan analisis SWOT di atas, berikan 5-7 rekomendasi strategis yang actionable dan spesifik untuk meningkatkan daya saing.",
+        note: "Membuat rekomendasi berdasarkan SWOT",
+      },
+    ],
+  },
+];
 
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function WorkflowRunnerPage() {
   const {
     workflows,
@@ -131,12 +128,10 @@ export default function WorkflowRunnerPage() {
     [workflows, selectedId]
   );
 
-  const workflowRuns = useMemo(
-    () => runs.filter((r) => r.workflowId === selectedId),
-    [runs, selectedId]
-  );
+  const [activeTab, setActiveTab] = useState<"builder" | "jalankan">("builder");
+  const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
 
-  // ─── Create workflow dialog ───────────────────────────────────────
+  // ─── Create workflow dialog ──────────────────────────────────────────────
   const [wfDialogOpen, setWfDialogOpen] = useState(false);
   const [wfName, setWfName] = useState("");
   const [wfDesc, setWfDesc] = useState("");
@@ -155,7 +150,7 @@ export default function WorkflowRunnerPage() {
     setWfDialogOpen(false);
   };
 
-  // ─── Edit workflow dialog ─────────────────────────────────────────
+  // ─── Edit workflow dialog ────────────────────────────────────────────────
   const [wfEditOpen, setWfEditOpen] = useState(false);
   const [wfEditName, setWfEditName] = useState("");
   const [wfEditDesc, setWfEditDesc] = useState("");
@@ -184,12 +179,13 @@ export default function WorkflowRunnerPage() {
     }
   };
 
-  // ─── Inline step editing ──────────────────────────────────────────
-  const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
-
   const handleAddStep = () => {
     if (!selected) return;
-    addStep(selected.id, { title: "Step Baru", prompt: "", note: "" });
+    addStep(selected.id, {
+      title: `Step ${selected.steps.length + 1}`,
+      prompt: "",
+      note: "",
+    });
   };
 
   const handleDeleteStep = (stepId: string) => {
@@ -199,29 +195,30 @@ export default function WorkflowRunnerPage() {
     if (expandedStepId === stepId) setExpandedStepId(null);
   };
 
-  // ─── Template creation ────────────────────────────────────────────
-  const applyTemplate = (tpl: (typeof TEMPLATES)[0]) => {
+  const handleLoadTemplate = (tpl: (typeof TEMPLATES)[number]) => {
     const id = addWorkflow({ name: tpl.name, description: tpl.description });
-    tpl.steps.forEach((s) => addStep(id, s));
+    tpl.steps.forEach((s) => {
+      addStep(id, s);
+    });
     setSelectedId(id);
+    setActiveTab("builder");
   };
 
-  // ─── Run state ────────────────────────────────────────────────────
+  // ─── Run workflow ────────────────────────────────────────────────────────
   const [userInput, setUserInput] = useState("");
   const [runSteps, setRunSteps] = useState<RunStepState[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [runDone, setRunDone] = useState(false);
-  const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
+  const [expandedRunIds, setExpandedRunIds] = useState<Set<string>>(new Set());
 
-  const resetRun = () => {
-    setRunSteps([]);
-    setRunDone(false);
-  };
+  const workflowRuns = useMemo(
+    () => runs.filter((r) => r.workflowId === selectedId),
+    [runs, selectedId]
+  );
 
-  const startRun = async () => {
-    if (!selected || !selected.steps.length || isRunning) return;
+  const handleRunWorkflow = async () => {
+    if (!selected || selected.steps.length === 0) return;
 
-    // Initialize all steps as pending
     const initial: RunStepState[] = selected.steps.map((s) => ({
       stepId: s.id,
       title: s.title,
@@ -229,18 +226,24 @@ export default function WorkflowRunnerPage() {
       output: "",
     }));
     setRunSteps(initial);
-    setRunDone(false);
     setIsRunning(true);
+    setRunDone(false);
 
-    const currentSteps = [...initial];
-    const previousOutputs: { title: string; output: string }[] = [];
+    const completed: RunStepState[] = [];
 
     for (let i = 0; i < selected.steps.length; i++) {
       const step = selected.steps[i];
 
-      // Mark as running
-      currentSteps[i] = { ...currentSteps[i], status: "running" };
-      setRunSteps([...currentSteps]);
+      setRunSteps((prev) =>
+        prev.map((rs) =>
+          rs.stepId === step.id ? { ...rs, status: "running" } : rs
+        )
+      );
+
+      const previousOutputs = completed.map((c) => ({
+        title: c.title,
+        output: c.output,
+      }));
 
       try {
         const res = await fetch("/api/workflow-run", {
@@ -253,31 +256,41 @@ export default function WorkflowRunnerPage() {
           }),
         });
 
-        const data = await res.json() as { output?: string; error?: string };
+        const data = (await res.json()) as { output?: string; error?: string };
 
         if (!res.ok || data.error) {
-          currentSteps[i] = {
-            ...currentSteps[i],
-            status: "error",
-            output: data.error ?? "Terjadi kesalahan.",
-          };
-          setRunSteps([...currentSteps]);
+          const errMsg = data.error ?? "Terjadi kesalahan.";
+          setRunSteps((prev) =>
+            prev.map((rs) =>
+              rs.stepId === step.id
+                ? { ...rs, status: "error", output: errMsg }
+                : rs
+            )
+          );
           setIsRunning(false);
           return;
         }
 
-        const output = data.output ?? "";
-        currentSteps[i] = { ...currentSteps[i], status: "done", output };
-        previousOutputs.push({ title: step.title, output });
-        setRunSteps([...currentSteps]);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        currentSteps[i] = {
-          ...currentSteps[i],
-          status: "error",
-          output: message,
+        const doneStep: RunStepState = {
+          stepId: step.id,
+          title: step.title,
+          status: "done",
+          output: data.output ?? "",
         };
-        setRunSteps([...currentSteps]);
+        completed.push(doneStep);
+
+        setRunSteps((prev) =>
+          prev.map((rs) => (rs.stepId === step.id ? doneStep : rs))
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setRunSteps((prev) =>
+          prev.map((rs) =>
+            rs.stepId === step.id
+              ? { ...rs, status: "error", output: msg }
+              : rs
+          )
+        );
         setIsRunning(false);
         return;
       }
@@ -287,8 +300,8 @@ export default function WorkflowRunnerPage() {
     setRunDone(true);
   };
 
-  const saveToHistory = () => {
-    if (!selected || !runDone) return;
+  const handleSaveRun = () => {
+    if (!selected) return;
     addRun({
       workflowId: selected.id,
       workflowName: selected.name,
@@ -300,13 +313,24 @@ export default function WorkflowRunnerPage() {
         status: rs.status,
       })),
     });
+    setRunDone(false);
+    setRunSteps([]);
   };
 
-  const copyAllOutput = () => {
+  const handleCopyAll = () => {
     const text = runSteps
-      .map((rs) => `=== ${rs.title} ===\n${rs.output}`)
-      .join("\n\n");
+      .map((rs, i) => `## Step ${i + 1}: ${rs.title}\n\n${rs.output}`)
+      .join("\n\n---\n\n");
     navigator.clipboard.writeText(text);
+  };
+
+  const toggleExpandRun = (id: string) => {
+    setExpandedRunIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   return (
@@ -314,7 +338,7 @@ export default function WorkflowRunnerPage() {
       <PageHeader
         eyebrow="AI Studio"
         title="AI Workflow Runner"
-        subtitle="Rancang dan jalankan pipeline AI langkah demi langkah secara otomatis."
+        subtitle="Bangun pipeline AI multi-step dan jalankan langsung dari browser."
         actions={
           <Button onClick={openWfDialog}>
             <Icon name="plus" size={15} className="mr-1.5" />
@@ -323,8 +347,8 @@ export default function WorkflowRunnerPage() {
         }
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 items-start">
-        {/* ─── LEFT PANE ───────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 items-start">
+        {/* ─── LEFT PANEL ──────────────────────────────────────────────── */}
         <div className="flex flex-col gap-3">
           <div
             className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide px-1"
@@ -353,7 +377,11 @@ export default function WorkflowRunnerPage() {
                   transition={{ duration: 0.18 }}
                 >
                   <button
-                    onClick={() => { setSelectedId(w.id); resetRun(); }}
+                    onClick={() => {
+                      setSelectedId(w.id);
+                      setRunSteps([]);
+                      setRunDone(false);
+                    }}
                     className="group w-full text-left rounded-[14px] p-4 transition-all"
                     style={{
                       border: isActive
@@ -424,47 +452,49 @@ export default function WorkflowRunnerPage() {
             })}
           </AnimatePresence>
 
-          {/* Templates section */}
+          {workflows.length === 0 && (
+            <Card className="p-5 text-center">
+              <p className="text-[13px]" style={{ color: "var(--color-muted)" }}>
+                Belum ada workflow.
+              </p>
+            </Card>
+          )}
+
+          {/* Templates */}
           <div
-            className="mt-2 pt-3"
-            style={{ borderTop: "1px solid var(--color-hairline)" }}
+            className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide px-1 mt-4"
+            style={{ color: "var(--color-muted)" }}
           >
-            <div
-              className="text-[11px] font-semibold uppercase tracking-wide px-1 mb-2"
-              style={{ color: "var(--color-muted)" }}
-            >
-              Templates
-            </div>
-            <div className="flex flex-col gap-2">
-              {TEMPLATES.map((tpl) => (
-                <button
-                  key={tpl.name}
-                  onClick={() => applyTemplate(tpl)}
-                  className="w-full text-left rounded-[12px] p-3 transition-all hover:opacity-80"
-                  style={{
-                    border: "1px dashed var(--color-hairline)",
-                    background: "var(--color-canvas)",
-                  }}
-                >
-                  <div
-                    className="text-[12px] font-semibold leading-snug"
-                    style={{ color: "var(--color-ink)" }}
-                  >
-                    {tpl.name}
-                  </div>
-                  <div
-                    className="text-[11px] mt-0.5"
-                    style={{ color: "var(--color-muted)" }}
-                  >
-                    {tpl.steps.length} steps
-                  </div>
-                </button>
-              ))}
-            </div>
+            <Icon name="sparkles" size={14} />
+            Templates
           </div>
+          {TEMPLATES.map((tpl) => (
+            <button
+              key={tpl.name}
+              onClick={() => handleLoadTemplate(tpl)}
+              className="w-full text-left rounded-[14px] p-4 transition-all hover:opacity-80"
+              style={{
+                border: "1px solid var(--color-hairline)",
+                background: "var(--color-canvas)",
+              }}
+            >
+              <div
+                className="font-medium text-[13px]"
+                style={{ color: "var(--color-ink)" }}
+              >
+                {tpl.name}
+              </div>
+              <div
+                className="text-[12px] mt-0.5 line-clamp-2"
+                style={{ color: "var(--color-muted)" }}
+              >
+                {tpl.description}
+              </div>
+            </button>
+          ))}
         </div>
 
-        {/* ─── RIGHT PANE ──────────────────────────────────────────── */}
+        {/* ─── RIGHT PANEL ─────────────────────────────────────────────── */}
         <div>
           {!selected ? (
             <Card className="flex flex-col items-center justify-center text-center py-20 px-6">
@@ -482,13 +512,14 @@ export default function WorkflowRunnerPage() {
                 className="text-[18px] font-semibold"
                 style={{ color: "var(--color-ink)" }}
               >
-                Mulai workflow pertamamu
+                Pilih atau buat workflow
               </h3>
               <p
                 className="text-[14px] mt-1.5 max-w-sm"
                 style={{ color: "var(--color-muted)" }}
               >
-                Pilih template di sebelah kiri atau buat workflow baru untuk mulai.
+                Pilih workflow dari daftar kiri, atau mulai dari template yang
+                tersedia.
               </p>
               <Button className="mt-5" onClick={openWfDialog}>
                 <Icon name="plus" size={15} className="mr-1.5" />
@@ -496,46 +527,68 @@ export default function WorkflowRunnerPage() {
               </Button>
             </Card>
           ) : (
-            <Card className="p-6">
-              {/* Workflow header */}
-              <div className="flex items-start justify-between gap-3 mb-5">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <Icon
-                      name="sparkles"
-                      size={18}
-                      style={{ color: "var(--color-primary)" }}
-                    />
-                    <h2
-                      className="text-[20px] font-semibold tracking-tight truncate"
-                      style={{ color: "var(--color-ink)" }}
-                    >
-                      {selected.name}
-                    </h2>
+            <Card className="p-0 overflow-hidden">
+              {/* Workflow header + tabs */}
+              <div
+                className="px-6 pt-6 pb-4"
+                style={{ borderBottom: "1px solid var(--color-hairline)" }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Icon
+                        name="sparkles"
+                        size={18}
+                        style={{ color: "var(--color-primary)" }}
+                      />
+                      <h2
+                        className="text-[20px] font-semibold tracking-tight truncate"
+                        style={{ color: "var(--color-ink)" }}
+                      >
+                        {selected.name}
+                      </h2>
+                    </div>
+                    {selected.description && (
+                      <p
+                        className="text-[13px] mt-1"
+                        style={{ color: "var(--color-muted)" }}
+                      >
+                        {selected.description}
+                      </p>
+                    )}
                   </div>
-                  {selected.description && (
-                    <p
-                      className="text-[13px] mt-0.5"
-                      style={{ color: "var(--color-muted)" }}
-                    >
-                      {selected.description}
-                    </p>
-                  )}
+                  <Button variant="ghost" size="sm" onClick={openWfEdit}>
+                    <Icon name="edit" size={14} className="mr-1.5" />
+                    Edit
+                  </Button>
                 </div>
-                <Button variant="ghost" size="sm" onClick={openWfEdit}>
-                  <Icon name="edit" size={14} className="mr-1.5" />
-                  Edit
-                </Button>
+
+                <div className="flex gap-1 mt-4">
+                  {(["builder", "jalankan"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className="px-4 py-1.5 rounded-full text-[13px] font-medium transition-all"
+                      style={{
+                        background:
+                          activeTab === tab
+                            ? "var(--color-primary)"
+                            : "transparent",
+                        color:
+                          activeTab === tab
+                            ? "var(--color-on-primary)"
+                            : "var(--color-muted)",
+                      }}
+                    >
+                      {tab === "builder" ? "Builder" : "Jalankan"}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <Tabs defaultValue="builder">
-                <TabsList className="mb-5">
-                  <TabsTrigger value="builder">Builder</TabsTrigger>
-                  <TabsTrigger value="run">Jalankan</TabsTrigger>
-                </TabsList>
-
-                {/* ── BUILDER TAB ── */}
-                <TabsContent value="builder">
+              {/* ─── BUILDER TAB ──────────────────────────────────────── */}
+              {activeTab === "builder" && (
+                <div className="p-6">
                   {selected.steps.length === 0 ? (
                     <div
                       className="rounded-[14px] border border-dashed flex flex-col items-center text-center py-14 px-6"
@@ -583,14 +636,13 @@ export default function WorkflowRunnerPage() {
                               transition={{ duration: 0.2 }}
                               className="group relative pl-12 pb-3"
                             >
-                              {/* connector line */}
                               {idx < selected.steps.length - 1 && (
                                 <span
                                   className="absolute left-[18px] top-9 bottom-0 w-px"
                                   style={{ background: "var(--color-hairline)" }}
                                 />
                               )}
-                              {/* number node */}
+
                               <div
                                 className="absolute left-0 top-0 w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-semibold z-10"
                                 style={{
@@ -604,155 +656,149 @@ export default function WorkflowRunnerPage() {
                               <div
                                 className="rounded-[12px] transition-colors"
                                 style={{
-                                  border: "1px solid var(--color-hairline)",
+                                  border: isExpanded
+                                    ? "1px solid var(--color-primary)"
+                                    : "1px solid var(--color-hairline)",
                                   background: "var(--color-surface-card)",
                                 }}
                               >
-                                {/* Step header (click to expand) */}
                                 <button
-                                  className="w-full flex items-center justify-between gap-3 p-4 text-left"
+                                  className="w-full text-left p-4 flex items-center justify-between gap-3"
                                   onClick={() =>
                                     setExpandedStepId(isExpanded ? null : step.id)
                                   }
                                 >
-                                  <div className="min-w-0">
-                                    <span
+                                  <div className="min-w-0 flex-1">
+                                    <div
                                       className="font-semibold text-[14px]"
                                       style={{ color: "var(--color-ink)" }}
                                     >
-                                      {step.title || "(tanpa judul)"}
-                                    </span>
+                                      {step.title || `Step ${idx + 1}`}
+                                    </div>
                                     {step.note && !isExpanded && (
-                                      <p
+                                      <div
                                         className="text-[12px] mt-0.5 truncate"
                                         style={{ color: "var(--color-muted)" }}
                                       >
                                         {step.note}
-                                      </p>
+                                      </div>
+                                    )}
+                                    {step.prompt && !isExpanded && (
+                                      <div
+                                        className="text-[12px] mt-0.5 truncate opacity-60"
+                                        style={{ color: "var(--color-muted)" }}
+                                      >
+                                        {step.prompt}
+                                      </div>
                                     )}
                                   </div>
-                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                  <div className="flex items-center gap-2 flex-shrink-0">
                                     <span
                                       className="opacity-0 group-hover:opacity-100 transition-opacity"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleDeleteStep(step.id);
                                       }}
+                                      role="button"
+                                      tabIndex={0}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                          e.stopPropagation();
+                                          handleDeleteStep(step.id);
+                                        }
+                                      }}
+                                      aria-label="Hapus step"
                                     >
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        aria-label="Hapus step"
-                                        tabIndex={-1}
-                                      >
-                                        <Icon name="trash" size={14} />
-                                      </Button>
+                                      <Icon
+                                        name="trash"
+                                        size={14}
+                                        style={{ color: "var(--color-muted)" }}
+                                      />
                                     </span>
                                     <Icon
-                                      name="chevron-down"
+                                      name={isExpanded ? "chevron-up" : "chevron-down"}
                                       size={14}
-                                      style={{
-                                        color: "var(--color-muted)",
-                                        transform: isExpanded
-                                          ? "rotate(180deg)"
-                                          : "rotate(0deg)",
-                                        transition: "transform 0.15s",
-                                      }}
+                                      style={{ color: "var(--color-muted)" }}
                                     />
                                   </div>
                                 </button>
 
-                                {/* Expanded edit fields */}
-                                <AnimatePresence initial={false}>
-                                  {isExpanded && (
-                                    <motion.div
-                                      initial={{ height: 0, opacity: 0 }}
-                                      animate={{ height: "auto", opacity: 1 }}
-                                      exit={{ height: 0, opacity: 0 }}
-                                      transition={{ duration: 0.18 }}
-                                      className="overflow-hidden"
-                                    >
-                                      <div
-                                        className="px-4 pb-4 flex flex-col gap-3"
-                                        style={{
-                                          borderTop: "1px solid var(--color-hairline)",
-                                        }}
+                                {isExpanded && (
+                                  <div
+                                    className="px-4 pb-4 flex flex-col gap-3"
+                                    style={{
+                                      borderTop: "1px solid var(--color-hairline)",
+                                    }}
+                                  >
+                                    <div className="pt-3">
+                                      <label
+                                        className="text-[12px] font-medium mb-1 block"
+                                        style={{ color: "var(--color-muted)" }}
                                       >
-                                        <div className="pt-3">
-                                          <label
-                                            className="text-[12px] font-medium mb-1 block"
-                                            style={{ color: "var(--color-muted)" }}
-                                          >
-                                            Judul
-                                          </label>
-                                          <Input
-                                            value={step.title}
-                                            onChange={(e) =>
-                                              updateStep(selected.id, step.id, {
-                                                title: e.target.value,
-                                              })
-                                            }
-                                            placeholder="Judul step"
-                                          />
-                                        </div>
-                                        <div>
-                                          <label
-                                            className="text-[12px] font-medium mb-1 block"
-                                            style={{ color: "var(--color-muted)" }}
-                                          >
-                                            Deskripsi (opsional)
-                                          </label>
-                                          <Input
-                                            value={step.note}
-                                            onChange={(e) =>
-                                              updateStep(selected.id, step.id, {
-                                                note: e.target.value,
-                                              })
-                                            }
-                                            placeholder="Catatan singkat tentang step ini"
-                                          />
-                                        </div>
-                                        <div>
-                                          <label
-                                            className="text-[12px] font-medium mb-1 block"
-                                            style={{ color: "var(--color-muted)" }}
-                                          >
-                                            Instruksi untuk AI
-                                          </label>
-                                          <Textarea
-                                            value={step.prompt}
-                                            onChange={(e) =>
-                                              updateStep(selected.id, step.id, {
-                                                prompt: e.target.value,
-                                              })
-                                            }
-                                            rows={5}
-                                            placeholder="Tulis instruksi untuk AI di step ini. Gunakan {{input}} untuk merujuk ke input awal user."
-                                          />
-                                          <p
-                                            className="text-[11px] mt-1"
-                                            style={{ color: "var(--color-muted-soft)" }}
-                                          >
-                                            Gunakan{" "}
-                                            <code
-                                              className="px-1 py-0.5 rounded text-[10px]"
-                                              style={{
-                                                background: "var(--color-canvas)",
-                                                color: "var(--color-primary-ink)",
-                                              }}
-                                            >
-                                              {"{{input}}"}
-                                            </code>{" "}
-                                            untuk menyisipkan input user.
-                                          </p>
-                                        </div>
-                                      </div>
-                                    </motion.div>
-                                  )}
-                                </AnimatePresence>
+                                        Judul
+                                      </label>
+                                      <Input
+                                        value={step.title}
+                                        onChange={(e) =>
+                                          updateStep(selected.id, step.id, {
+                                            title: e.target.value,
+                                          })
+                                        }
+                                        placeholder="Judul step"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label
+                                        className="text-[12px] font-medium mb-1 block"
+                                        style={{ color: "var(--color-muted)" }}
+                                      >
+                                        Catatan (opsional)
+                                      </label>
+                                      <Input
+                                        value={step.note}
+                                        onChange={(e) =>
+                                          updateStep(selected.id, step.id, {
+                                            note: e.target.value,
+                                          })
+                                        }
+                                        placeholder="Deskripsi singkat step ini"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label
+                                        className="text-[12px] font-medium mb-1 block"
+                                        style={{ color: "var(--color-muted)" }}
+                                      >
+                                        Instruksi untuk AI
+                                      </label>
+                                      <Textarea
+                                        value={step.prompt}
+                                        onChange={(e) =>
+                                          updateStep(selected.id, step.id, {
+                                            prompt: e.target.value,
+                                          })
+                                        }
+                                        placeholder="Tulis prompt untuk AI, gunakan {{input}} untuk menyisipkan input awal user."
+                                        rows={4}
+                                      />
+                                      <p
+                                        className="text-[11px] mt-1"
+                                        style={{ color: "var(--color-muted-soft)" }}
+                                      >
+                                        Gunakan{" "}
+                                        <code
+                                          className="px-1 rounded"
+                                          style={{ background: "var(--color-canvas)" }}
+                                        >
+                                          {"{{input}}"}
+                                        </code>{" "}
+                                        untuk menyisipkan input user ke prompt.
+                                      </p>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
 
-                              {/* arrow between nodes */}
                               {idx < selected.steps.length - 1 && (
                                 <div
                                   className="absolute left-[12px] -bottom-0.5 z-10"
@@ -774,292 +820,276 @@ export default function WorkflowRunnerPage() {
                       </div>
                     </div>
                   )}
-                </TabsContent>
+                </div>
+              )}
 
-                {/* ── RUN TAB ── */}
-                <TabsContent value="run">
-                  {selected.steps.length === 0 ? (
-                    <div
-                      className="rounded-[14px] border border-dashed flex flex-col items-center text-center py-10 px-6"
-                      style={{ borderColor: "var(--color-hairline)" }}
+              {/* ─── JALANKAN TAB ─────────────────────────────────────── */}
+              {activeTab === "jalankan" && (
+                <div className="p-6 flex flex-col gap-5">
+                  <div>
+                    <label
+                      className="text-[13px] font-medium mb-1.5 block"
+                      style={{ color: "var(--color-ink)" }}
                     >
-                      <p
-                        className="text-[14px]"
-                        style={{ color: "var(--color-muted)" }}
-                      >
-                        Tambahkan step di tab Builder dulu sebelum menjalankan workflow.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-5">
-                      {/* Input */}
-                      <div>
-                        <label
-                          className="text-[13px] font-medium mb-1.5 block"
-                          style={{ color: "var(--color-ink)" }}
-                        >
-                          Input awal (opsional)
-                        </label>
-                        <Textarea
-                          value={userInput}
-                          onChange={(e) => setUserInput(e.target.value)}
-                          rows={3}
-                          placeholder="Masukkan topik, konteks, atau data yang jadi input untuk seluruh workflow..."
-                          disabled={isRunning}
-                        />
-                      </div>
+                      Input awal (opsional)
+                    </label>
+                    <Textarea
+                      value={userInput}
+                      onChange={(e) => setUserInput(e.target.value)}
+                      placeholder="Masukkan topik, konteks, atau data awal untuk workflow ini..."
+                      rows={3}
+                    />
+                  </div>
 
-                      {/* Run button */}
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={startRun}
-                          disabled={isRunning}
-                          className="flex items-center gap-2"
-                        >
-                          {isRunning ? (
-                            <>
-                              <Icon name="sparkles" size={15} spin className="mr-1.5" />
-                              Sedang berjalan...
-                            </>
-                          ) : (
-                            <>
-                              <Icon name="sparkles" size={15} className="mr-1.5" />
-                              Jalankan Workflow
-                            </>
-                          )}
-                        </Button>
-                        {runSteps.length > 0 && !isRunning && (
-                          <Button
-                            variant="secondary"
-                            onClick={resetRun}
-                          >
-                            Reset
-                          </Button>
-                        )}
-                      </div>
+                  <Button
+                    onClick={handleRunWorkflow}
+                    disabled={isRunning || selected.steps.length === 0}
+                    className="self-start"
+                  >
+                    {isRunning ? (
+                      <>
+                        <span className="mr-2 animate-spin inline-block">
+                          <Icon name="loader" size={15} />
+                        </span>
+                        Sedang berjalan...
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="play" size={15} className="mr-1.5" />
+                        Jalankan Workflow
+                      </>
+                    )}
+                  </Button>
 
-                      {/* Execution panel */}
-                      {runSteps.length > 0 && (
-                        <div className="flex flex-col gap-3">
-                          {runSteps.map((rs, idx) => (
+                  {runSteps.length > 0 && (
+                    <div className="flex flex-col gap-3">
+                      {runSteps.map((rs, idx) => (
+                        <div
+                          key={rs.stepId}
+                          className="rounded-[12px] p-4"
+                          style={{
+                            border:
+                              rs.status === "done"
+                                ? "1px solid #22c55e"
+                                : rs.status === "error"
+                                ? "1px solid #ef4444"
+                                : rs.status === "running"
+                                ? "1px solid var(--color-primary)"
+                                : "1px solid var(--color-hairline)",
+                            background:
+                              rs.status === "done"
+                                ? "rgba(34,197,94,0.06)"
+                                : rs.status === "error"
+                                ? "rgba(239,68,68,0.06)"
+                                : rs.status === "running"
+                                ? "var(--color-primary-light)"
+                                : "var(--color-surface)",
+                          }}
+                        >
+                          <div className="flex items-center gap-2.5 mb-2">
                             <div
-                              key={rs.stepId}
-                              className="rounded-[12px] p-4"
+                              className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0"
                               style={{
-                                border: "1px solid var(--color-hairline)",
                                 background:
                                   rs.status === "done"
-                                    ? "var(--color-surface-card)"
+                                    ? "#22c55e"
                                     : rs.status === "error"
-                                    ? "var(--color-surface-card)"
+                                    ? "#ef4444"
                                     : rs.status === "running"
-                                    ? "var(--color-primary-light)"
-                                    : "var(--color-canvas)",
+                                    ? "var(--color-primary)"
+                                    : "var(--color-hairline)",
+                                color:
+                                  rs.status === "pending"
+                                    ? "var(--color-muted)"
+                                    : "#fff",
                               }}
                             >
-                              <div className="flex items-center gap-2 mb-1">
-                                <div
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
-                                  style={{
-                                    background:
-                                      rs.status === "done"
-                                        ? "#16a34a"
-                                        : rs.status === "error"
-                                        ? "#dc2626"
-                                        : rs.status === "running"
-                                        ? "var(--color-primary)"
-                                        : "var(--color-hairline)",
-                                    color:
-                                      rs.status === "pending"
-                                        ? "var(--color-muted)"
-                                        : "#fff",
-                                  }}
-                                >
-                                  {rs.status === "done" ? "✓" : rs.status === "error" ? "✕" : idx + 1}
-                                </div>
-                                <span
-                                  className="font-semibold text-[13px]"
-                                  style={{ color: "var(--color-ink)" }}
-                                >
-                                  {rs.title}
+                              {rs.status === "done" ? (
+                                <Icon name="check" size={12} />
+                              ) : rs.status === "error" ? (
+                                <Icon name="x" size={12} />
+                              ) : rs.status === "running" ? (
+                                <span className="animate-spin inline-block">
+                                  <Icon name="loader" size={11} />
                                 </span>
-                                {rs.status === "running" && (
-                                  <span
-                                    className="text-[12px] ml-1"
-                                    style={{ color: "var(--color-primary-ink)" }}
-                                  >
-                                    Sedang diproses...
-                                  </span>
-                                )}
-                              </div>
-
-                              {rs.status === "done" && rs.output && (
-                                <div
-                                  className="mt-2 text-[13px] rounded-[8px] p-3 max-h-48 overflow-y-auto whitespace-pre-wrap"
-                                  style={{
-                                    background: "var(--color-canvas)",
-                                    color: "var(--color-body)",
-                                  }}
-                                >
-                                  {rs.output}
-                                </div>
-                              )}
-
-                              {rs.status === "error" && (
-                                <div
-                                  className="mt-2 text-[13px] rounded-[8px] p-3"
-                                  style={{
-                                    background: "#fee2e2",
-                                    color: "#b91c1c",
-                                  }}
-                                >
-                                  {rs.output}
-                                </div>
+                              ) : (
+                                idx + 1
                               )}
                             </div>
-                          ))}
+                            <span
+                              className="font-semibold text-[14px]"
+                              style={{ color: "var(--color-ink)" }}
+                            >
+                              {rs.title}
+                            </span>
+                            {rs.status === "running" && (
+                              <span
+                                className="text-[12px]"
+                                style={{ color: "var(--color-primary)" }}
+                              >
+                                Sedang diproses...
+                              </span>
+                            )}
+                          </div>
 
-                          {/* Post-run actions */}
-                          {runDone && (
-                            <div className="flex gap-2 pt-1">
-                              <Button onClick={saveToHistory}>
-                                Simpan ke History
-                              </Button>
-                              <Button variant="secondary" onClick={copyAllOutput}>
-                                Copy semua output
-                              </Button>
+                          {rs.status === "done" && rs.output && (
+                            <div
+                              className="rounded-[8px] p-3 max-h-48 overflow-y-auto text-[13px] whitespace-pre-wrap"
+                              style={{
+                                background: "var(--color-canvas)",
+                                color: "var(--color-ink)",
+                                lineHeight: "1.6",
+                              }}
+                            >
+                              {rs.output}
+                            </div>
+                          )}
+
+                          {rs.status === "error" && rs.output && (
+                            <div
+                              className="rounded-[8px] p-3 text-[13px]"
+                              style={{
+                                background: "rgba(239,68,68,0.08)",
+                                color: "#ef4444",
+                              }}
+                            >
+                              {rs.output}
                             </div>
                           )}
                         </div>
-                      )}
-
-                      {/* Run history */}
-                      {workflowRuns.length > 0 && (
-                        <div className="mt-2">
-                          <div
-                            className="text-[12px] font-semibold uppercase tracking-wide mb-3"
-                            style={{ color: "var(--color-muted)" }}
-                          >
-                            Riwayat Run
-                          </div>
-                          <div className="flex flex-col gap-2">
-                            {workflowRuns.map((run) => {
-                              const isExpanded = expandedRunId === run.id;
-                              return (
-                                <div
-                                  key={run.id}
-                                  className="rounded-[12px]"
-                                  style={{
-                                    border: "1px solid var(--color-hairline)",
-                                    background: "var(--color-surface-card)",
-                                  }}
-                                >
-                                  <div className="flex items-center justify-between gap-2 p-3">
-                                    <button
-                                      className="flex-1 text-left"
-                                      onClick={() =>
-                                        setExpandedRunId(isExpanded ? null : run.id)
-                                      }
-                                    >
-                                      <div
-                                        className="text-[12px] font-semibold"
-                                        style={{ color: "var(--color-ink)" }}
-                                      >
-                                        {formatDate(run.createdAt)}
-                                      </div>
-                                      {run.userInput && (
-                                        <div
-                                          className="text-[11px] mt-0.5 truncate"
-                                          style={{ color: "var(--color-muted)" }}
-                                        >
-                                          {run.userInput}
-                                        </div>
-                                      )}
-                                      <div
-                                        className="text-[11px] mt-0.5"
-                                        style={{ color: "var(--color-muted-soft)" }}
-                                      >
-                                        {run.steps.length} step
-                                        {run.steps.length === 1 ? "" : "s"}
-                                      </div>
-                                    </button>
-                                    <div className="flex items-center gap-1 flex-shrink-0">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => deleteRun(run.id)}
-                                        aria-label="Hapus run"
-                                      >
-                                        <Icon name="trash" size={13} />
-                                      </Button>
-                                      <Icon
-                                        name="chevron-down"
-                                        size={13}
-                                        style={{
-                                          color: "var(--color-muted)",
-                                          transform: isExpanded
-                                            ? "rotate(180deg)"
-                                            : "rotate(0deg)",
-                                          transition: "transform 0.15s",
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <AnimatePresence initial={false}>
-                                    {isExpanded && (
-                                      <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: "auto", opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        transition={{ duration: 0.15 }}
-                                        className="overflow-hidden"
-                                      >
-                                        <div
-                                          className="px-3 pb-3 flex flex-col gap-2"
-                                          style={{
-                                            borderTop: "1px solid var(--color-hairline)",
-                                          }}
-                                        >
-                                          {run.steps.map((s) => (
-                                            <div key={s.stepId} className="pt-2">
-                                              <div
-                                                className="text-[12px] font-semibold mb-1"
-                                                style={{ color: "var(--color-ink)" }}
-                                              >
-                                                {s.title}
-                                              </div>
-                                              <div
-                                                className="text-[12px] rounded-[6px] p-2 whitespace-pre-wrap max-h-32 overflow-y-auto"
-                                                style={{
-                                                  background: "var(--color-canvas)",
-                                                  color: "var(--color-body)",
-                                                }}
-                                              >
-                                                {s.output || "(kosong)"}
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </motion.div>
-                                    )}
-                                  </AnimatePresence>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
+                      ))}
                     </div>
                   )}
-                </TabsContent>
-              </Tabs>
+
+                  {runDone && (
+                    <div className="flex items-center gap-3">
+                      <Button onClick={handleSaveRun}>
+                        <Icon name="save" size={14} className="mr-1.5" />
+                        Simpan ke History
+                      </Button>
+                      <Button variant="outline" onClick={handleCopyAll}>
+                        <Icon name="copy" size={14} className="mr-1.5" />
+                        Copy semua output
+                      </Button>
+                    </div>
+                  )}
+
+                  {workflowRuns.length > 0 && (
+                    <div>
+                      <div
+                        className="text-[12px] font-semibold uppercase tracking-wide mb-3"
+                        style={{ color: "var(--color-muted)" }}
+                      >
+                        Riwayat Run ({workflowRuns.length})
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {workflowRuns.map((run) => {
+                          const isExpanded = expandedRunIds.has(run.id);
+                          return (
+                            <div
+                              key={run.id}
+                              className="rounded-[12px]"
+                              style={{
+                                border: "1px solid var(--color-hairline)",
+                                background: "var(--color-surface)",
+                              }}
+                            >
+                              <button
+                                className="w-full text-left px-4 py-3 flex items-center justify-between gap-3"
+                                onClick={() => toggleExpandRun(run.id)}
+                              >
+                                <div className="min-w-0">
+                                  <div
+                                    className="text-[13px] font-medium"
+                                    style={{ color: "var(--color-ink)" }}
+                                  >
+                                    {new Date(run.createdAt).toLocaleString("id-ID", {
+                                      day: "numeric",
+                                      month: "short",
+                                      year: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </div>
+                                  {run.userInput && (
+                                    <div
+                                      className="text-[12px] truncate mt-0.5"
+                                      style={{ color: "var(--color-muted)" }}
+                                    >
+                                      Input: {run.userInput}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteRun(run.id);
+                                    }}
+                                    className="hover:text-red-500 transition-colors"
+                                    style={{ color: "var(--color-muted)" }}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" || e.key === " ") {
+                                        e.stopPropagation();
+                                        deleteRun(run.id);
+                                      }
+                                    }}
+                                    aria-label="Hapus run"
+                                  >
+                                    <Icon name="trash" size={13} />
+                                  </span>
+                                  <Icon
+                                    name={isExpanded ? "chevron-up" : "chevron-down"}
+                                    size={13}
+                                    style={{ color: "var(--color-muted)" }}
+                                  />
+                                </div>
+                              </button>
+
+                              {isExpanded && (
+                                <div
+                                  className="px-4 pb-4 flex flex-col gap-3"
+                                  style={{
+                                    borderTop: "1px solid var(--color-hairline)",
+                                  }}
+                                >
+                                  {run.steps.map((rs, i) => (
+                                    <div key={rs.stepId} className="pt-3">
+                                      <div
+                                        className="text-[12px] font-semibold mb-1"
+                                        style={{ color: "var(--color-muted)" }}
+                                      >
+                                        Step {i + 1}: {rs.title}
+                                      </div>
+                                      <div
+                                        className="rounded-[8px] p-3 text-[13px] whitespace-pre-wrap max-h-40 overflow-y-auto"
+                                        style={{
+                                          background: "var(--color-canvas)",
+                                          color: "var(--color-ink)",
+                                        }}
+                                      >
+                                        {rs.output || "(tidak ada output)"}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </Card>
           )}
         </div>
       </div>
 
-      {/* ─── Create workflow dialog ──────────────────────────────────── */}
+      {/* ─── Create workflow dialog ──────────────────────────────────────── */}
       <Dialog open={wfDialogOpen} onOpenChange={setWfDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1113,7 +1143,7 @@ export default function WorkflowRunnerPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ─── Edit workflow dialog ────────────────────────────────────── */}
+      {/* ─── Edit workflow dialog ────────────────────────────────────────── */}
       <Dialog open={wfEditOpen} onOpenChange={setWfEditOpen}>
         <DialogContent>
           <DialogHeader>
