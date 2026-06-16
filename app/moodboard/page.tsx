@@ -238,9 +238,9 @@ export default function MoodboardPage() {
                   {item.image_url && item.media_type === "video" ? (
                     <video
                       src={item.image_url}
-                      muted loop playsInline
-                      onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
-                      onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+                      autoPlay muted loop playsInline
+                      // Some browsers ignore the autoPlay attribute until JS kicks it.
+                      ref={(el) => { if (el) el.play().catch(() => {}); }}
                       className="w-full block"
                       style={{ display: "block", background: resolveCover(item.color, item.id) }}
                     />
