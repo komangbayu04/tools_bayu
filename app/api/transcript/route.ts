@@ -17,7 +17,8 @@ Analisa transcript dan kembalikan JSON PERSIS seperti schema berikut (tanpa mark
       "title": "deskripsi tugas spesifik",
       "priority": "high|medium|low",
       "deadline": "2026-06-20",
-      "notes": "konteks tambahan jika ada"
+      "notes": "konteks tambahan jika ada",
+      "emphasis": "hal SPESIFIK yang harus ditekankan / tidak boleh terlewat saat mengerjakan task ini"
     }
   ],
   "watchPoints": [
@@ -30,6 +31,7 @@ Analisa transcript dan kembalikan JSON PERSIS seperti schema berikut (tanpa mark
 
 Aturan:
 - "tasks" = pekerjaan yang HARUS dilakukan Bayu (action items)
+- "emphasis" = detail penting per-task: hal kritis yang harus ditekankan, syarat spesifik dari klien, atau jebakan yang harus dihindari. Isi null jika tidak ada penekanan khusus.
 - "watchPoints" = risiko, hal yang perlu dipantau, keputusan yang menggantung
 - "improvements" = feedback, kritik, atau area yang perlu ditingkatkan
 - "deadline" = isi HANYA jika disebutkan di transcript, format ISO "YYYY-MM-DD", boleh null/omit

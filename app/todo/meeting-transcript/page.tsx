@@ -5,10 +5,11 @@ import { ShellLayout } from "@/components/shell/Layout";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
 import { Icon } from "@/components/ui/icon";
-import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  useMeetingStore, useTaskStore,
+  useMeetingStore, useTaskStore, useProjectStore,
   type MeetingAnalysis, type ExtractedTask,
 } from "@/lib/store";
 
@@ -57,6 +58,17 @@ function TaskCard({ task, added, onAdd }: { task: ExtractedTask; added: boolean;
         {task.notes && (
           <p className="text-[11.5px] mt-1 leading-snug" style={{ color: "var(--color-muted)" }}>{task.notes}</p>
         )}
+        {task.emphasis && (
+          <div
+            className="mt-2 flex items-start gap-1.5 rounded-lg px-2.5 py-1.5"
+            style={{ background: "rgba(216,90,74,0.08)" }}
+          >
+            <Icon name="flag" size={11} style={{ color: "#D85A4A", flexShrink: 0, marginTop: 2 }} />
+            <p className="text-[11.5px] leading-snug font-medium" style={{ color: "#D85A4A" }}>
+              <span className="font-bold">Tekankan: </span>{task.emphasis}
+            </p>
+          </div>
+        )}
         <div className="flex items-center gap-2 mt-2 flex-wrap">
           <span
             className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full"
@@ -101,20 +113,49 @@ function AnalysisResult({ result, onSave, saved }: {
   onSave: () => void;
   saved: boolean;
 }) {
-  const { addTask } = useTaskStore();
+  const addTask = useTaskStore((s) => s.addTask);
+  const projects = useProjectStore((s) => s.projects);
+  const addProject = useProjectStore((s) => s.addProject);
   const [addedIds, setAddedIds] = useState<Set<number>>(new Set());
+  // Target project for added tasks. Empty string = auto-create a meeting project.
+  const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
 
-  const handleAddTask = (task: ExtractedTask, idx: number) => {
+  // Tasks must land in a REAL project or they won't appear in the Todolist
+  // (which is grouped per-project). If none is selected/exists, create one.
+  const resolveProject = (): string => {
+    if (projectId) return projectId;
+    const newId = addProject({
+      name: result.title || "Meeting Tasks",
+      client: "—",
+      description: "Task dari analisa transcript meeting",
+      color: "#3B82F6",
+      status: "active",
+    });
+    setProjectId(newId);
+    return newId;
+  };
+
+  const handleAddTask = (task: ExtractedTask, idx: number, targetProject?: string) => {
     addTask({
       title: task.title,
-      description: task.notes,
-      projectId: "general",
+      // Fold the emphasis into the task description so the detail isn't lost.
+      description: [task.notes, task.emphasis ? `⚑ Tekankan: ${task.emphasis}` : null]
+        .filter(Boolean)
+        .join("\n") || undefined,
+      projectId: targetProject ?? resolveProject(),
       priority: task.priority,
       status: "todo",
       source: "transcript",
       deadline: task.deadline,
     });
     setAddedIds((prev) => new Set(prev).add(idx));
+  };
+
+  const addAll = () => {
+    const target = resolveProject();
+    result.tasks.forEach((task, i) => {
+      if (!addedIds.has(i)) handleAddTask(task, i, target);
+    });
   };
 
   return (
@@ -156,29 +197,35 @@ function AnalysisResult({ result, onSave, saved }: {
         {result.tasks.length === 0 ? (
           <p className="text-[12.5px]" style={{ color: "var(--color-muted)" }}>Tidak ada task spesifik yang ditemukan.</p>
         ) : (
-          <div className="flex flex-col gap-2.5">
-            {result.tasks.map((task, i) => (
-              <TaskCard
-                key={i}
-                task={task}
-                added={addedIds.has(i)}
-                onAdd={() => handleAddTask(task, i)}
-              />
-            ))}
-          </div>
-        )}
-        {result.tasks.length > 0 && (
-          <button
-            onClick={() => {
-              result.tasks.forEach((task, i) => {
-                if (!addedIds.has(i)) handleAddTask(task, i);
-              });
-            }}
-            className="mt-3 text-[12px] font-semibold transition-colors hover:opacity-70"
-            style={{ color: "var(--color-primary)" }}
-          >
-            + Tambah semua ke Todolist
-          </button>
+          <>
+            {/* Project picker — where added tasks go */}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[11.5px] font-medium flex-shrink-0" style={{ color: "var(--color-muted)" }}>Masukkan ke project:</span>
+              <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="text-[12.5px] py-1">
+                <option value="">+ Buat project baru &quot;{result.title || "Meeting Tasks"}&quot;</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </Select>
+            </div>
+            <div className="flex flex-col gap-2.5">
+              {result.tasks.map((task, i) => (
+                <TaskCard
+                  key={i}
+                  task={task}
+                  added={addedIds.has(i)}
+                  onAdd={() => handleAddTask(task, i)}
+                />
+              ))}
+            </div>
+            <button
+              onClick={addAll}
+              className="mt-3 text-[12px] font-semibold transition-colors hover:opacity-70"
+              style={{ color: "var(--color-primary)" }}
+            >
+              + Tambah semua ke Todolist
+            </button>
+          </>
         )}
       </div>
 
@@ -246,11 +293,16 @@ function MeetingCard({ meeting, onDelete }: { meeting: MeetingAnalysis; onDelete
           {meeting.tasks.length > 0 && (
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted-soft)" }}>Tasks</p>
-              <ul className="flex flex-col gap-1.5">
+              <ul className="flex flex-col gap-2">
                 {meeting.tasks.map((t, i) => (
-                  <li key={i} className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--color-ink)" }}>
-                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: PRIORITY_COLOR[t.priority] }} />
-                    {t.title}
+                  <li key={i} className="flex flex-col gap-0.5">
+                    <span className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--color-ink)" }}>
+                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: PRIORITY_COLOR[t.priority] }} />
+                      {t.title}
+                    </span>
+                    {t.emphasis && (
+                      <span className="text-[11px] ml-3.5" style={{ color: "#D85A4A" }}>⚑ {t.emphasis}</span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -290,13 +342,16 @@ function MeetingCard({ meeting, onDelete }: { meeting: MeetingAnalysis; onDelete
 
 // ─── Main page ────────────────────────────────────────────────────
 export default function MeetingTranscriptPage() {
+  const [tab, setTab] = useState("transcript");
   const [transcript, setTranscript] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Omit<MeetingAnalysis, "id" | "savedAt"> | null>(null);
   const [resultSaved, setResultSaved] = useState(false);
 
-  const { meetings, saveMeeting, deleteMeeting } = useMeetingStore();
+  const meetings = useMeetingStore((s) => s.meetings);
+  const saveMeeting = useMeetingStore((s) => s.saveMeeting);
+  const deleteMeeting = useMeetingStore((s) => s.deleteMeeting);
 
   const analyze = async () => {
     if (!transcript.trim() || loading) return;
@@ -337,67 +392,90 @@ export default function MeetingTranscriptPage() {
         subtitle="Paste transcript meeting — AI akan extract task, hal yang perlu diperhatikan, dan area improvement untuk Bayu."
       />
 
-      <div className="flex flex-col gap-6 max-w-3xl mx-auto">
-        {/* Input */}
-        <div
-          className="rounded-2xl p-5"
-          style={{ background: "var(--color-surface-card)", border: "1px solid var(--color-hairline)" }}
-        >
-          <label className="block text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted-soft)" }}>
-            Transcript Meeting
-          </label>
-          <Textarea
-            rows={10}
-            value={transcript}
-            onChange={(e) => setTranscript(e.target.value)}
-            placeholder={`Paste transcript meeting di sini...\n\nContoh:\nBayu: Oke, jadi untuk project website klien A, saya akan handle bagian UI dulu minggu ini.\nClient: Tolong deadline UI-nya hari Jumat ya.\nBayu: Siap. Saya juga perlu revisi copywriting dari tim konten dulu.`}
-            className="text-[13px]"
-          />
-          {error && (
-            <div className="flex items-start gap-2 mt-3 text-[12.5px] rounded-lg px-3 py-2" style={{ background: "rgba(216,90,74,0.1)", color: "#D85A4A" }}>
-              <Icon name="alert-triangle" size={13} style={{ flexShrink: 0, marginTop: 1 }} />
-              <span>{error}</span>
-            </div>
-          )}
-          <div className="flex items-center justify-between mt-4">
-            <span className="text-[11.5px]" style={{ color: "var(--color-muted)" }}>
-              {transcript.trim().split(/\s+/).filter(Boolean).length} kata
-            </span>
-            <div className="flex gap-2">
-              {transcript && (
-                <Button variant="outline" onClick={() => { setTranscript(""); setResult(null); setError(null); }}>
-                  Bersihkan
-                </Button>
+      <div className="max-w-3xl mx-auto">
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="mb-6">
+            <TabsTrigger value="transcript">
+              <Icon name="mic" size={13} style={{ marginRight: 6 }} /> Transcript
+            </TabsTrigger>
+            <TabsTrigger value="history">
+              <Icon name="history" size={13} style={{ marginRight: 6 }} /> Riwayat
+              {meetings.length > 0 && (
+                <span className="ml-1.5 text-[10.5px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "var(--color-primary-light)", color: "var(--color-primary-ink)" }}>
+                  {meetings.length}
+                </span>
               )}
-              <Button onClick={analyze} disabled={loading || !transcript.trim()}>
-                {loading ? (
-                  <><Icon name="spinner" size={13} spin /> Menganalisa…</>
-                ) : (
-                  <><Icon name="sparkles" size={13} /> Analisa Transcript</>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Result */}
-        {result && (
-          <AnalysisResult result={result} onSave={handleSave} saved={resultSaved} />
-        )}
-
-        {/* History */}
-        {meetings.length > 0 && (
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider mb-3" style={{ color: "var(--color-muted-soft)" }}>
-              Riwayat Meeting ({meetings.length})
-            </p>
-            <div className="flex flex-col gap-3">
-              {meetings.map((m) => (
-                <MeetingCard key={m.id} meeting={m} onDelete={() => deleteMeeting(m.id)} />
-              ))}
+          {/* ── Transcript tab ── */}
+          <TabsContent value="transcript" className="flex flex-col gap-6">
+            <div
+              className="rounded-2xl p-5"
+              style={{ background: "var(--color-surface-card)", border: "1px solid var(--color-hairline)" }}
+            >
+              <label className="block text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted-soft)" }}>
+                Transcript Meeting
+              </label>
+              <Textarea
+                rows={10}
+                value={transcript}
+                onChange={(e) => setTranscript(e.target.value)}
+                placeholder={`Paste transcript meeting di sini...\n\nContoh:\nBayu: Oke, jadi untuk project website klien A, saya akan handle bagian UI dulu minggu ini.\nClient: Tolong deadline UI-nya hari Jumat ya, dan pastikan mobile-first.\nBayu: Siap. Saya juga perlu revisi copywriting dari tim konten dulu.`}
+                className="text-[13px]"
+              />
+              {error && (
+                <div className="flex items-start gap-2 mt-3 text-[12.5px] rounded-lg px-3 py-2" style={{ background: "rgba(216,90,74,0.1)", color: "#D85A4A" }}>
+                  <Icon name="alert-triangle" size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+                  <span>{error}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between mt-4">
+                <span className="text-[11.5px]" style={{ color: "var(--color-muted)" }}>
+                  {transcript.trim().split(/\s+/).filter(Boolean).length} kata
+                </span>
+                <div className="flex gap-2">
+                  {transcript && (
+                    <Button variant="outline" onClick={() => { setTranscript(""); setResult(null); setError(null); }}>
+                      Bersihkan
+                    </Button>
+                  )}
+                  <Button onClick={analyze} disabled={loading || !transcript.trim()}>
+                    {loading ? (
+                      <><Icon name="spinner" size={13} spin /> Menganalisa…</>
+                    ) : (
+                      <><Icon name="sparkles" size={13} /> Analisa Transcript</>
+                    )}
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+
+            {result && (
+              <AnalysisResult result={result} onSave={handleSave} saved={resultSaved} />
+            )}
+          </TabsContent>
+
+          {/* ── History tab ── */}
+          <TabsContent value="history">
+            {meetings.length === 0 ? (
+              <div
+                className="rounded-2xl p-10 text-center flex flex-col items-center gap-2"
+                style={{ background: "var(--color-surface-card)", border: "1px dashed var(--color-hairline)" }}
+              >
+                <Icon name="history" size={22} style={{ color: "var(--color-muted-soft)" }} />
+                <p className="text-[13px] font-medium" style={{ color: "var(--color-muted)" }}>Belum ada riwayat meeting</p>
+                <p className="text-[12px]" style={{ color: "var(--color-muted-soft)" }}>Analisa transcript dan klik &quot;Simpan ke Memory&quot; untuk mendokumentasikannya di sini.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {meetings.map((m) => (
+                  <MeetingCard key={m.id} meeting={m} onDelete={() => deleteMeeting(m.id)} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </ShellLayout>
   );

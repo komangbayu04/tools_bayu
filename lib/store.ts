@@ -76,7 +76,7 @@ export interface Project {
 
 interface ProjectStore {
   projects: Project[]
-  addProject: (p: Omit<Project, "id" | "createdAt">) => void
+  addProject: (p: Omit<Project, "id" | "createdAt">) => string
   updateProject: (id: string, patch: Partial<Project>) => void
   deleteProject: (id: string) => void
 }
@@ -85,7 +85,11 @@ export const useProjectStore = create<ProjectStore>()(
   persist(
     (set) => ({
       projects: [],
-      addProject: (p) => set((s) => ({ projects: [{ ...p, id: crypto.randomUUID(), createdAt: Date.now() }, ...s.projects] })),
+      addProject: (p) => {
+        const id = crypto.randomUUID()
+        set((s) => ({ projects: [{ ...p, id, createdAt: Date.now() }, ...s.projects] }))
+        return id
+      },
       updateProject: (id, patch) => set((s) => ({ projects: s.projects.map(p => p.id === id ? { ...p, ...patch } : p) })),
       deleteProject: (id) => set((s) => ({ projects: s.projects.filter(p => p.id !== id) })),
     }),
@@ -426,6 +430,7 @@ export interface ExtractedTask {
   priority: "high" | "medium" | "low"
   deadline?: string   // ISO date "2026-06-20" if the transcript mentions one
   notes?: string
+  emphasis?: string   // what Bayu must specifically focus on / not miss for this task
 }
 
 export interface MeetingAnalysis {
