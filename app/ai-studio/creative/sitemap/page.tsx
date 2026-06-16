@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShellLayout } from "@/components/shell/Layout";
@@ -425,6 +425,26 @@ export default function SitemapGeneratorPage() {
   const zoomBy = (delta: number) =>
     setZoom((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((z + delta) * 100) / 100)));
 
+  // React registers onWheel as a passive listener (can't call preventDefault).
+  // We need a native, non-passive listener so pinch-zoom / Ctrl+wheel inside
+  // the canvas never leaks out and zooms the browser viewport.
+  const zoomByRef = useRef(zoomBy);
+  useEffect(() => { zoomByRef.current = zoomBy; });
+
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        // Always prevent the browser zoom, even when we're at the zoom limit.
+        e.preventDefault();
+        zoomByRef.current(e.deltaY < 0 ? 0.1 : -0.1);
+      }
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, []);
+
   const active = sitemaps.find((s) => s.id === activeId) ?? null;
 
   const handleGenerate = () => {
@@ -487,12 +507,6 @@ export default function SitemapGeneratorPage() {
         <div className="relative rounded-2xl border overflow-hidden" style={{ borderColor: "var(--color-hairline)" }}>
           <div
             ref={canvasRef}
-            onWheel={(e) => {
-              if (e.ctrlKey || e.metaKey) {
-                e.preventDefault();
-                zoomBy(e.deltaY < 0 ? 0.1 : -0.1);
-              }
-            }}
             className="overflow-auto"
             style={{
               minHeight: "72vh",
