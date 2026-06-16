@@ -350,8 +350,21 @@ function SessionChat({ session, chatHistory, onMessage, onSave, saving }: {
 }
 
 // ─── History card ─────────────────────────────────────────────────
-function MeetingCard({ meeting, onDelete }: { meeting: MeetingAnalysis; onDelete: () => void }) {
+function MeetingCard({ meeting: raw, onDelete }: { meeting: MeetingAnalysis; onDelete: () => void }) {
   const [open, setOpen] = useState(false);
+  // Meetings saved before the schema expanded may lack the newer fields —
+  // normalize so accessing `.length` / `.map` never throws and crashes the page.
+  const meeting = {
+    ...raw,
+    tasks: raw.tasks ?? [],
+    watchPoints: raw.watchPoints ?? [],
+    improvements: raw.improvements ?? [],
+    decisions: raw.decisions ?? [],
+    waitingOn: raw.waitingOn ?? [],
+    openQuestions: raw.openQuestions ?? [],
+    chatHistory: raw.chatHistory ?? [],
+    moodScore: typeof raw.moodScore === "number" ? raw.moodScore : 50,
+  };
   const scoreColor = moodColor(meeting.moodScore ?? 50);
   return (
     <div
