@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
+import { Select } from "@/components/ui/select";
+import { DocDetail } from "./DocDetail";
 import { useInvoiceHistoryStore, type SavedDoc, type DocType } from "@/lib/store";
 import { differenceInCalendarDays } from "date-fns";
 
@@ -46,6 +48,7 @@ export default function DocumentHistoryPage() {
   const router = useRouter();
   const [month, setMonth] = useState<string>("all");
   const [docType, setDocType] = useState<"all" | DocType>("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Unpaid invoices that are due soon or overdue — surfaced as reminders.
   const reminders = useMemo(
@@ -138,51 +141,41 @@ export default function DocumentHistoryPage() {
         </div>
       )}
 
-      {/* Type filter */}
+      {/* Filters: document type (left) + date (right), aligned on one row */}
       {history.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          <button
-            onClick={() => setDocType("all")}
-            className="px-3.5 py-1.5 rounded-full text-[13px] font-semibold border transition-all"
-            style={chip(docType === "all")}
-          >
-            Semua Tipe
-          </button>
-          {(Object.keys(TYPE_META) as DocType[])
-            .filter((t) => typeCounts[t])
-            .map((t) => (
-              <button
-                key={t}
-                onClick={() => setDocType(t)}
-                className="px-3.5 py-1.5 rounded-full text-[13px] font-semibold border transition-all"
-                style={chip(docType === t)}
-              >
-                {TYPE_META[t].label} ({typeCounts[t]})
-              </button>
-            ))}
-        </div>
-      )}
-
-      {/* Month filter */}
-      {history.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 mb-6">
-          <button
-            onClick={() => setMonth("all")}
-            className="px-3.5 py-1.5 rounded-full text-[13px] font-semibold border transition-all"
-            style={chip(month === "all")}
-          >
-            All
-          </button>
-          {months.map((m) => (
+        <div className="flex items-start justify-between gap-4 mb-6">
+          {/* Type filter chips */}
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              key={m}
-              onClick={() => setMonth(m)}
+              onClick={() => setDocType("all")}
               className="px-3.5 py-1.5 rounded-full text-[13px] font-semibold border transition-all"
-              style={chip(month === m)}
+              style={chip(docType === "all")}
             >
-              {monthLabel(m)}
+              Semua Tipe
             </button>
-          ))}
+            {(Object.keys(TYPE_META) as DocType[])
+              .filter((t) => typeCounts[t])
+              .map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setDocType(t)}
+                  className="px-3.5 py-1.5 rounded-full text-[13px] font-semibold border transition-all"
+                  style={chip(docType === t)}
+                >
+                  {TYPE_META[t].label} ({typeCounts[t]})
+                </button>
+              ))}
+          </div>
+
+          {/* Date filter dropdown */}
+          <div className="flex-shrink-0 w-[180px]">
+            <Select value={month} onChange={(e) => setMonth(e.target.value)} className="py-1.5 text-[13px]">
+              <option value="all">Semua Tanggal</option>
+              {months.map((m) => (
+                <option key={m} value={m}>{monthLabel(m)}</option>
+              ))}
+            </Select>
+          </div>
         </div>
       )}
 
@@ -199,7 +192,8 @@ export default function DocumentHistoryPage() {
       ) : (
         <div className="flex flex-col gap-2.5">
           {filtered.map((doc) => (
-            <Card key={doc.id} className="flex items-center gap-4 p-4">
+            <Card key={doc.id} className="flex flex-col p-0 overflow-hidden">
+            <div className="flex items-center gap-4 p-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
                   <Badge variant={TYPE_META[doc.type].variant}>{TYPE_META[doc.type].label}</Badge>
@@ -269,6 +263,24 @@ export default function DocumentHistoryPage() {
               >
                 <Icon name="trash" size={15} />
               </button>
+              {/* Expand to view the full document */}
+              <button
+                onClick={() => setExpandedId((id) => (id === doc.id ? null : doc.id))}
+                className="p-2 rounded-lg transition-colors flex-shrink-0 hover:bg-[var(--color-canvas)]"
+                style={{ color: "var(--color-muted)" }}
+                aria-label="Lihat dokumen"
+                aria-expanded={expandedId === doc.id}
+              >
+                <Icon name={expandedId === doc.id ? "chevron-down" : "chevron-right"} size={16} />
+              </button>
+            </div>
+
+            {/* Document detail */}
+            {expandedId === doc.id && (
+              <div className="border-t px-5 py-4" style={{ borderColor: "var(--color-hairline)", background: "var(--color-canvas)" }}>
+                <DocDetail doc={doc} />
+              </div>
+            )}
             </Card>
           ))}
         </div>
