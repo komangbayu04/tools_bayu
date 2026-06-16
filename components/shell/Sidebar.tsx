@@ -32,6 +32,7 @@ const navItems: (NavItem | { group: NavGroup })[] = [
       icon: "check-square",
       children: [
         { label: "Todolist", href: "/todo", icon: "list-check" },
+        { label: "Meeting Transcript", href: "/todo/meeting-transcript", icon: "mic" },
         { label: "Notepad", href: "/todo/notepad", icon: "edit" },
         { label: "Time Tracker", href: "/time-tracker", icon: "clock" },
       ],
