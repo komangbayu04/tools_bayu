@@ -36,6 +36,13 @@ const tools: Tool[] = [
     href: "/creative-tools/motion",
     badge: "Baru",
   },
+  {
+    title: "SVG to 3D",
+    description: "Ubah logo/ikon SVG jadi objek 3D dengan efek glass, metal, atau gold — putar & ekspor PNG.",
+    icon: "cube",
+    href: "/creative-tools/svg-3d",
+    badge: "Baru",
+  },
 ];
 
 export default function CreativeToolsPage() {

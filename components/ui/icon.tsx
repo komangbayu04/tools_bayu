@@ -18,7 +18,7 @@ import {
   faDiagramProject, faLayerGroup, faLightbulb, faStar, faClone,
   faBriefcase, faPause, faStop, faPaperPlane, faLocationDot, faMoneyBillWave,
   faFilm, faVideo, faPalette, faShapes, faFont, faSquare, faRotateRight, faExpand,
-  faMicrophone,
+  faMicrophone, faCube, faGem,
 } from "@fortawesome/free-solid-svg-icons";
 
 // Prevent Font Awesome from adding its CSS since we import it manually (SSR-safe)
@@ -38,7 +38,7 @@ library.add(
   faDiagramProject, faLayerGroup, faLightbulb, faStar, faClone,
   faBriefcase, faPause, faStop, faPaperPlane, faLocationDot, faMoneyBillWave,
   faFilm, faVideo, faPalette, faShapes, faFont, faSquare, faRotateRight, faExpand,
-  faMicrophone,
+  faMicrophone, faCube, faGem,
 );
 
 // Map friendly names → Font Awesome icon definitions.
@@ -125,6 +125,8 @@ const REGISTRY: Record<string, IconProp> = {
   rotate: faRotateRight,
   expand: faExpand,
   mic: faMicrophone,
+  cube: faCube,
+  gem: faGem,
 };
 
 export type IconName = keyof typeof REGISTRY;

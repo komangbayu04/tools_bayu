@@ -58,6 +58,7 @@ const navItems: (NavItem | { group: NavGroup })[] = [
         { label: "Image Generator", href: "/creative-tools/image", icon: "image" },
         { label: "Video Generator", href: "/creative-tools/video", icon: "film" },
         { label: "Motion Editor", href: "/creative-tools/motion", icon: "shapes" },
+        { label: "SVG to 3D", href: "/creative-tools/svg-3d", icon: "cube" },
       ],
     },
   },
