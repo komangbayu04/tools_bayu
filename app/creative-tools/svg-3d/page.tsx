@@ -63,6 +63,34 @@ const BG_COLORS: Record<Exclude<BgId, "transparent">, number> = {
 
 const DEFAULT_SVG = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M50 6 L62 38 L96 38 L68 58 L79 92 L50 72 L21 92 L32 58 L4 38 L38 38 Z" fill="#3b82f6"/></svg>`;
 
+// ─── Presentational helpers (module-level so they don't remount on every
+//     render — defining them inside the component would recreate the
+//     component type each render, unmounting sliders mid-drag). ─────────
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl p-4 border flex flex-col gap-3.5" style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface-card)" }}>
+      <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted-soft)" }}>{title}</p>
+      {children}
+    </div>
+  );
+}
+
+function Slider({ label, value, set, min, max, step = 0.01, suffix = "" }: {
+  label: string; value: number; set: (n: number) => void; min: number; max: number; step?: number; suffix?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between">
+        <span className="text-[11.5px] font-medium" style={{ color: "var(--color-muted)" }}>{label}</span>
+        <span className="text-[11.5px] font-semibold tabular-nums" style={{ color: "var(--color-ink)" }}>{value.toFixed(step < 1 ? 2 : 0)}{suffix}</span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={(e) => set(Number(e.target.value))}
+        className="w-full accent-[var(--color-primary)]" />
+    </div>
+  );
+}
+
 // ─── Material factory (uses matParams overrides) ───────────────────
 function makeMaterial(style: StyleId, color: string, p: MatParams): THREE.Material {
   const c = new THREE.Color(color);
@@ -362,26 +390,6 @@ export default function Svg3DPage() {
     a.click();
   };
 
-  // ── UI helpers ──
-  const S = (label: string, value: number, set: (n: number) => void, min: number, max: number, step = 0.01, suffix = "") => (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between">
-        <span className="text-[11.5px] font-medium" style={{ color: "var(--color-muted)" }}>{label}</span>
-        <span className="text-[11.5px] font-semibold tabular-nums" style={{ color: "var(--color-ink)" }}>{value.toFixed(step < 1 ? 2 : 0)}{suffix}</span>
-      </div>
-      <input type="range" min={min} max={max} step={step} value={value}
-        onChange={(e) => set(Number(e.target.value))}
-        className="w-full accent-[var(--color-primary)]" />
-    </div>
-  );
-
-  const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="rounded-2xl p-4 border flex flex-col gap-3.5" style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface-card)" }}>
-      <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted-soft)" }}>{title}</p>
-      {children}
-    </div>
-  );
-
   return (
     <ShellLayout>
       <PageHeader
@@ -463,8 +471,8 @@ export default function Svg3DPage() {
 
           {/* Shape */}
           <SectionCard title="Bentuk">
-            {S("Ketebalan (depth)", depth, setDepth, 2, 80, 1)}
-            {S("Bevel (lengkung tepi)", bevel, setBevel, 0, 12, 0.5)}
+            <Slider label="Ketebalan (depth)" value={depth} set={setDepth} min={2} max={80} step={1} />
+            <Slider label="Bevel (lengkung tepi)" value={bevel} set={setBevel} min={0} max={12} step={0.5} />
             <div className="flex items-center justify-between">
               <span className="text-[11.5px] font-medium" style={{ color: "var(--color-muted)" }}>Warna</span>
               <input type="color" value={color} onChange={(e) => setColor(e.target.value)}
@@ -504,25 +512,25 @@ export default function Svg3DPage() {
             <>
               {/* Material fine-tuning */}
               <SectionCard title="Material Detail">
-                {S("Roughness (kasar↔halus)", matP.roughness, v => setMP("roughness", v), 0, 1)}
-                {S("Metalness", matP.metalness, v => setMP("metalness", v), 0, 1)}
-                {S("Clearcoat (lapisan clear)", matP.clearcoat, v => setMP("clearcoat", v), 0, 1)}
-                {S("Clearcoat Roughness", matP.clearcoatRoughness, v => setMP("clearcoatRoughness", v), 0, 1)}
-                {S("Env Map Intensity", matP.envIntensity, v => setMP("envIntensity", v), 0, 3)}
-                {(style === "glass") && (<>
-                  {S("Transmission (transparansi)", matP.transmission, v => setMP("transmission", v), 0, 1)}
-                  {S("IOR (pembiasan cahaya)", matP.ior, v => setMP("ior", v), 1, 2.5, 0.01)}
-                  {S("Thickness (ketebalan kaca)", matP.thickness, v => setMP("thickness", v), 0.1, 5, 0.1)}
+                <Slider label="Roughness (kasar↔halus)" value={matP.roughness} set={v => setMP("roughness", v)} min={0} max={1} />
+                <Slider label="Metalness" value={matP.metalness} set={v => setMP("metalness", v)} min={0} max={1} />
+                <Slider label="Clearcoat (lapisan clear)" value={matP.clearcoat} set={v => setMP("clearcoat", v)} min={0} max={1} />
+                <Slider label="Clearcoat Roughness" value={matP.clearcoatRoughness} set={v => setMP("clearcoatRoughness", v)} min={0} max={1} />
+                <Slider label="Env Map Intensity" value={matP.envIntensity} set={v => setMP("envIntensity", v)} min={0} max={3} />
+                {style === "glass" && (<>
+                  <Slider label="Transmission (transparansi)" value={matP.transmission} set={v => setMP("transmission", v)} min={0} max={1} />
+                  <Slider label="IOR (pembiasan cahaya)" value={matP.ior} set={v => setMP("ior", v)} min={1} max={2.5} step={0.01} />
+                  <Slider label="Thickness (ketebalan kaca)" value={matP.thickness} set={v => setMP("thickness", v)} min={0.1} max={5} step={0.1} />
                 </>)}
-                {(style === "iridescent") && (
-                  S("Iridescence (efek pelangi)", matP.iridescence, v => setMP("iridescence", v), 0, 1)
+                {style === "iridescent" && (
+                  <Slider label="Iridescence (efek pelangi)" value={matP.iridescence} set={v => setMP("iridescence", v)} min={0} max={1} />
                 )}
               </SectionCard>
 
               {/* Geometry quality */}
               <SectionCard title="Kualitas Geometri">
-                {S("Curve Segments (kelancaran kurva)", curveSegs, setCurveSegs, 4, 64, 1, "")}
-                {S("Bevel Segments (kelancaran bevel)", bevelSegs, setBevelSegs, 1, 12, 1, "")}
+                <Slider label="Curve Segments (kelancaran kurva)" value={curveSegs} set={setCurveSegs} min={4} max={64} step={1} />
+                <Slider label="Bevel Segments (kelancaran bevel)" value={bevelSegs} set={setBevelSegs} min={1} max={12} step={1} />
                 <p className="text-[10.5px] leading-snug" style={{ color: "var(--color-muted-soft)" }}>
                   Nilai lebih tinggi = lebih halus tapi lebih berat. Direkomendasikan 24 / 4.
                 </p>
@@ -550,10 +558,10 @@ export default function Svg3DPage() {
               </SectionCard>
 
               <SectionCard title="Pencahayaan">
-                {S("Key Light (cahaya utama)", keyIntensity, setKeyIntensity, 0, 6, 0.1)}
-                {S("Rim Light (cahaya tepi)", rimIntensity, setRimIntensity, 0, 4, 0.1)}
-                {S("Exposure (kecerahan global)", exposure, setExposure, 0.3, 3, 0.05)}
-                {S("Kecepatan rotasi", rotateSpeed, setRotateSpeed, 0.5, 10, 0.1)}
+                <Slider label="Key Light (cahaya utama)" value={keyIntensity} set={setKeyIntensity} min={0} max={6} step={0.1} />
+                <Slider label="Rim Light (cahaya tepi)" value={rimIntensity} set={setRimIntensity} min={0} max={4} step={0.1} />
+                <Slider label="Exposure (kecerahan global)" value={exposure} set={setExposure} min={0.3} max={3} step={0.05} />
+                <Slider label="Kecepatan rotasi" value={rotateSpeed} set={setRotateSpeed} min={0.5} max={10} step={0.1} />
               </SectionCard>
             </>
           )}
