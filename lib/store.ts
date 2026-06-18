@@ -143,6 +143,12 @@ export const useInvoiceHistoryStore = create<InvoiceHistoryStore>()(
 export type MoodCategory = "graphic_design" | "product_design" | "3d" | "motion"
 export type MediaType = "image" | "video"
 
+export interface MoodProject {
+  id: string
+  name: string
+  createdAt: number
+}
+
 export interface MoodItem {
   id: string
   url: string
@@ -155,20 +161,41 @@ export interface MoodItem {
   image_url?: string
   media_type?: MediaType
   createdAt: number
+  projectId?: string   // undefined / null = Global
 }
 
 interface MoodStore {
   items: MoodItem[]
+  projects: MoodProject[]
   addItem: (item: Omit<MoodItem, "id">) => void
   deleteItem: (id: string) => void
+  moveItem: (itemId: string, projectId: string | null) => void
+  addProject: (name: string) => string
+  renameProject: (id: string, name: string) => void
+  deleteProject: (id: string) => void
 }
 
 export const useMoodStore = create<MoodStore>()(
   persist(
     (set) => ({
       items: [],
+      projects: [],
       addItem: (item) => set((s) => ({ items: [{ ...item, id: crypto.randomUUID(), createdAt: item.createdAt ?? Date.now() }, ...s.items] })),
       deleteItem: (id) => set((s) => ({ items: s.items.filter(i => i.id !== id) })),
+      moveItem: (itemId, projectId) => set((s) => ({
+        items: s.items.map(i => i.id === itemId ? { ...i, projectId: projectId ?? undefined } : i),
+      })),
+      addProject: (name) => {
+        const id = crypto.randomUUID()
+        set((s) => ({ projects: [...s.projects, { id, name, createdAt: Date.now() }] }))
+        return id
+      },
+      renameProject: (id, name) => set((s) => ({ projects: s.projects.map(p => p.id === id ? { ...p, name } : p) })),
+      deleteProject: (id) => set((s) => ({
+        projects: s.projects.filter(p => p.id !== id),
+        // Move items from deleted project back to Global
+        items: s.items.map(i => i.projectId === id ? { ...i, projectId: undefined } : i),
+      })),
     }),
     { name: "moodboard-storage", storage: cloud() }
   )
