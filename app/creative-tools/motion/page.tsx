@@ -303,6 +303,21 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
     else setPlaying(true);
   };
 
+  // Spacebar toggles play/pause — but not while typing in a field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== "Space" && e.key !== " ") return;
+      const el = document.activeElement;
+      const typing = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || (el as HTMLElement | null)?.isContentEditable;
+      if (typing) return;
+      e.preventDefault();
+      togglePlay();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing]);
+
   // ── Timeline scrubbing ──
   const pxToTime = (clientX: number) => {
     const el = timelineRef.current;
@@ -382,6 +397,12 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
     patchLayer(drag.current.id, { x: Math.round(x - drag.current.offX), y: Math.round(y - drag.current.offY) });
   };
   const onPointerUp = () => { drag.current = null; };
+
+  // ── Remove a layer (from timeline row or properties panel) ──
+  const deleteLayer = (id: string) => {
+    patch({ layers: project.layers.filter((l) => l.id !== id) });
+    setSelectedId((cur) => (cur === id ? null : cur));
+  };
 
   // ── Add layers ──
   const addLayer = (kind: LayerKind, src?: string) => {
@@ -545,19 +566,27 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
             ) : (
               <div className="flex">
                 {/* Left: layer names */}
-                <div className="flex-shrink-0 border-r" style={{ width: 130, borderColor: "var(--color-hairline)" }}>
+                <div className="flex-shrink-0 border-r" style={{ width: 150, borderColor: "var(--color-hairline)" }}>
                   <div className="h-6 border-b" style={{ borderColor: "var(--color-hairline)" }} />
                   {[...project.layers].reverse().map((l) => (
-                    <button key={l.id} onClick={() => { setScrubTime(timeRef.current); setSelectedId(l.id); setPlaying(false); }}
-                      className="flex items-center gap-2 px-2.5 h-9 w-full text-left border-b"
+                    <div key={l.id}
+                      className="group/row flex items-center gap-1.5 px-2.5 h-9 w-full border-b"
                       style={{
                         borderColor: "var(--color-hairline)",
                         background: selectedId === l.id ? "var(--color-primary-light)" : "transparent",
                         color: selectedId === l.id ? "var(--color-primary-ink)" : "var(--color-body)",
                       }}>
-                      <Icon name={layerIcon(l)} size={12} style={{ color: selectedId === l.id ? "var(--color-primary)" : "var(--color-muted-soft)" }} />
-                      <span className="text-[12px] font-medium truncate">{layerLabel(l)}</span>
-                    </button>
+                      <button onClick={() => { setScrubTime(timeRef.current); setSelectedId(l.id); setPlaying(false); }}
+                        className="flex items-center gap-2 flex-1 min-w-0 text-left">
+                        <Icon name={layerIcon(l)} size={12} style={{ color: selectedId === l.id ? "var(--color-primary)" : "var(--color-muted-soft)" }} />
+                        <span className="text-[12px] font-medium truncate">{layerLabel(l)}</span>
+                      </button>
+                      <button onClick={() => deleteLayer(l.id)} title="Hapus objek"
+                        className="flex-shrink-0 p-1 rounded opacity-0 group-hover/row:opacity-100 transition-opacity hover:bg-red-50"
+                        style={{ color: "#C64545" }}>
+                        <Icon name="trash" size={12} />
+                      </button>
+                    </div>
                   ))}
                 </div>
 
@@ -610,11 +639,19 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                     );
                   })}
 
-                  {/* Playhead spanning ruler + tracks */}
-                  <div ref={playheadRef} className="absolute top-0 bottom-0 pointer-events-none z-10"
+                  {/* Playhead spanning ruler + tracks — draggable via the handle */}
+                  <div ref={playheadRef} className="absolute top-0 bottom-0 z-10"
                     style={{ left: pct(scrubTime), width: 0 }}>
-                    <div className="w-px h-full" style={{ background: "#e0533c" }} />
-                    <div className="absolute -top-0 -left-[3px] w-[7px] h-[7px] rounded-full" style={{ background: "#e0533c" }} />
+                    <div className="w-px h-full pointer-events-none" style={{ background: "#e0533c" }} />
+                    {/* Grab handle (wider hit area) */}
+                    <div
+                      className="absolute -top-[1px] -left-[7px] w-[15px] h-[15px] rounded-full cursor-ew-resize touch-none"
+                      title="Geser untuk pindah waktu"
+                      onPointerDown={onScrubDown} onPointerMove={onScrubMove} onPointerUp={onScrubUp}
+                      style={{ background: "transparent" }}
+                    >
+                      <div className="absolute top-[4px] left-[4px] w-[7px] h-[7px] rounded-full" style={{ background: "#e0533c" }} />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -653,7 +690,7 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
             <div className="rounded-[14px] border p-4" style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface-card)" }}>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-[12px] font-bold" style={{ color: "var(--color-ink)" }}>Properti Layer</p>
-                <button onClick={() => { patch({ layers: project.layers.filter((l) => l.id !== selected.id) }); setSelectedId(null); }}
+                <button onClick={() => deleteLayer(selected.id)}
                   className="text-[12px] font-semibold flex items-center gap-1" style={{ color: "#C64545" }}>
                   <Icon name="trash" size={12} /> Hapus
                 </button>
