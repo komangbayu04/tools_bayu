@@ -16,11 +16,15 @@ const PILL_BG = "#e0f0f0";
 // ─── Constants ───────────────────────────────────────────────────────
 // `edit: true` → the model supports image-to-image (combine / transfer texture).
 const ALL_MODELS = [
-  { value: "gpt-image-1", label: "GPT Image 1", edit: true },
-  { value: "gpt-image-1-mini", label: "GPT Image 1 Mini", edit: true },
-  { value: "dall-e-3", label: "DALL·E 3", edit: false },
-  { value: "dall-e-2", label: "DALL·E 2", edit: false },
+  { value: "gpt-5.5", label: "GPT-5.5 ✨ (terbaru)", edit: true, single: true },
+  { value: "gpt-image-1", label: "GPT Image 1", edit: true, single: false },
+  { value: "gpt-image-1-mini", label: "GPT Image 1 Mini", edit: true, single: false },
+  { value: "dall-e-3", label: "DALL·E 3", edit: false, single: true },
+  { value: "dall-e-2", label: "DALL·E 2", edit: false, single: false },
 ];
+
+// Models that only ever return a single image.
+const SINGLE_IMAGE = new Set(ALL_MODELS.filter((m) => m.single).map((m) => m.value));
 const SIZES = [
   { value: "1024x1024", label: "Persegi 1:1" },
   { value: "1024x1536", label: "Potrait 3:4" },
@@ -238,7 +242,7 @@ export default function ImageGeneratorPage() {
 
   const [mode, setMode] = useState<Mode>("generate");
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState("gpt-image-1");
+  const [model, setModel] = useState("gpt-5.5");
   const [size, setSize] = useState("1024x1024");
   const [style, setStyle] = useState("");
   const [n, setN] = useState(1);
@@ -261,9 +265,7 @@ export default function ImageGeneratorPage() {
     setMode(next);
     setError(null);
     const editOnly = next !== "generate";
-    if (editOnly && !ALL_MODELS.find((m) => m.value === model)?.edit) setModel("gpt-image-1");
-    // DALL·E 3 only ever returns a single image.
-    if (model === "dall-e-3") setN(1);
+    if (editOnly && !ALL_MODELS.find((m) => m.value === model)?.edit) setModel("gpt-5.5");
   };
 
   const generate = async () => {
@@ -328,7 +330,7 @@ export default function ImageGeneratorPage() {
 
   const handleSetModel = (v: string) => {
     setModel(v);
-    if (v === "dall-e-3") setN(1); // DALL·E 3 returns one image at a time.
+    if (SINGLE_IMAGE.has(v)) setN(1); // some models return one image at a time.
   };
 
   const promptPanel = (

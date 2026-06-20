@@ -9,11 +9,13 @@ export const maxDuration = 180;
 type Mode = "generate" | "combine" | "texture";
 
 // Which models we accept, and what each one can do.
+// `chat` models generate images via the Responses API image_generation tool.
 const MODELS = {
-  "gpt-image-1": { edit: true },
-  "gpt-image-1-mini": { edit: true },
-  "dall-e-3": { edit: false },
-  "dall-e-2": { edit: false },
+  "gpt-5.5": { edit: true, chat: true },
+  "gpt-image-1": { edit: true, chat: false },
+  "gpt-image-1-mini": { edit: true, chat: false },
+  "dall-e-3": { edit: false, chat: false },
+  "dall-e-2": { edit: false, chat: false },
 } as const;
 type ModelId = keyof typeof MODELS;
 
@@ -25,6 +27,15 @@ async function dataUrlToFile(dataUrl: string, name: string) {
   const type = mimeMatch?.[1] ?? "image/png";
   const buffer = Buffer.from(base64, "base64");
   return toFile(buffer, name, { type });
+}
+
+// Pull base64 PNGs out of a Responses API result (image_generation tool).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractFromResponses(response: any): string[] {
+  const out = (response?.output ?? []) as Array<{ type?: string; result?: string }>;
+  return out
+    .filter((o) => o.type === "image_generation_call" && o.result)
+    .map((o) => `data:image/png;base64,${o.result}`);
 }
 
 // Normalize our 3 UI sizes to whatever a given model supports.
@@ -66,11 +77,51 @@ export async function POST(req: NextRequest) {
   const model: ModelId = (body.model && body.model in MODELS ? body.model : "gpt-image-1") as ModelId;
   const size = normalizeSize(model, body.size ?? "1024x1024");
 
-  // n: DALL·E 3 only ever returns one image; others cap at 4.
-  const n = model === "dall-e-3" ? 1 : Math.min(Math.max(body.n ?? 1, 1), 4);
+  // n: DALL·E 3 and the chat models return a single image; others cap at 4.
+  const n = model === "dall-e-3" || MODELS[model].chat ? 1 : Math.min(Math.max(body.n ?? 1, 1), 4);
+  const quality = ["low", "medium", "high", "auto"].includes(body.quality ?? "") ? body.quality! : "medium";
 
   try {
     let images: string[];
+
+    // ── Chat models (GPT-5.5) → Responses API image_generation tool ──
+    if (MODELS[model].chat) {
+      const srcUrls = (body.images ?? []).filter(Boolean);
+      if (mode !== "generate" && srcUrls.length < 2) {
+        return Response.json({ error: "Perlu 2 gambar untuk mode ini." }, { status: 400 });
+      }
+      if (mode === "generate" && !userPrompt) {
+        return Response.json({ error: "Prompt tidak boleh kosong." }, { status: 400 });
+      }
+
+      const directive =
+        mode === "combine"
+          ? "Gabungkan kedua gambar menjadi satu komposisi yang menyatu dan natural — gambar pertama subjek utama, gambar kedua elemen/latar. Padukan pencahayaan, perspektif, dan warna."
+          : mode === "texture"
+            ? "Terapkan tekstur/material dari gambar kedua ke subjek pada gambar pertama, pertahankan bentuk dan siluet aslinya. Hasil realistis dan tajam."
+            : "";
+      const text = [directive, userPrompt].filter(Boolean).join("\n\n") || "Buat sebuah gambar.";
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const content: any[] = [{ type: "input_text", text }];
+      if (mode !== "generate") {
+        for (const url of srcUrls.slice(0, 2)) content.push({ type: "input_image", image_url: url });
+      }
+
+      const response = await client.responses.create({
+        model,
+        input: [{ role: "user", content }],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        tools: [{ type: "image_generation", size, quality } as any],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+
+      images = extractFromResponses(response);
+      if (images.length === 0) {
+        return Response.json({ error: "Model tidak mengembalikan gambar." }, { status: 502 });
+      }
+      return Response.json({ images, size, model });
+    }
 
     if (mode === "generate") {
       if (!userPrompt) {
@@ -123,7 +174,6 @@ export async function POST(req: NextRequest) {
             "sambil mempertahankan siluet dan bentuk asli subjek. Hasilkan render yang realistis dan tajam.";
 
       const prompt = userPrompt ? `${instruction}\n\nCatatan tambahan: ${userPrompt}` : instruction;
-      const quality = ["low", "medium", "high", "auto"].includes(body.quality ?? "") ? body.quality! : "medium";
 
       const result = await client.images.edit({
         model,
