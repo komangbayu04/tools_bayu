@@ -14,6 +14,7 @@ import {
   type MotionLayer,
   type LayerKind,
   type AnimPreset,
+  type AnimOut,
   type Easing,
   type CanvasRatio,
 } from "@/lib/creativeStore";
@@ -45,43 +46,96 @@ function bounceOut(t: number) {
 
 interface Transform { opacity: number; dx: number; dy: number; scale: number; rotate: number; }
 
-function computeTransform(layer: MotionLayer, time: number): Transform {
-  const base: Transform = { opacity: 1, dx: 0, dy: 0, scale: 1, rotate: 0 };
-  if (layer.preset === "none") return base;
+const OFF = 120;
 
-  const raw = clamp01((time - layer.delay) / Math.max(0.0001, layer.duration));
-  const OFF = 120;
-
-  if (layer.preset === "bounce") {
-    const p = bounceOut(raw);
-    return { ...base, opacity: clamp01(raw * 2), dy: (1 - p) * -OFF };
-  }
-
-  const p = EASE[layer.easing](raw);
-  switch (layer.preset) {
-    case "fade": return { ...base, opacity: p };
-    case "slide-up": return { ...base, opacity: p, dy: (1 - p) * OFF };
-    case "slide-down": return { ...base, opacity: p, dy: (1 - p) * -OFF };
-    case "slide-left": return { ...base, opacity: p, dx: (1 - p) * OFF };
-    case "slide-right": return { ...base, opacity: p, dx: (1 - p) * -OFF };
-    case "pop": return { ...base, opacity: p, scale: 0.6 + 0.4 * p };
-    case "rotate": return { ...base, opacity: p, scale: 0.9 + 0.1 * p, rotate: (1 - p) * -0.26 };
-    default: return base;
+// Layer lifespan helpers (so timeline + engine agree on timing).
+const layerInEnd = (l: MotionLayer) => l.delay + l.duration;
+const layerOutStart = (l: MotionLayer, total: number) => {
+  if (!l.outPreset || l.outPreset === "none") return total;
+  const dur = l.outDuration ?? 0.6;
+  return l.outStart ?? Math.max(layerInEnd(l), total - dur);
+};
+function applyIn(tr: Transform, preset: AnimPreset, p: number) {
+  switch (preset) {
+    case "fade": tr.opacity = p; break;
+    case "slide-up": tr.opacity = p; tr.dy = (1 - p) * OFF; break;
+    case "slide-down": tr.opacity = p; tr.dy = (1 - p) * -OFF; break;
+    case "slide-left": tr.opacity = p; tr.dx = (1 - p) * OFF; break;
+    case "slide-right": tr.opacity = p; tr.dx = (1 - p) * -OFF; break;
+    case "pop": tr.opacity = p; tr.scale = 0.6 + 0.4 * p; break;
+    case "rotate": tr.opacity = p; tr.scale = 0.9 + 0.1 * p; tr.rotate = (1 - p) * -0.26; break;
   }
 }
 
+function applyOut(tr: Transform, preset: AnimOut, q: number) {
+  switch (preset) {
+    case "fade-out": tr.opacity *= 1 - q; break;
+    case "slide-up-out": tr.opacity *= 1 - q; tr.dy += q * -OFF; break;
+    case "slide-down-out": tr.opacity *= 1 - q; tr.dy += q * OFF; break;
+    case "slide-left-out": tr.opacity *= 1 - q; tr.dx += q * -OFF; break;
+    case "slide-right-out": tr.opacity *= 1 - q; tr.dx += q * OFF; break;
+    case "pop-out": tr.opacity *= 1 - q; tr.scale *= 1 - 0.4 * q; break;
+    case "rotate-out": tr.opacity *= 1 - q; tr.rotate += q * 0.26; break;
+  }
+}
+
+function computeTransform(layer: MotionLayer, time: number, total: number): Transform {
+  const tr: Transform = { opacity: 1, dx: 0, dy: 0, scale: 1, rotate: 0 };
+
+  // Before the entry begins, the layer is hidden (unless it has no entry anim).
+  if (layer.preset !== "none" && time < layer.delay) {
+    tr.opacity = 0;
+    return tr;
+  }
+
+  // Entry
+  if (layer.preset !== "none") {
+    const raw = clamp01((time - layer.delay) / Math.max(0.0001, layer.duration));
+    if (layer.preset === "bounce") {
+      const p = bounceOut(raw);
+      tr.opacity = clamp01(raw * 2);
+      tr.dy = (1 - p) * -OFF;
+    } else {
+      applyIn(tr, layer.preset, EASE[layer.easing](raw));
+    }
+  }
+
+  // Exit
+  if (layer.outPreset && layer.outPreset !== "none") {
+    const start = layerOutStart(layer, total);
+    const dur = layer.outDuration ?? 0.6;
+    if (time >= start) {
+      const q = EASE[layer.outEasing ?? "ease-in"](clamp01((time - start) / Math.max(0.0001, dur)));
+      applyOut(tr, layer.outPreset, q);
+    }
+  }
+
+  return tr;
+}
+
 // ─── Presets / options ────────────────────────────────────────────
-const PRESETS: { value: AnimPreset; label: string }[] = [
-  { value: "none", label: "Tanpa animasi" },
-  { value: "fade", label: "Fade In" },
-  { value: "slide-up", label: "Slide Up" },
-  { value: "slide-down", label: "Slide Down" },
-  { value: "slide-left", label: "Slide Left" },
-  { value: "slide-right", label: "Slide Right" },
-  { value: "pop", label: "Pop / Scale" },
-  { value: "rotate", label: "Rotate In" },
-  { value: "bounce", label: "Bounce" },
+type TemplateDef = { value: AnimPreset; label: string; icon: string };
+const IN_TEMPLATES: TemplateDef[] = [
+  { value: "fade", label: "Fade In", icon: "circle" },
+  { value: "slide-up", label: "Slide Up", icon: "chevron-down" },
+  { value: "slide-down", label: "Slide Down", icon: "chevron-down" },
+  { value: "slide-left", label: "Slide Left", icon: "chevron-right" },
+  { value: "slide-right", label: "Slide Right", icon: "chevron-right" },
+  { value: "pop", label: "Pop / Scale", icon: "expand" },
+  { value: "rotate", label: "Rotate In", icon: "rotate" },
+  { value: "bounce", label: "Bounce", icon: "play" },
 ];
+type OutTemplateDef = { value: AnimOut; label: string; icon: string };
+const OUT_TEMPLATES: OutTemplateDef[] = [
+  { value: "fade-out", label: "Fade Out", icon: "circle" },
+  { value: "slide-up-out", label: "Slide Up Out", icon: "chevron-down" },
+  { value: "slide-down-out", label: "Slide Down Out", icon: "chevron-down" },
+  { value: "slide-left-out", label: "Slide Left Out", icon: "chevron-right" },
+  { value: "slide-right-out", label: "Slide Right Out", icon: "chevron-right" },
+  { value: "pop-out", label: "Pop Out", icon: "expand" },
+  { value: "rotate-out", label: "Rotate Out", icon: "rotate" },
+];
+
 const EASINGS: { value: Easing; label: string }[] = [
   { value: "ease-out", label: "Ease Out" },
   { value: "ease-in", label: "Ease In" },
@@ -117,7 +171,7 @@ function drawFrame(
   ctx.fillRect(0, 0, w, h);
 
   for (const layer of project.layers) {
-    const t = computeTransform(layer, time);
+    const t = computeTransform(layer, time, project.duration);
     if (t.opacity <= 0.001) continue;
     const cx = layer.x + layer.w / 2;
     const cy = layer.y + layer.h / 2;
@@ -164,6 +218,9 @@ function newLayer(kind: LayerKind, ratio: CanvasRatio, src?: string): MotionLaye
     duration: 0.8,
     delay: 0,
     easing: "ease-out" as Easing,
+    outPreset: "none" as AnimOut,
+    outDuration: 0.6,
+    outEasing: "ease-in" as Easing,
   };
   if (kind === "text")
     return { ...base, x: w / 2 - 250, y: h / 2 - 50, w: 500, h: 100, text: "Teks Kamu", fontSize: 64 };
@@ -181,9 +238,14 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
   const fileRef = useRef<HTMLInputElement>(null);
   const rafRef = useRef<number>(0);
   const startRef = useRef<number>(0);
+  const timeRef = useRef<number>(0);            // live playback time
+  const playheadRef = useRef<HTMLDivElement>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const timeLabelRef = useRef<HTMLSpanElement>(null);
   const [playing, setPlaying] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [scrubTime, setScrubTime] = useState(0); // time shown when paused
   const [tick, setTick] = useState(0); // forces redraw on data change
 
   const { w: W, h: H } = DIMS[project.ratio];
@@ -214,19 +276,85 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
     const loop = () => {
       const elapsed = (performance.now() - startRef.current) / 1000;
       const t = elapsed % project.duration;
+      timeRef.current = t;
       redraw(t);
+      // Move the timeline playhead + time readout imperatively — avoids a
+      // React re-render every animation frame (which would make it janky).
+      if (playheadRef.current) playheadRef.current.style.left = `${(t / project.duration) * 100}%`;
+      if (timeLabelRef.current) timeLabelRef.current.textContent = t.toFixed(2);
       rafRef.current = requestAnimationFrame(loop);
     };
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
   }, [playing, exporting, redraw, project.duration]);
 
-  // Paused: show the final composed frame, and redraw once whenever a layer
-  // image loads (tick) so it appears without needing to hit play.
+  // Paused: show the frame at the current scrub position, and redraw once
+  // whenever a layer image loads (tick) so it appears without hitting play.
   useEffect(() => {
     if (exporting || playing) return;
-    redraw(project.duration);
-  }, [playing, exporting, redraw, project.duration, tick]);
+    redraw(scrubTime);
+    if (playheadRef.current) playheadRef.current.style.left = `${(scrubTime / project.duration) * 100}%`;
+    if (timeLabelRef.current) timeLabelRef.current.textContent = scrubTime.toFixed(2);
+  }, [playing, exporting, redraw, project.duration, scrubTime, tick]);
+
+  // ── Play / pause: when pausing, freeze the scrubber at the live time. ──
+  const togglePlay = () => {
+    if (playing) { setScrubTime(timeRef.current); setPlaying(false); }
+    else setPlaying(true);
+  };
+
+  // ── Timeline scrubbing ──
+  const pxToTime = (clientX: number) => {
+    const el = timelineRef.current;
+    if (!el) return 0;
+    const r = el.getBoundingClientRect();
+    return clamp01((clientX - r.left) / r.width) * project.duration;
+  };
+  const scrubbing = useRef(false);
+  const onScrubDown = (e: React.PointerEvent) => {
+    setPlaying(false);
+    scrubbing.current = true;
+    setScrubTime(pxToTime(e.clientX));
+    (e.target as Element).setPointerCapture(e.pointerId);
+  };
+  const onScrubMove = (e: React.PointerEvent) => {
+    if (!scrubbing.current) return;
+    setScrubTime(pxToTime(e.clientX));
+  };
+  const onScrubUp = () => { scrubbing.current = false; };
+
+  // ── Drag a layer's in/out bar along the timeline to retime it ──
+  const barDrag = useRef<{ id: string; type: "in" | "out"; startX: number; orig: number } | null>(null);
+  const onBarDown = (e: React.PointerEvent, l: MotionLayer, type: "in" | "out") => {
+    e.stopPropagation();
+    setSelectedId(l.id);
+    setPlaying(false);
+    barDrag.current = {
+      id: l.id, type, startX: e.clientX,
+      orig: type === "in" ? l.delay : layerOutStart(l, project.duration),
+    };
+    (e.target as Element).setPointerCapture(e.pointerId);
+  };
+  const onBarMove = (e: React.PointerEvent) => {
+    const d = barDrag.current;
+    if (!d) return;
+    const el = timelineRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const dt = ((e.clientX - d.startX) / r.width) * project.duration;
+    const l = project.layers.find((x) => x.id === d.id);
+    if (!l) return;
+    if (d.type === "in") {
+      const max = project.duration - l.duration;
+      patchLayer(d.id, { delay: Math.max(0, Math.min(max, d.orig + dt)) });
+    } else {
+      const dur = l.outDuration ?? 0.6;
+      const min = layerInEnd(l);
+      const max = project.duration - dur;
+      patchLayer(d.id, { outStart: Math.max(min, Math.min(max, d.orig + dt)) });
+    }
+  };
+  const onBarUp = () => { barDrag.current = null; };
 
   // ── Pointer drag to reposition selected layer ──
   const drag = useRef<{ id: string; offX: number; offY: number } | null>(null);
@@ -326,7 +454,18 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
     setPlaying(true);
   };
 
-  const replay = () => { setPlaying(false); setTimeout(() => setPlaying(true), 20); };
+  const replay = () => { setScrubTime(0); setPlaying(false); setTimeout(() => setPlaying(true), 20); };
+
+  // Layer display helpers for the timeline
+  const layerLabel = (l: MotionLayer) =>
+    l.kind === "text" ? (l.text || "Teks") : l.kind === "rect" ? "Kotak" : l.kind === "circle" ? "Lingkaran" : "Gambar";
+  const layerIcon = (l: MotionLayer) =>
+    l.kind === "text" ? "type" : l.kind === "rect" ? "square" : l.kind === "circle" ? "circle" : "image";
+  const pct = (t: number) => `${(t / project.duration) * 100}%`;
+  // Ruler ticks roughly every 0.5s, but cap the count for long durations.
+  const tickStep = project.duration > 8 ? 1 : 0.5;
+  const ticks: number[] = [];
+  for (let t = 0; t <= project.duration + 0.0001; t += tickStep) ticks.push(Number(t.toFixed(2)));
 
   const fieldLabel = "block text-[11px] font-bold uppercase tracking-wider mb-1.5";
   const numInput = "w-full rounded-[8px] border px-2.5 py-1.5 text-[13px] outline-none focus:ring-2";
@@ -364,10 +503,13 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
             <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}><Icon name="image" size={13} /> Gambar</Button>
             <input ref={fileRef} type="file" accept="image/*" onChange={onUpload} className="hidden" />
             <div className="w-px h-5 mx-1" style={{ background: "var(--color-hairline)" }} />
-            <Button size="sm" variant="outline" onClick={() => setPlaying((p) => !p)}>
+            <Button size="sm" variant="outline" onClick={togglePlay}>
               <Icon name={playing ? "pause" : "play"} size={13} /> {playing ? "Jeda" : "Main"}
             </Button>
             <Button size="sm" variant="outline" onClick={replay}><Icon name="rotate" size={13} /> Ulang</Button>
+            <span className="ml-1 text-[12px] tabular-nums" style={{ color: "var(--color-muted)" }}>
+              <span ref={timeLabelRef}>{scrubTime.toFixed(2)}</span>s / {project.duration.toFixed(1)}s
+            </span>
           </div>
 
           {/* Canvas */}
@@ -386,29 +528,95 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
             />
           </div>
 
-          {/* Layers list */}
-          <div className="rounded-[12px] border p-3" style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface-card)" }}>
-            <p className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted-soft)" }}>Layer ({project.layers.length})</p>
+          {/* ── Timeline ── */}
+          <div className="rounded-[12px] border overflow-hidden" style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface-card)" }}>
+            <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: "var(--color-hairline)" }}>
+              <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted-soft)" }}>
+                Timeline · {project.layers.length} layer
+              </p>
+              <div className="flex items-center gap-3 text-[10.5px]" style={{ color: "var(--color-muted)" }}>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: "var(--color-primary)" }} /> Masuk</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: "#d98a3c" }} /> Keluar</span>
+              </div>
+            </div>
+
             {project.layers.length === 0 ? (
-              <p className="text-[12.5px]" style={{ color: "var(--color-muted)" }}>Tambahkan elemen dari toolbar di atas.</p>
+              <p className="text-[12.5px] px-3 py-4" style={{ color: "var(--color-muted)" }}>Tambahkan elemen dari toolbar di atas.</p>
             ) : (
-              <div className="flex flex-col gap-1">
-                {[...project.layers].reverse().map((l) => (
-                  <button
-                    key={l.id}
-                    onClick={() => { setSelectedId(l.id); setPlaying(false); }}
-                    className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors"
-                    style={{ background: selectedId === l.id ? "var(--color-primary-light)" : "transparent",
-                      color: selectedId === l.id ? "var(--color-primary-ink)" : "var(--color-body)" }}
-                  >
-                    <Icon name={l.kind === "text" ? "type" : l.kind === "rect" ? "square" : l.kind === "circle" ? "circle" : "image"} size={13}
-                      style={{ color: selectedId === l.id ? "var(--color-primary)" : "var(--color-muted-soft)" }} />
-                    <span className="text-[12.5px] font-medium flex-1 truncate">
-                      {l.kind === "text" ? (l.text || "Teks") : l.kind === "rect" ? "Kotak" : l.kind === "circle" ? "Lingkaran" : "Gambar"}
-                    </span>
-                    <span className="text-[10.5px]" style={{ color: "var(--color-muted-soft)" }}>{l.preset}</span>
-                  </button>
-                ))}
+              <div className="flex">
+                {/* Left: layer names */}
+                <div className="flex-shrink-0 border-r" style={{ width: 130, borderColor: "var(--color-hairline)" }}>
+                  <div className="h-6 border-b" style={{ borderColor: "var(--color-hairline)" }} />
+                  {[...project.layers].reverse().map((l) => (
+                    <button key={l.id} onClick={() => { setScrubTime(timeRef.current); setSelectedId(l.id); setPlaying(false); }}
+                      className="flex items-center gap-2 px-2.5 h-9 w-full text-left border-b"
+                      style={{
+                        borderColor: "var(--color-hairline)",
+                        background: selectedId === l.id ? "var(--color-primary-light)" : "transparent",
+                        color: selectedId === l.id ? "var(--color-primary-ink)" : "var(--color-body)",
+                      }}>
+                      <Icon name={layerIcon(l)} size={12} style={{ color: selectedId === l.id ? "var(--color-primary)" : "var(--color-muted-soft)" }} />
+                      <span className="text-[12px] font-medium truncate">{layerLabel(l)}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Right: ruler + tracks + playhead */}
+                <div className="relative flex-1 overflow-hidden">
+                  {/* Ruler — also the scrub area */}
+                  <div ref={timelineRef}
+                    className="relative h-6 border-b cursor-ew-resize touch-none select-none"
+                    style={{ borderColor: "var(--color-hairline)", background: "var(--color-canvas)" }}
+                    onPointerDown={onScrubDown} onPointerMove={onScrubMove} onPointerUp={onScrubUp}>
+                    {ticks.map((t) => (
+                      <div key={t} className="absolute top-0 bottom-0 flex items-end pb-0.5" style={{ left: pct(t) }}>
+                        <div className="absolute top-0 w-px h-1.5" style={{ background: "var(--color-hairline)" }} />
+                        <span className="text-[8.5px] pl-0.5" style={{ color: "var(--color-muted-soft)" }}>{t}s</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Tracks */}
+                  {[...project.layers].reverse().map((l) => {
+                    const inStart = l.preset === "none" ? 0 : l.delay;
+                    const inW = l.preset === "none" ? 0 : l.duration;
+                    const hasOut = !!l.outPreset && l.outPreset !== "none";
+                    const oStart = layerOutStart(l, project.duration);
+                    const oDur = l.outDuration ?? 0.6;
+                    const isSel = selectedId === l.id;
+                    return (
+                      <div key={l.id} className="relative h-9 border-b" style={{ borderColor: "var(--color-hairline)" }}
+                        onPointerMove={onBarMove} onPointerUp={onBarUp}
+                        onClick={() => { setSelectedId(l.id); }}>
+                        {/* Full lifespan track background */}
+                        <div className="absolute top-1/2 -translate-y-1/2 h-4 rounded"
+                          style={{ left: pct(inStart), width: pct(Math.max(0.001, (hasOut ? oStart + oDur : project.duration) - inStart)),
+                            background: isSel ? "var(--color-primary-light)" : "var(--color-canvas)", border: "1px solid var(--color-hairline)" }} />
+                        {/* Entry bar (draggable to change delay) */}
+                        {l.preset !== "none" && (
+                          <div className="absolute top-1/2 -translate-y-1/2 h-4 rounded cursor-grab active:cursor-grabbing touch-none"
+                            title={`Masuk: ${l.preset} · ${l.duration}s (geser untuk delay)`}
+                            onPointerDown={(e) => onBarDown(e, l, "in")}
+                            style={{ left: pct(inStart), width: pct(inW), background: "var(--color-primary)", opacity: 0.92 }} />
+                        )}
+                        {/* Exit bar (draggable to change out start) */}
+                        {hasOut && (
+                          <div className="absolute top-1/2 -translate-y-1/2 h-4 rounded cursor-grab active:cursor-grabbing touch-none"
+                            title={`Keluar: ${l.outPreset} · ${oDur}s (geser untuk waktu keluar)`}
+                            onPointerDown={(e) => onBarDown(e, l, "out")}
+                            style={{ left: pct(oStart), width: pct(oDur), background: "#d98a3c", opacity: 0.92 }} />
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Playhead spanning ruler + tracks */}
+                  <div ref={playheadRef} className="absolute top-0 bottom-0 pointer-events-none z-10"
+                    style={{ left: pct(scrubTime), width: 0 }}>
+                    <div className="w-px h-full" style={{ background: "#e0533c" }} />
+                    <div className="absolute -top-0 -left-[3px] w-[7px] h-[7px] rounded-full" style={{ background: "#e0533c" }} />
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -484,25 +692,101 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
               </div>
 
               <div className="h-px my-3" style={{ background: "var(--color-hairline)" }} />
-              <p className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted-soft)" }}>Animasi</p>
-              <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Preset</label>
-              <Select value={selected.preset} onChange={(e) => { patchLayer(selected.id, { preset: e.target.value as AnimPreset }); replay(); }} className="mb-3">
-                {PRESETS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-              </Select>
-              <div className="grid grid-cols-2 gap-3 mb-3">
+
+              {/* ── Animasi Masuk (In) ── */}
+              <div className="flex items-center gap-2 mb-2">
+                <Icon name="arrow-right" size={12} style={{ color: "var(--color-primary)" }} />
+                <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted-soft)" }}>Animasi Masuk</p>
+              </div>
+              {/* Template grid */}
+              <div className="grid grid-cols-2 gap-1.5 mb-3">
+                {IN_TEMPLATES.map((t) => {
+                  const on = selected.preset === t.value;
+                  return (
+                    <button key={t.value}
+                      onClick={() => { patchLayer(selected.id, { preset: t.value }); replay(); }}
+                      className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11.5px] font-medium border transition-all"
+                      style={{
+                        borderColor: on ? "var(--color-primary)" : "var(--color-hairline)",
+                        background: on ? "var(--color-primary-light)" : "var(--color-surface)",
+                        color: on ? "var(--color-primary-ink)" : "var(--color-body)",
+                      }}>
+                      <Icon name={t.icon as never} size={11} /> <span className="truncate">{t.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="grid grid-cols-3 gap-2 mb-3">
                 <div>
-                  <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Durasi (dtk)</label>
+                  <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Durasi</label>
                   <input type="number" min={0.1} step={0.1} value={selected.duration} onChange={(e) => patchLayer(selected.id, { duration: Math.max(0.1, Number(e.target.value)) })} className={numInput} style={numStyle} />
                 </div>
                 <div>
-                  <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Delay (dtk)</label>
+                  <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Delay</label>
                   <input type="number" min={0} step={0.1} value={selected.delay} onChange={(e) => patchLayer(selected.id, { delay: Math.max(0, Number(e.target.value)) })} className={numInput} style={numStyle} />
                 </div>
+                <div>
+                  <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Easing</label>
+                  <Select value={selected.easing} onChange={(e) => { patchLayer(selected.id, { easing: e.target.value as Easing }); replay(); }} className="!px-1.5 !text-[11px]">
+                    {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </Select>
+                </div>
               </div>
-              <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Easing</label>
-              <Select value={selected.easing} onChange={(e) => { patchLayer(selected.id, { easing: e.target.value as Easing }); replay(); }}>
-                {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-              </Select>
+
+              <div className="h-px my-3" style={{ background: "var(--color-hairline)" }} />
+
+              {/* ── Animasi Keluar (Out) ── */}
+              <div className="flex items-center gap-2 mb-2">
+                <Icon name="arrow-left" size={12} style={{ color: "#d98a3c" }} />
+                <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted-soft)" }}>Animasi Keluar</p>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 mb-3">
+                <button
+                  onClick={() => { patchLayer(selected.id, { outPreset: "none" }); replay(); }}
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11.5px] font-medium border transition-all col-span-2"
+                  style={{
+                    borderColor: (!selected.outPreset || selected.outPreset === "none") ? "#d98a3c" : "var(--color-hairline)",
+                    background: (!selected.outPreset || selected.outPreset === "none") ? "rgba(217,138,60,0.12)" : "var(--color-surface)",
+                    color: "var(--color-body)",
+                  }}>
+                  <Icon name="x" size={11} /> Tanpa animasi keluar
+                </button>
+                {OUT_TEMPLATES.map((t) => {
+                  const on = selected.outPreset === t.value;
+                  return (
+                    <button key={t.value}
+                      onClick={() => { patchLayer(selected.id, { outPreset: t.value }); replay(); }}
+                      className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11.5px] font-medium border transition-all"
+                      style={{
+                        borderColor: on ? "#d98a3c" : "var(--color-hairline)",
+                        background: on ? "rgba(217,138,60,0.12)" : "var(--color-surface)",
+                        color: "var(--color-body)",
+                      }}>
+                      <Icon name={t.icon as never} size={11} /> <span className="truncate">{t.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {selected.outPreset && selected.outPreset !== "none" && (
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Durasi</label>
+                    <input type="number" min={0.1} step={0.1} value={selected.outDuration ?? 0.6}
+                      onChange={(e) => patchLayer(selected.id, { outDuration: Math.max(0.1, Number(e.target.value)) })} className={numInput} style={numStyle} />
+                  </div>
+                  <div>
+                    <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Mulai</label>
+                    <input type="number" min={0} step={0.1} value={Number(layerOutStart(selected, project.duration).toFixed(2))}
+                      onChange={(e) => patchLayer(selected.id, { outStart: Math.max(layerInEnd(selected), Number(e.target.value)) })} className={numInput} style={numStyle} />
+                  </div>
+                  <div>
+                    <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Easing</label>
+                    <Select value={selected.outEasing ?? "ease-in"} onChange={(e) => { patchLayer(selected.id, { outEasing: e.target.value as Easing }); replay(); }} className="!px-1.5 !text-[11px]">
+                      {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    </Select>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="rounded-[14px] border border-dashed p-6 text-center" style={{ borderColor: "var(--color-hairline)" }}>

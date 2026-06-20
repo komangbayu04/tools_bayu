@@ -96,6 +96,16 @@ export type AnimPreset =
   | "pop"
   | "rotate"
   | "bounce";
+// Exit / "out" animations — played at the end of a layer's lifespan.
+export type AnimOut =
+  | "none"
+  | "fade-out"
+  | "slide-up-out"
+  | "slide-down-out"
+  | "slide-left-out"
+  | "slide-right-out"
+  | "pop-out"
+  | "rotate-out";
 export type Easing = "linear" | "ease-in" | "ease-out" | "ease-in-out";
 
 export interface MotionLayer {
@@ -112,11 +122,16 @@ export interface MotionLayer {
   color: string;
   radius?: number; // corner radius for rect
   src?: string; // data url for images
-  // animation
+  // entry ("in") animation
   preset: AnimPreset;
-  duration: number; // seconds
-  delay: number; // seconds
+  duration: number; // seconds — entry duration
+  delay: number; // seconds — when the entry begins
   easing: Easing;
+  // exit ("out") animation — all optional so older projects keep working
+  outPreset?: AnimOut;
+  outDuration?: number; // seconds — exit duration
+  outStart?: number; // seconds — when the exit begins (defaults to end - outDuration)
+  outEasing?: Easing;
 }
 
 export type CanvasRatio = "1:1" | "16:9" | "9:16";
