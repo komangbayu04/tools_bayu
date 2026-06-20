@@ -312,7 +312,7 @@ function PromptPanel(props: {
 export default function ImageGeneratorPage() {
   const { images, addImages, removeImage } = useCreativeImageStore();
 
-  const [view, setView] = useState<"landing" | "result">("landing");
+  const [view, setView] = useState<"landing" | "result" | "history">("landing");
   const [results, setResults] = useState<ResultEntry[]>([]);
 
   const [mode, setMode] = useState<Mode>("generate");
@@ -325,7 +325,6 @@ export default function ImageGeneratorPage() {
   const [imgB, setImgB] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
   const [zoomSrc, setZoomSrc] = useState<string | null>(null);
 
   const needsImages = mode !== "generate";
@@ -391,7 +390,7 @@ export default function ImageGeneratorPage() {
 
   const HistoryPill = (
     <button
-      onClick={() => setShowHistory((v) => !v)}
+      onClick={() => setView("history")}
       className="inline-flex items-center gap-1.5 h-[32px] px-4 rounded-[20px] text-[14px] font-medium transition-opacity hover:opacity-80"
       style={{ background: PILL_BG, color: TEAL }}
     >
@@ -427,6 +426,78 @@ export default function ImageGeneratorPage() {
       {zoomSrc && <Lightbox src={zoomSrc} onClose={() => setZoomSrc(null)} />}
     </AnimatePresence>
   );
+
+  // ── HISTORY VIEW (image-only grid, like the moodboard) ────────────
+  if (view === "history") {
+    return (
+      <ShellLayout>
+        <div className="flex flex-col min-h-[calc(100vh-7rem)]">
+          {/* Top bar */}
+          <div className="flex items-center justify-between mb-6">
+            <button
+              onClick={() => setView("landing")}
+              className="inline-flex items-center gap-1.5 text-[16px] font-medium transition-opacity hover:opacity-70"
+              style={{ color: TEAL }}
+            >
+              <Icon name="chevron-down" size={14} className="rotate-90" /> Back
+            </button>
+            <h1 className="text-[18px] font-bold" style={{ color: TEAL }}>Riwayat Gambar</h1>
+          </div>
+
+          {images.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center">
+              <Icon name="image" size={36} style={{ color: "var(--color-muted-soft)" }} />
+              <p className="mt-3 text-[14px]" style={{ color: "var(--color-muted)" }}>
+                Belum ada gambar. Buat gambar dulu untuk mengisi riwayat.
+              </p>
+            </div>
+          ) : (
+            <>
+              <style>{`
+                .img-history-grid { columns: 2; column-gap: 12px; }
+                @media (min-width: 640px) { .img-history-grid { columns: 3; } }
+                @media (min-width: 1100px) { .img-history-grid { columns: 4; } }
+              `}</style>
+              <div className="img-history-grid pb-8">
+                <AnimatePresence>
+                  {images.map((img, idx) => (
+                    <motion.div
+                      key={img.id}
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2, delay: idx * 0.02 }}
+                      className="break-inside-avoid mb-3 group relative overflow-hidden rounded-[12px] cursor-zoom-in"
+                      style={{ border: "1px solid var(--color-hairline)" }}
+                      onClick={() => setZoomSrc(img.dataUrl)}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.dataUrl} alt={img.prompt} loading="lazy" className="w-full block" style={{ display: "block" }} />
+                      <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); download(img.dataUrl, `image-${img.id}.png`); }}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center bg-black/55 backdrop-blur-sm hover:bg-black/75"
+                          title="Unduh"
+                        >
+                          <Icon name="download" size={13} className="text-white" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeImage(img.id); }}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center bg-black/55 backdrop-blur-sm hover:bg-black/75"
+                          title="Hapus"
+                        >
+                          <Icon name="trash" size={13} className="text-white" />
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </>
+          )}
+        </div>
+        {lightbox}
+      </ShellLayout>
+    );
+  }
 
   // ── RESULT VIEW ──────────────────────────────────────────────────
   if (view === "result") {
@@ -562,54 +633,6 @@ export default function ImageGeneratorPage() {
           <div className="mx-auto w-full max-w-[780px] flex items-start gap-2.5 rounded-xl px-4 py-3 mt-4" style={{ background: "#fef2f2" }}>
             <Icon name="alert-triangle" size={13} style={{ color: "#dc2626", flexShrink: 0, marginTop: 1 }} />
             <p className="text-[13px]" style={{ color: "#991b1b" }}>{error}</p>
-          </div>
-        )}
-
-        {/* History / Gallery */}
-        {showHistory && images.length > 0 && (
-          <div className="mx-auto w-full max-w-[780px] mt-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[16px] font-bold" style={{ color: TEAL }}>Riwayat Gambar</h2>
-              <button onClick={() => setShowHistory(false)} className="text-[12px]" style={{ color: TEAL }}>Tutup</button>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 pb-8">
-              <AnimatePresence>
-                {images.map((img) => (
-                  <motion.div
-                    key={img.id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.96 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.96 }}
-                    className="group relative rounded-[14px] overflow-hidden border"
-                    style={{ borderColor: "rgba(0,0,0,0.08)", background: "#fff" }}
-                  >
-                    <button onClick={() => setZoomSrc(img.dataUrl)} className="block w-full cursor-zoom-in" title="Klik untuk perbesar">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={img.dataUrl} alt={img.prompt} className="w-full aspect-square object-cover" />
-                    </button>
-                    <div className="absolute inset-x-0 bottom-0 p-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                      style={{ background: "linear-gradient(to top, rgba(0,0,0,0.65), transparent)" }}>
-                      <button
-                        onClick={() => download(img.dataUrl, `image-${img.id}.png`)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[12px] font-semibold text-white"
-                        style={{ background: "rgba(255,255,255,0.18)" }}
-                      >
-                        <Icon name="download" size={12} /> Unduh
-                      </button>
-                      <button
-                        onClick={() => removeImage(img.id)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg text-white"
-                        style={{ background: "rgba(255,255,255,0.18)" }}
-                        aria-label="Hapus"
-                      >
-                        <Icon name="trash" size={12} />
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
           </div>
         )}
 
