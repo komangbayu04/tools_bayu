@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ShellLayout } from "@/components/shell/Layout";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { useCreativeImageStore } from "@/lib/creativeStore";
+import { uploadDataUrl } from "@/lib/supabase";
 
 // ─── Palette (from Figma) ────────────────────────────────────────────
 const TEAL = "#1c4f4f";
@@ -447,10 +448,13 @@ export default function ImageGeneratorPage() {
 
       const imgs = data.images;
       setResults((r) => r.map((e) => (e.id === entryId ? { ...e, loading: false, images: imgs } : e)));
-      // History keeps lightweight thumbnails so localStorage stays within quota;
-      // the full-resolution results remain in this session for download.
-      const thumbs = await Promise.all(imgs.map((d) => thumbnailize(d)));
-      addImages(thumbs.map((dataUrl) => ({ prompt: entryPrompt, size, quality: "medium", dataUrl })));
+      // Upload each generated image to Supabase Storage and keep only the URL in
+      // history (cloud-synced). If an upload fails (e.g. signed out), fall back to
+      // a lightweight thumbnail so nothing is lost.
+      const stored = await Promise.all(
+        imgs.map(async (d) => (await uploadDataUrl(d, "generated")) ?? (await thumbnailize(d)))
+      );
+      addImages(stored.map((dataUrl) => ({ prompt: entryPrompt, size, quality: "medium", dataUrl })));
     } catch (err) {
       const msg = err instanceof Error ? `Koneksi gagal: ${err.message}` : "Koneksi gagal. Coba lagi.";
       setResults((r) => r.map((e) => (e.id === entryId ? { ...e, loading: false, error: msg } : e)));

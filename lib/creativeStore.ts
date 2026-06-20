@@ -1,27 +1,11 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { supabaseStorage } from "./supabase";
 
-// localStorage that never throws on quota errors — a failed write just means
-// the history isn't persisted, which must NOT break image generation.
-const safeStorage = createJSONStorage(() => ({
-  getItem: (name: string) => (typeof window === "undefined" ? null : window.localStorage.getItem(name)),
-  setItem: (name: string, value: string) => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(name, value);
-    } catch {
-      // Quota exceeded (or private mode) — drop persistence silently.
-    }
-  },
-  removeItem: (name: string) => {
-    if (typeof window === "undefined") return;
-    window.localStorage.removeItem(name);
-  },
-}));
-
-// These stores keep base64 media (images/video/uploaded assets) which would
-// bloat the shared Supabase JSON blob, so they persist to localStorage only.
-// History is capped aggressively to stay within the browser storage quota.
+// All creative stores persist to Supabase (same cloud adapter as the rest of
+// the app). Heavy media (images/videos/uploaded assets) is uploaded to Supabase
+// Storage and only its URL is kept here, so the cloud JSON blob stays small.
+const cloud = () => createJSONStorage(() => supabaseStorage);
 
 // ─── Generated Images ─────────────────────────────────────────────
 export interface GeneratedImage {
@@ -29,7 +13,7 @@ export interface GeneratedImage {
   prompt: string;
   size: string;
   quality: string;
-  dataUrl: string; // data:image/png;base64,...
+  dataUrl: string; // Supabase Storage public URL (or a data URL as fallback)
   createdAt: number;
 }
 
@@ -40,7 +24,7 @@ interface CreativeImageStore {
   clear: () => void;
 }
 
-const IMAGE_CAP = 24;
+const IMAGE_CAP = 60;
 
 export const useCreativeImageStore = create<CreativeImageStore>()(
   persist(
@@ -56,7 +40,7 @@ export const useCreativeImageStore = create<CreativeImageStore>()(
       removeImage: (id) => set((s) => ({ images: s.images.filter((i) => i.id !== id) })),
       clear: () => set({ images: [] }),
     }),
-    { name: "creative-images-storage", storage: safeStorage }
+    { name: "creative-images-storage", storage: cloud() }
   )
 );
 
@@ -98,7 +82,7 @@ export const useCreativeVideoStore = create<CreativeVideoStore>()(
         set((s) => ({ videos: s.videos.map((v) => (v.id === id ? { ...v, ...patch } : v)) })),
       removeVideo: (id) => set((s) => ({ videos: s.videos.filter((v) => v.id !== id) })),
     }),
-    { name: "creative-videos-storage" }
+    { name: "creative-videos-storage", storage: cloud() }
   )
 );
 
@@ -194,6 +178,6 @@ export const useMotionStore = create<MotionStore>()(
         })),
       deleteProject: (id) => set((s) => ({ projects: s.projects.filter((p) => p.id !== id) })),
     }),
-    { name: "motion-projects-storage" }
+    { name: "motion-projects-storage", storage: cloud() }
   )
 );

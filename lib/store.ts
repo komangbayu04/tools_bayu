@@ -408,7 +408,7 @@ interface SavedJobStore {
   removeJob: (id: string) => void
 }
 
-// ─── Integration settings (localStorage only) ─────────────────────
+// ─── Integration settings ─────────────────────────────────────────
 export interface IntegrationSettings {
   remotive: boolean
   linkedin: boolean
@@ -432,7 +432,7 @@ export const useIntegrationStore = create<IntegrationStore>()(
       },
       update: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
     }),
-    { name: "integrations-storage" }  // localStorage is fine — no sensitive data
+    { name: "integrations-storage", storage: cloud() }
   )
 )
 

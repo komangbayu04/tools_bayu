@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { useCreativeVideoStore, type GeneratedVideo } from "@/lib/creativeStore";
+import { uploadDataUrl } from "@/lib/supabase";
 
 const MODELS = [
   { value: "sora-2", label: "Sora 2 (cepat)" },
@@ -66,7 +67,11 @@ export default function VideoGeneratorPage() {
           return;
         }
         if (data.status === "completed" && data.dataUrl) {
-          updateVideo(localId, { status: "completed", dataUrl: data.dataUrl });
+          // Upload the finished video to Supabase Storage and keep only the URL
+          // in state; fall back to the inline data URL if the upload fails.
+          const url = (await uploadDataUrl(data.dataUrl, "video")) ?? data.dataUrl;
+          if (!mounted.current) return;
+          updateVideo(localId, { status: "completed", dataUrl: url });
           stopPolling(localId);
         } else if (data.status === "failed") {
           updateVideo(localId, { status: "failed", error: data.error ?? "Render gagal." });

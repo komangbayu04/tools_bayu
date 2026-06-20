@@ -143,6 +143,39 @@ export async function uploadMedia(file: File): Promise<string | null> {
   }
 }
 
+// Upload a base64 data URL (e.g. an AI-generated image/video) to Storage and
+// return its public URL. Keeps heavy base64 out of the app_state JSON blob.
+// Returns null on any failure so callers can fall back to the inline data URL.
+export async function uploadDataUrl(dataUrl: string, namePrefix = "media"): Promise<string | null> {
+  await userReady;
+  if (!supabase || !currentUserId) return null;
+  try {
+    const mimeMatch = /^data:([^;]+);base64,/.exec(dataUrl);
+    if (!mimeMatch) return null; // already a URL, not a data URL
+    const mime = mimeMatch[1];
+    const ext = mime.split("/")[1]?.replace(/[^a-z0-9]/g, "") || "bin";
+    const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+    const bin = atob(base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mime });
+
+    const path = `${currentUserId}/${namePrefix}-${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage
+      .from(MEDIA_BUCKET)
+      .upload(path, blob, { cacheControl: "3600", upsert: false, contentType: mime });
+    if (error) {
+      console.warn("[supabase] uploadDataUrl failed, will fall back to base64:", error.message);
+      return null;
+    }
+    const { data } = supabase.storage.from(MEDIA_BUCKET).getPublicUrl(path);
+    return data?.publicUrl ?? null;
+  } catch (e) {
+    console.warn("[supabase] uploadDataUrl threw, will fall back to base64:", e);
+    return null;
+  }
+}
+
 // ─── Debounced cloud writes ───────────────────────────────────────
 // The localStorage mirror is updated synchronously (instant local persistence),
 // while cloud upserts for the same key are coalesced so a burst of edits (e.g.
