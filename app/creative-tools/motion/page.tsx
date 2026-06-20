@@ -55,8 +55,10 @@ const layerOutStart = (l: MotionLayer, total: number) => {
   const dur = l.outDuration ?? 0.6;
   return l.outStart ?? Math.max(layerInEnd(l), total - dur);
 };
-function applyIn(tr: Transform, preset: AnimPreset, p: number) {
-  switch (preset) {
+const DEG = Math.PI / 180;
+
+function applyIn(tr: Transform, layer: MotionLayer, p: number) {
+  switch (layer.preset) {
     case "fade": tr.opacity = p; break;
     case "slide-up": tr.opacity = p; tr.dy = (1 - p) * OFF; break;
     case "slide-down": tr.opacity = p; tr.dy = (1 - p) * -OFF; break;
@@ -64,11 +66,23 @@ function applyIn(tr: Transform, preset: AnimPreset, p: number) {
     case "slide-right": tr.opacity = p; tr.dx = (1 - p) * -OFF; break;
     case "pop": tr.opacity = p; tr.scale = 0.6 + 0.4 * p; break;
     case "rotate": tr.opacity = p; tr.scale = 0.9 + 0.1 * p; tr.rotate = (1 - p) * -0.26; break;
+    case "custom": {
+      // Animate FROM the user-defined offsets to the resting state.
+      const fDX = layer.fromDX ?? 0, fDY = layer.fromDY ?? 0;
+      const fS = layer.fromScale ?? 1, fR = (layer.fromRotate ?? 0) * DEG;
+      const fO = layer.fromOpacity ?? 0;
+      tr.dx = fDX * (1 - p);
+      tr.dy = fDY * (1 - p);
+      tr.scale = fS + (1 - fS) * p;
+      tr.rotate = fR * (1 - p);
+      tr.opacity = fO + (1 - fO) * p;
+      break;
+    }
   }
 }
 
-function applyOut(tr: Transform, preset: AnimOut, q: number) {
-  switch (preset) {
+function applyOut(tr: Transform, layer: MotionLayer, q: number) {
+  switch (layer.outPreset) {
     case "fade-out": tr.opacity *= 1 - q; break;
     case "slide-up-out": tr.opacity *= 1 - q; tr.dy += q * -OFF; break;
     case "slide-down-out": tr.opacity *= 1 - q; tr.dy += q * OFF; break;
@@ -76,6 +90,18 @@ function applyOut(tr: Transform, preset: AnimOut, q: number) {
     case "slide-right-out": tr.opacity *= 1 - q; tr.dx += q * OFF; break;
     case "pop-out": tr.opacity *= 1 - q; tr.scale *= 1 - 0.4 * q; break;
     case "rotate-out": tr.opacity *= 1 - q; tr.rotate += q * 0.26; break;
+    case "custom-out": {
+      // Animate TO the user-defined offsets.
+      const tDX = layer.toDX ?? 0, tDY = layer.toDY ?? 0;
+      const tS = layer.toScale ?? 1, tR = (layer.toRotate ?? 0) * DEG;
+      const tO = layer.toOpacity ?? 0;
+      tr.dx += tDX * q;
+      tr.dy += tDY * q;
+      tr.scale *= 1 + (tS - 1) * q;
+      tr.rotate += tR * q;
+      tr.opacity *= 1 - q * (1 - tO);
+      break;
+    }
   }
 }
 
@@ -96,7 +122,7 @@ function computeTransform(layer: MotionLayer, time: number, total: number): Tran
       tr.opacity = clamp01(raw * 2);
       tr.dy = (1 - p) * -OFF;
     } else {
-      applyIn(tr, layer.preset, EASE[layer.easing](raw));
+      applyIn(tr, layer, EASE[layer.easing](raw));
     }
   }
 
@@ -106,7 +132,7 @@ function computeTransform(layer: MotionLayer, time: number, total: number): Tran
     const dur = layer.outDuration ?? 0.6;
     if (time >= start) {
       const q = EASE[layer.outEasing ?? "ease-in"](clamp01((time - start) / Math.max(0.0001, dur)));
-      applyOut(tr, layer.outPreset, q);
+      applyOut(tr, layer, q);
     }
   }
 
@@ -124,6 +150,7 @@ const IN_TEMPLATES: TemplateDef[] = [
   { value: "pop", label: "Pop / Scale", icon: "expand" },
   { value: "rotate", label: "Rotate In", icon: "rotate" },
   { value: "bounce", label: "Bounce", icon: "play" },
+  { value: "custom", label: "Custom", icon: "edit" },
 ];
 type OutTemplateDef = { value: AnimOut; label: string; icon: string };
 const OUT_TEMPLATES: OutTemplateDef[] = [
@@ -134,6 +161,7 @@ const OUT_TEMPLATES: OutTemplateDef[] = [
   { value: "slide-right-out", label: "Slide Right Out", icon: "chevron-right" },
   { value: "pop-out", label: "Pop Out", icon: "expand" },
   { value: "rotate-out", label: "Rotate Out", icon: "rotate" },
+  { value: "custom-out", label: "Custom", icon: "edit" },
 ];
 
 const EASINGS: { value: Easing; label: string }[] = [
@@ -338,6 +366,35 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
   };
   const onScrubUp = () => { scrubbing.current = false; };
 
+  // ── Resize the selected layer via on-canvas handles ──
+  const resizing = useRef<{ handle: string; sx: number; sy: number; box: { x: number; y: number; w: number; h: number } } | null>(null);
+  const onHandleDown = (e: React.PointerEvent, handle: string) => {
+    e.stopPropagation();
+    if (!selected) return;
+    setPlaying(false);
+    resizing.current = { handle, sx: e.clientX, sy: e.clientY, box: { x: selected.x, y: selected.y, w: selected.w, h: selected.h } };
+    (e.target as Element).setPointerCapture(e.pointerId);
+  };
+  const onHandleMove = (e: React.PointerEvent) => {
+    const r = resizing.current;
+    const cv = canvasRef.current;
+    if (!r || !cv || !selected) return;
+    const rect = cv.getBoundingClientRect();
+    const dx = ((e.clientX - r.sx) / rect.width) * W;
+    const dy = ((e.clientY - r.sy) / rect.height) * H;
+    let { x, y, w, h } = r.box;
+    const hd = r.handle;
+    if (hd.includes("e")) w = r.box.w + dx;
+    if (hd.includes("s")) h = r.box.h + dy;
+    if (hd.includes("w")) { x = r.box.x + dx; w = r.box.w - dx; }
+    if (hd.includes("n")) { y = r.box.y + dy; h = r.box.h - dy; }
+    const MIN = 20;
+    if (w < MIN) { if (hd.includes("w")) x = r.box.x + r.box.w - MIN; w = MIN; }
+    if (h < MIN) { if (hd.includes("n")) y = r.box.y + r.box.h - MIN; h = MIN; }
+    patchLayer(selected.id, { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) });
+  };
+  const onHandleUp = () => { resizing.current = null; };
+
   // ── Drag a layer's in/out bar along the timeline to retime it ──
   const barDrag = useRef<{ id: string; type: "in" | "out"; startX: number; orig: number } | null>(null);
   const onBarDown = (e: React.PointerEvent, l: MotionLayer, type: "in" | "out") => {
@@ -512,9 +569,9 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
         }
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5">
-        {/* ── Stage ── */}
-        <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 lg:items-start">
+        {/* ── Stage (sticky so canvas + timeline stay visible while scrolling) ── */}
+        <div className="flex flex-col gap-3 lg:sticky lg:top-4 lg:self-start">
           {/* Toolbar */}
           <div className="flex items-center gap-2 flex-wrap rounded-[12px] border p-2"
             style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface-card)" }}>
@@ -537,16 +594,62 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
           <div className="rounded-[16px] border overflow-hidden flex items-center justify-center p-4"
             style={{ borderColor: "var(--color-hairline)", background: "var(--color-canvas)",
               backgroundImage: "radial-gradient(var(--color-hairline) 1px, transparent 1px)", backgroundSize: "20px 20px" }}>
-            <canvas
-              ref={canvasRef}
-              width={W}
-              height={H}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              className="rounded-[8px] shadow-lg touch-none cursor-move"
-              style={{ maxWidth: "100%", maxHeight: "62vh", aspectRatio: `${W} / ${H}`, background: project.bg }}
-            />
+            {/* Wrapper sizes exactly to the canvas so the selection overlay maps 1:1 */}
+            <div className="relative" style={{ lineHeight: 0, maxWidth: "100%", maxHeight: "62vh" }}>
+              <canvas
+                ref={canvasRef}
+                width={W}
+                height={H}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                className="rounded-[8px] shadow-lg touch-none cursor-move"
+                style={{ display: "block", maxWidth: "100%", maxHeight: "62vh", aspectRatio: `${W} / ${H}`, background: project.bg }}
+              />
+
+              {/* Selection rectangle with resize handles (paused editing only) */}
+              {selected && !playing && (
+                <div className="absolute inset-0 pointer-events-none">
+                  <div
+                    className="absolute"
+                    onPointerMove={onHandleMove}
+                    onPointerUp={onHandleUp}
+                    style={{
+                      left: `${(selected.x / W) * 100}%`,
+                      top: `${(selected.y / H) * 100}%`,
+                      width: `${(selected.w / W) * 100}%`,
+                      height: `${(selected.h / H) * 100}%`,
+                      border: "1.5px solid var(--color-primary)",
+                      boxShadow: "0 0 0 1px rgba(255,255,255,0.5)",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    {[
+                      { id: "nw", l: 0, t: 0, c: "nwse-resize" },
+                      { id: "n", l: 0.5, t: 0, c: "ns-resize" },
+                      { id: "ne", l: 1, t: 0, c: "nesw-resize" },
+                      { id: "e", l: 1, t: 0.5, c: "ew-resize" },
+                      { id: "se", l: 1, t: 1, c: "nwse-resize" },
+                      { id: "s", l: 0.5, t: 1, c: "ns-resize" },
+                      { id: "sw", l: 0, t: 1, c: "nesw-resize" },
+                      { id: "w", l: 0, t: 0.5, c: "ew-resize" },
+                    ].map((h) => (
+                      <div
+                        key={h.id}
+                        onPointerDown={(e) => onHandleDown(e, h.id)}
+                        className="absolute rounded-[2px] touch-none"
+                        style={{
+                          left: `${h.l * 100}%`, top: `${h.t * 100}%`,
+                          width: 10, height: 10, transform: "translate(-50%, -50%)",
+                          background: "#fff", border: "1.5px solid var(--color-primary)",
+                          cursor: h.c, pointerEvents: "auto",
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ── Timeline ── */}
@@ -770,6 +873,37 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                 </div>
               </div>
 
+              {/* Manual ("custom") entry transform — animate FROM these values */}
+              {selected.preset === "custom" && (
+                <div className="rounded-[10px] p-2.5 mb-1" style={{ background: "var(--color-canvas)", border: "1px solid var(--color-hairline)" }}>
+                  <p className="text-[10.5px] font-semibold mb-2" style={{ color: "var(--color-muted)" }}>Mulai dari posisi (animasi ke posisi asli)</p>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <div>
+                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Geser X (px)</label>
+                      <input type="number" step={10} value={selected.fromDX ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDX: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
+                    </div>
+                    <div>
+                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Geser Y (px)</label>
+                      <input type="number" step={10} value={selected.fromDY ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDY: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Skala</label>
+                      <input type="number" step={0.1} value={selected.fromScale ?? 1} onChange={(e) => { patchLayer(selected.id, { fromScale: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
+                    </div>
+                    <div>
+                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Rotasi°</label>
+                      <input type="number" step={15} value={selected.fromRotate ?? 0} onChange={(e) => { patchLayer(selected.id, { fromRotate: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
+                    </div>
+                    <div>
+                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Opasitas</label>
+                      <input type="number" min={0} max={1} step={0.1} value={selected.fromOpacity ?? 0} onChange={(e) => { patchLayer(selected.id, { fromOpacity: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="h-px my-3" style={{ background: "var(--color-hairline)" }} />
 
               {/* ── Animasi Keluar (Out) ── */}
@@ -821,6 +955,37 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                     <Select value={selected.outEasing ?? "ease-in"} onChange={(e) => { patchLayer(selected.id, { outEasing: e.target.value as Easing }); replay(); }} className="!px-1.5 !text-[11px]">
                       {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                     </Select>
+                  </div>
+                </div>
+              )}
+
+              {/* Manual ("custom") exit transform — animate TO these values */}
+              {selected.outPreset === "custom-out" && (
+                <div className="rounded-[10px] p-2.5 mt-2" style={{ background: "var(--color-canvas)", border: "1px solid var(--color-hairline)" }}>
+                  <p className="text-[10.5px] font-semibold mb-2" style={{ color: "var(--color-muted)" }}>Akhiri di posisi (animasi menuju ke sini)</p>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <div>
+                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Geser X (px)</label>
+                      <input type="number" step={10} value={selected.toDX ?? 0} onChange={(e) => { patchLayer(selected.id, { toDX: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
+                    </div>
+                    <div>
+                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Geser Y (px)</label>
+                      <input type="number" step={10} value={selected.toDY ?? 0} onChange={(e) => { patchLayer(selected.id, { toDY: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Skala</label>
+                      <input type="number" step={0.1} value={selected.toScale ?? 1} onChange={(e) => { patchLayer(selected.id, { toScale: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
+                    </div>
+                    <div>
+                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Rotasi°</label>
+                      <input type="number" step={15} value={selected.toRotate ?? 0} onChange={(e) => { patchLayer(selected.id, { toRotate: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
+                    </div>
+                    <div>
+                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Opasitas</label>
+                      <input type="number" min={0} max={1} step={0.1} value={selected.toOpacity ?? 0} onChange={(e) => { patchLayer(selected.id, { toOpacity: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
+                    </div>
                   </div>
                 </div>
               )}

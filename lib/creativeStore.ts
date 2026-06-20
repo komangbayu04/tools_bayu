@@ -95,7 +95,8 @@ export type AnimPreset =
   | "slide-right"
   | "pop"
   | "rotate"
-  | "bounce";
+  | "bounce"
+  | "custom"; // manual: animate FROM the from* offsets to the resting state
 // Exit / "out" animations — played at the end of a layer's lifespan.
 export type AnimOut =
   | "none"
@@ -105,7 +106,8 @@ export type AnimOut =
   | "slide-left-out"
   | "slide-right-out"
   | "pop-out"
-  | "rotate-out";
+  | "rotate-out"
+  | "custom-out"; // manual: animate TO the to* offsets
 export type Easing = "linear" | "ease-in" | "ease-out" | "ease-in-out";
 
 export interface MotionLayer {
@@ -132,6 +134,10 @@ export interface MotionLayer {
   outDuration?: number; // seconds — exit duration
   outStart?: number; // seconds — when the exit begins (defaults to end - outDuration)
   outEasing?: Easing;
+  // manual ("custom") entry transform — where the layer animates FROM
+  fromDX?: number; fromDY?: number; fromScale?: number; fromRotate?: number; fromOpacity?: number;
+  // manual ("custom") exit transform — where the layer animates TO
+  toDX?: number; toDY?: number; toScale?: number; toRotate?: number; toOpacity?: number;
 }
 
 export type CanvasRatio = "1:1" | "16:9" | "9:16";
