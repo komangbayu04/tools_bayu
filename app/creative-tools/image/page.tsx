@@ -88,6 +88,34 @@ const readFileAsDataUrl = (file: File): Promise<string> =>
     r.readAsDataURL(file);
   });
 
+// Shrink a base64 image into a lightweight JPEG thumbnail for history storage,
+// so localStorage doesn't blow its ~5MB quota. Full-res stays in the session.
+async function thumbnailize(dataUrl: string, maxDim = 768, quality = 0.78): Promise<string> {
+  try {
+    const img = document.createElement("img");
+    await new Promise<void>((res, rej) => {
+      img.onload = () => res();
+      img.onerror = () => rej(new Error("decode failed"));
+      img.src = dataUrl;
+    });
+    let { width, height } = img;
+    if (Math.max(width, height) > maxDim) {
+      const scale = maxDim / Math.max(width, height);
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return dataUrl;
+    ctx.drawImage(img, 0, 0, width, height);
+    return canvas.toDataURL("image/jpeg", quality);
+  } catch {
+    return dataUrl;
+  }
+}
+
 // Downscale + recompress a picked photo so the request body stays well under
 // the serverless body limit (Vercel ~4.5 MB). gpt-image edit input doesn't
 // need full-resolution source images.
@@ -419,8 +447,10 @@ export default function ImageGeneratorPage() {
 
       const imgs = data.images;
       setResults((r) => r.map((e) => (e.id === entryId ? { ...e, loading: false, images: imgs } : e)));
-      // Only the generated images go into history.
-      addImages(imgs.map((dataUrl) => ({ prompt: entryPrompt, size, quality: "medium", dataUrl })));
+      // History keeps lightweight thumbnails so localStorage stays within quota;
+      // the full-resolution results remain in this session for download.
+      const thumbs = await Promise.all(imgs.map((d) => thumbnailize(d)));
+      addImages(thumbs.map((dataUrl) => ({ prompt: entryPrompt, size, quality: "medium", dataUrl })));
     } catch (err) {
       const msg = err instanceof Error ? `Koneksi gagal: ${err.message}` : "Koneksi gagal. Coba lagi.";
       setResults((r) => r.map((e) => (e.id === entryId ? { ...e, loading: false, error: msg } : e)));

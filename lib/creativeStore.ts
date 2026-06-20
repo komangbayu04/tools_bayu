@@ -1,5 +1,23 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
+
+// localStorage that never throws on quota errors — a failed write just means
+// the history isn't persisted, which must NOT break image generation.
+const safeStorage = createJSONStorage(() => ({
+  getItem: (name: string) => (typeof window === "undefined" ? null : window.localStorage.getItem(name)),
+  setItem: (name: string, value: string) => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(name, value);
+    } catch {
+      // Quota exceeded (or private mode) — drop persistence silently.
+    }
+  },
+  removeItem: (name: string) => {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem(name);
+  },
+}));
 
 // These stores keep base64 media (images/video/uploaded assets) which would
 // bloat the shared Supabase JSON blob, so they persist to localStorage only.
@@ -22,7 +40,7 @@ interface CreativeImageStore {
   clear: () => void;
 }
 
-const IMAGE_CAP = 12;
+const IMAGE_CAP = 24;
 
 export const useCreativeImageStore = create<CreativeImageStore>()(
   persist(
@@ -38,7 +56,7 @@ export const useCreativeImageStore = create<CreativeImageStore>()(
       removeImage: (id) => set((s) => ({ images: s.images.filter((i) => i.id !== id) })),
       clear: () => set({ images: [] }),
     }),
-    { name: "creative-images-storage" }
+    { name: "creative-images-storage", storage: safeStorage }
   )
 );
 
