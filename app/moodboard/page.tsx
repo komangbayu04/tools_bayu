@@ -59,11 +59,19 @@ const startOf = (unit: "today" | "week" | "month") => {
 // null = Global (no project)
 type ActiveFolder = null | string;
 
+// Pick up to 4 cover images from items in a folder for the tile preview
+function folderCovers(items: { projectId?: string; image_url?: string; color: string; id: string }[], projectId: string | null) {
+  return items
+    .filter(i => projectId === null ? !i.projectId : i.projectId === projectId)
+    .slice(0, 4);
+}
+
 export default function MoodboardPage() {
   const { items, projects, addItem, deleteItem, moveItem, addProject, renameProject, deleteProject } = useMoodStore();
 
   // ── Folder state ──
   const [activeFolder, setActiveFolder] = useState<ActiveFolder>(null);
+  const [showFolderPanel, setShowFolderPanel] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
@@ -100,9 +108,7 @@ export default function MoodboardPage() {
   // ── Filtered items ──
   const filtered = useMemo(() => {
     let list = items.filter(i =>
-      activeFolder === null
-        ? !i.projectId
-        : i.projectId === activeFolder
+      activeFolder === null ? !i.projectId : i.projectId === activeFolder
     );
     if (activeCategory !== "all") list = list.filter(i => i.category === activeCategory);
     if (dateFilter !== "all") {
@@ -113,8 +119,12 @@ export default function MoodboardPage() {
   }, [items, activeFolder, activeCategory, dateFilter]);
 
   const globalCount = items.filter(i => !i.projectId).length;
-
   const categories: Category[] = ["all", "graphic_design", "product_design", "3d", "motion"];
+
+  // ── Label for the active folder shown below the filter bar ──
+  const activeFolderName = activeFolder === null
+    ? null
+    : (projects.find(p => p.id === activeFolder)?.name ?? "Folder");
 
   // ── File handling ──
   const handleFiles = async (files: FileList | null) => {
@@ -181,8 +191,7 @@ export default function MoodboardPage() {
   const handleCreateFolder = () => {
     const name = newFolderName.trim();
     if (!name) return;
-    const id = addProject(name);
-    setActiveFolder(id);
+    addProject(name);
     setNewFolderName("");
     setShowNewFolder(false);
   };
@@ -200,6 +209,11 @@ export default function MoodboardPage() {
     setFolderMenuId(null);
   };
 
+  const selectFolder = (id: string | null) => {
+    setActiveFolder(id);
+    setShowFolderPanel(false);
+  };
+
   return (
     <ShellLayout>
       <PageHeader
@@ -207,131 +221,7 @@ export default function MoodboardPage() {
         subtitle={`${items.length} references collected`}
       />
 
-      {/* ── Folder bar ── */}
-      <div className="mb-4 flex items-center gap-2 flex-wrap">
-        {/* Global */}
-        <button
-          onClick={() => setActiveFolder(null)}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] text-[13px] font-semibold border transition-all"
-          style={
-            activeFolder === null
-              ? { background: "var(--color-primary)", color: "var(--color-on-primary)", borderColor: "var(--color-primary)" }
-              : { background: "var(--color-surface)", color: "var(--color-muted)", borderColor: "var(--color-hairline)" }
-          }
-        >
-          <Icon name="image" size={12} />
-          Global
-          <span className="ml-0.5 text-[11px] opacity-70">({globalCount})</span>
-        </button>
-
-        {/* Project folders */}
-        {projects.map((proj) => {
-          const count = items.filter(i => i.projectId === proj.id).length;
-          const isActive = activeFolder === proj.id;
-          return (
-            <div key={proj.id} className="relative">
-              {editingFolderId === proj.id ? (
-                <input
-                  autoFocus
-                  value={editingFolderName}
-                  onChange={e => setEditingFolderName(e.target.value)}
-                  onBlur={() => handleRenameFolder(proj.id)}
-                  onKeyDown={e => { if (e.key === "Enter") handleRenameFolder(proj.id); if (e.key === "Escape") setEditingFolderId(null); }}
-                  className="px-3 py-1.5 rounded-[10px] text-[13px] font-semibold border outline-none w-32"
-                  style={{ borderColor: "var(--color-primary)", background: "var(--color-surface)", color: "var(--color-ink)" }}
-                />
-              ) : (
-                <button
-                  onClick={() => setActiveFolder(proj.id)}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] text-[13px] font-semibold border transition-all"
-                  style={
-                    isActive
-                      ? { background: "var(--color-primary)", color: "var(--color-on-primary)", borderColor: "var(--color-primary)" }
-                      : { background: "var(--color-surface)", color: "var(--color-muted)", borderColor: "var(--color-hairline)" }
-                  }
-                >
-                  <Icon name="folder" size={12} />
-                  {proj.name}
-                  <span className="ml-0.5 text-[11px] opacity-70">({count})</span>
-                </button>
-              )}
-
-              {/* Folder options button */}
-              <button
-                onClick={(e) => { e.stopPropagation(); setFolderMenuId(folderMenuId === proj.id ? null : proj.id); }}
-                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 border"
-                style={{ background: "var(--color-surface)", borderColor: "var(--color-hairline)", color: "var(--color-muted)" }}
-              >
-                <Icon name="more-vertical" size={9} />
-              </button>
-
-              {/* Folder context menu */}
-              <AnimatePresence>
-                {folderMenuId === proj.id && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95, y: -4 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: -4 }}
-                    transition={{ duration: 0.1 }}
-                    className="absolute left-0 top-full mt-1 z-50 rounded-xl overflow-hidden shadow-lg py-1 min-w-[140px]"
-                    style={{ background: "var(--color-surface)", border: "1px solid var(--color-hairline)" }}
-                  >
-                    <button
-                      onClick={() => { setEditingFolderId(proj.id); setEditingFolderName(proj.name); setFolderMenuId(null); }}
-                      className="w-full text-left px-3.5 py-2 text-[12.5px] font-medium hover:bg-[var(--color-canvas)] flex items-center gap-2"
-                      style={{ color: "var(--color-ink)" }}
-                    >
-                      <Icon name="edit" size={12} /> Rename
-                    </button>
-                    <button
-                      onClick={() => handleDeleteFolder(proj.id)}
-                      className="w-full text-left px-3.5 py-2 text-[12.5px] font-medium hover:bg-red-50 flex items-center gap-2"
-                      style={{ color: "#c64545" }}
-                    >
-                      <Icon name="trash" size={12} /> Hapus folder
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          );
-        })}
-
-        {/* New folder */}
-        {showNewFolder ? (
-          <div className="flex items-center gap-1.5">
-            <input
-              autoFocus
-              value={newFolderName}
-              onChange={e => setNewFolderName(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") handleCreateFolder(); if (e.key === "Escape") { setShowNewFolder(false); setNewFolderName(""); } }}
-              placeholder="Nama folder…"
-              className="px-3 py-1.5 rounded-[10px] text-[13px] border outline-none w-36"
-              style={{ borderColor: "var(--color-primary)", background: "var(--color-surface)", color: "var(--color-ink)" }}
-            />
-            <button onClick={handleCreateFolder}
-              className="px-2.5 py-1.5 rounded-[10px] text-[12px] font-semibold border"
-              style={{ background: "var(--color-primary)", color: "var(--color-on-primary)", borderColor: "var(--color-primary)" }}>
-              Buat
-            </button>
-            <button onClick={() => { setShowNewFolder(false); setNewFolderName(""); }}
-              className="px-2 py-1.5 rounded-[10px] text-[12px] border"
-              style={{ borderColor: "var(--color-hairline)", color: "var(--color-muted)", background: "var(--color-surface)" }}>
-              <Icon name="x" size={12} />
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setShowNewFolder(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[13px] font-semibold border transition-all"
-            style={{ borderColor: "var(--color-hairline)", color: "var(--color-muted)", background: "var(--color-surface)" }}
-          >
-            <Icon name="plus" size={12} /> Folder baru
-          </button>
-        )}
-      </div>
-
-      {/* ── Filters: category tabs + date dropdown + add button ── */}
+      {/* ── Filter bar ── */}
       <div className="mb-7 flex items-center justify-between gap-3 flex-wrap">
         <Tabs value={activeCategory} onValueChange={(v) => setActiveCategory(v as Category)}>
           <TabsList>
@@ -358,23 +248,235 @@ export default function MoodboardPage() {
             <AnimatePresence>
               {showDateMenu && (
                 <motion.div
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
+                  initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
                   transition={{ duration: 0.12 }}
                   className="absolute right-0 mt-1.5 z-50 rounded-[12px] overflow-hidden py-1 min-w-[150px] shadow-[0_8px_24px_rgba(16,40,48,0.12)]"
                   style={{ background: "var(--color-surface)", border: "1px solid var(--color-hairline)" }}
                 >
                   {(Object.keys(dateLabels) as DateFilter[]).map((d) => (
-                    <button
-                      key={d}
-                      onClick={() => { setDateFilter(d); setShowDateMenu(false); }}
+                    <button key={d} onClick={() => { setDateFilter(d); setShowDateMenu(false); }}
                       className="w-full text-left px-4 py-2 text-[13px] font-medium transition-colors hover:bg-[var(--color-canvas)]"
-                      style={{ color: dateFilter === d ? "var(--color-ink)" : "var(--color-muted)" }}
-                    >
+                      style={{ color: dateFilter === d ? "var(--color-ink)" : "var(--color-muted)" }}>
                       {dateLabels[d]}
                     </button>
                   ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Folder button */}
+          <div className="relative">
+            <button
+              onClick={() => setShowFolderPanel(v => !v)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] text-[13px] font-semibold transition-all border"
+              style={
+                activeFolder !== null || showFolderPanel
+                  ? { background: "var(--color-primary-light)", color: "var(--color-primary-ink)", borderColor: "var(--color-primary)" }
+                  : { background: "var(--color-surface)", color: "var(--color-muted)", borderColor: "var(--color-hairline)" }
+              }
+            >
+              <Icon name={activeFolder !== null ? "folder-open" : "folder"} size={13} />
+              {activeFolder !== null ? (activeFolderName ?? "Folder") : "Folders"}
+              {activeFolder !== null && (
+                <span
+                  onClick={(e) => { e.stopPropagation(); selectFolder(null); }}
+                  className="ml-0.5 hover:opacity-70 transition-opacity"
+                  title="Kembali ke semua"
+                >
+                  <Icon name="x" size={10} />
+                </span>
+              )}
+            </button>
+
+            {/* Folder panel dropdown */}
+            <AnimatePresence>
+              {showFolderPanel && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                  transition={{ duration: 0.14 }}
+                  className="absolute right-0 mt-2 z-50 rounded-[16px] overflow-hidden shadow-[0_12px_40px_rgba(16,40,48,0.16)] p-4"
+                  style={{ background: "var(--color-surface)", border: "1px solid var(--color-hairline)", width: 340 }}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted-soft)" }}>Folders</p>
+                    {!showNewFolder && (
+                      <button
+                        onClick={() => setShowNewFolder(true)}
+                        className="flex items-center gap-1 text-[11.5px] font-semibold px-2 py-1 rounded-lg transition-colors hover:bg-[var(--color-canvas)]"
+                        style={{ color: "var(--color-primary-ink)" }}
+                      >
+                        <Icon name="plus" size={11} /> Folder baru
+                      </button>
+                    )}
+                  </div>
+
+                  {/* New folder input */}
+                  {showNewFolder && (
+                    <div className="flex items-center gap-2 mb-3">
+                      <input
+                        autoFocus
+                        value={newFolderName}
+                        onChange={e => setNewFolderName(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") handleCreateFolder(); if (e.key === "Escape") { setShowNewFolder(false); setNewFolderName(""); } }}
+                        placeholder="Nama folder…"
+                        className="flex-1 px-3 py-1.5 rounded-[9px] text-[12.5px] border outline-none"
+                        style={{ borderColor: "var(--color-primary)", background: "var(--color-canvas)", color: "var(--color-ink)" }}
+                      />
+                      <button onClick={handleCreateFolder}
+                        className="px-2.5 py-1.5 rounded-[9px] text-[12px] font-semibold"
+                        style={{ background: "var(--color-primary)", color: "var(--color-on-primary)" }}>
+                        Buat
+                      </button>
+                      <button onClick={() => { setShowNewFolder(false); setNewFolderName(""); }}
+                        className="p-1.5 rounded-[9px]"
+                        style={{ color: "var(--color-muted)" }}>
+                        <Icon name="x" size={12} />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Folder tiles grid */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {/* Global tile */}
+                    <button
+                      onClick={() => selectFolder(null)}
+                      className="relative rounded-[12px] overflow-hidden border transition-all text-left"
+                      style={{
+                        borderColor: activeFolder === null ? "var(--color-primary)" : "var(--color-hairline)",
+                        background: "var(--color-canvas)",
+                        boxShadow: activeFolder === null ? "0 0 0 2px var(--color-primary)" : undefined,
+                      }}
+                    >
+                      {/* 2×2 preview mosaic */}
+                      <div className="grid grid-cols-2 gap-0.5 p-0.5" style={{ height: 72 }}>
+                        {folderCovers(items, null).slice(0, 4).map((it, i) => (
+                          <div key={i} className="overflow-hidden" style={{ borderRadius: 4 }}>
+                            {it.image_url ? (
+                              <img src={it.image_url} alt="" className="w-full h-full object-cover" style={{ height: "100%" }} />
+                            ) : (
+                              <div className="w-full h-full" style={{ background: resolveCover(it.color, it.id) }} />
+                            )}
+                          </div>
+                        ))}
+                        {folderCovers(items, null).length === 0 && (
+                          <div className="col-span-2 row-span-2 flex items-center justify-center" style={{ height: 72 }}>
+                            <Icon name="image" size={22} style={{ color: "var(--color-muted-soft)" }} />
+                          </div>
+                        )}
+                      </div>
+                      <div className="px-2.5 pb-2.5 pt-1.5">
+                        <p className="text-[12px] font-semibold truncate" style={{ color: "var(--color-ink)" }}>Global</p>
+                        <p className="text-[10.5px]" style={{ color: "var(--color-muted)" }}>{globalCount} items</p>
+                      </div>
+                      {activeFolder === null && (
+                        <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center"
+                          style={{ background: "var(--color-primary)" }}>
+                          <Icon name="check" size={8} style={{ color: "var(--color-on-primary)" }} />
+                        </div>
+                      )}
+                    </button>
+
+                    {/* Project folder tiles */}
+                    {projects.map((proj) => {
+                      const count = items.filter(i => i.projectId === proj.id).length;
+                      const covers = folderCovers(items, proj.id);
+                      const isActive = activeFolder === proj.id;
+                      return (
+                        <div key={proj.id} className="relative group">
+                          <button
+                            onClick={() => selectFolder(proj.id)}
+                            className="w-full relative rounded-[12px] overflow-hidden border transition-all text-left"
+                            style={{
+                              borderColor: isActive ? "var(--color-primary)" : "var(--color-hairline)",
+                              background: "var(--color-canvas)",
+                              boxShadow: isActive ? "0 0 0 2px var(--color-primary)" : undefined,
+                            }}
+                          >
+                            <div className="grid grid-cols-2 gap-0.5 p-0.5" style={{ height: 72 }}>
+                              {covers.slice(0, 4).map((it, i) => (
+                                <div key={i} className="overflow-hidden" style={{ borderRadius: 4 }}>
+                                  {it.image_url ? (
+                                    <img src={it.image_url} alt="" className="w-full h-full object-cover" style={{ height: "100%" }} />
+                                  ) : (
+                                    <div className="w-full h-full" style={{ background: resolveCover(it.color, it.id) }} />
+                                  )}
+                                </div>
+                              ))}
+                              {covers.length === 0 && (
+                                <div className="col-span-2 row-span-2 flex items-center justify-center" style={{ height: 72 }}>
+                                  <Icon name="folder" size={22} style={{ color: "var(--color-muted-soft)" }} />
+                                </div>
+                              )}
+                            </div>
+                            <div className="px-2.5 pb-2.5 pt-1.5">
+                              {editingFolderId === proj.id ? (
+                                <input
+                                  autoFocus
+                                  value={editingFolderName}
+                                  onClick={e => e.stopPropagation()}
+                                  onChange={e => setEditingFolderName(e.target.value)}
+                                  onBlur={() => handleRenameFolder(proj.id)}
+                                  onKeyDown={e => { if (e.key === "Enter") handleRenameFolder(proj.id); if (e.key === "Escape") setEditingFolderId(null); }}
+                                  className="w-full text-[12px] font-semibold outline-none border-b"
+                                  style={{ borderColor: "var(--color-primary)", background: "transparent", color: "var(--color-ink)" }}
+                                />
+                              ) : (
+                                <p className="text-[12px] font-semibold truncate" style={{ color: "var(--color-ink)" }}>{proj.name}</p>
+                              )}
+                              <p className="text-[10.5px]" style={{ color: "var(--color-muted)" }}>{count} items</p>
+                            </div>
+                            {isActive && (
+                              <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center"
+                                style={{ background: "var(--color-primary)" }}>
+                                <Icon name="check" size={8} style={{ color: "var(--color-on-primary)" }} />
+                              </div>
+                            )}
+                          </button>
+
+                          {/* Folder context menu trigger (visible on hover) */}
+                          <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                            <div className="relative">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setFolderMenuId(folderMenuId === proj.id ? null : proj.id); }}
+                                className="w-5 h-5 rounded-md flex items-center justify-center"
+                                style={{ background: "rgba(0,0,0,0.4)", color: "#fff" }}
+                              >
+                                <Icon name="more-vertical" size={9} />
+                              </button>
+                              <AnimatePresence>
+                                {folderMenuId === proj.id && (
+                                  <motion.div
+                                    initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+                                    transition={{ duration: 0.1 }}
+                                    className="absolute bottom-full right-0 mb-1 z-50 rounded-xl overflow-hidden shadow-lg py-1 min-w-[130px]"
+                                    style={{ background: "var(--color-surface)", border: "1px solid var(--color-hairline)" }}
+                                  >
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setEditingFolderId(proj.id); setEditingFolderName(proj.name); setFolderMenuId(null); }}
+                                      className="w-full text-left px-3 py-2 text-[12px] font-medium hover:bg-[var(--color-canvas)] flex items-center gap-2"
+                                      style={{ color: "var(--color-ink)" }}
+                                    >
+                                      <Icon name="edit" size={11} /> Rename
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteFolder(proj.id); }}
+                                      className="w-full text-left px-3 py-2 text-[12px] font-medium hover:bg-red-50 flex items-center gap-2"
+                                      style={{ color: "#c64545" }}
+                                    >
+                                      <Icon name="trash" size={11} /> Hapus
+                                    </button>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -384,15 +486,26 @@ export default function MoodboardPage() {
         </div>
       </div>
 
+      {/* Active folder breadcrumb */}
+      {activeFolder !== null && (
+        <div className="mb-4 flex items-center gap-2">
+          <button onClick={() => selectFolder(null)} className="text-[12.5px] hover:underline" style={{ color: "var(--color-muted)" }}>
+            Global
+          </button>
+          <Icon name="chevron-right" size={11} style={{ color: "var(--color-muted-soft)" }} />
+          <span className="text-[12.5px] font-semibold" style={{ color: "var(--color-ink)" }}>{activeFolderName}</span>
+        </div>
+      )}
+
       {/* ── Masonry grid ── */}
       {filtered.length === 0 ? (
         <div className="text-center py-24">
           <p className="text-sm font-medium mb-2" style={{ color: "var(--color-muted-soft)" }}>
             {activeFolder === null ? "Belum ada reference di Global." : "Folder ini masih kosong."}
           </p>
-          {activeFolder !== null && items.filter(i => !i.projectId).length > 0 && (
+          {activeFolder !== null && globalCount > 0 && (
             <p className="text-[12px]" style={{ color: "var(--color-muted-soft)" }}>
-              Pindahkan reference dari Global ke folder ini dengan ikon folder pada setiap kartu.
+              Pindahkan reference dari Global dengan ikon folder pada setiap kartu.
             </p>
           )}
         </div>
@@ -403,14 +516,12 @@ export default function MoodboardPage() {
             @media (min-width: 640px) { .mood-grid { columns: 3; } }
             @media (min-width: 1100px) { .mood-grid { columns: 4; } }
           `}</style>
-          <div className="mood-grid" onClick={() => { setMoveMenuItemId(null); setFolderMenuId(null); }}>
+          <div className="mood-grid" onClick={() => { setMoveMenuItemId(null); setFolderMenuId(null); setShowFolderPanel(false); setShowDateMenu(false); }}>
             <AnimatePresence>
               {filtered.map((item, idx) => (
                 <motion.div
                   key={item.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   transition={{ duration: 0.2, delay: idx * 0.02 }}
                   className="break-inside-avoid mb-2.5 group relative overflow-hidden rounded-[12px] cursor-zoom-in"
                   style={{ border: "1px solid var(--color-hairline)" }}
@@ -418,17 +529,13 @@ export default function MoodboardPage() {
                 >
                   {item.image_url && item.media_type === "video" ? (
                     <video
-                      src={item.image_url}
-                      autoPlay muted loop playsInline
+                      src={item.image_url} autoPlay muted loop playsInline
                       ref={(el) => { if (el) el.play().catch(() => {}); }}
                       className="w-full block"
                       style={{ display: "block", background: resolveCover(item.color, item.id) }}
                     />
                   ) : item.image_url ? (
-                    <img
-                      src={item.image_url}
-                      alt={item.title}
-                      loading="lazy"
+                    <img src={item.image_url} alt={item.title} loading="lazy"
                       className="w-full block"
                       style={{ display: "block", background: resolveCover(item.color, item.id) }}
                       onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
@@ -472,15 +579,12 @@ export default function MoodboardPage() {
                         <AnimatePresence>
                           {moveMenuItemId === item.id && (
                             <motion.div
-                              initial={{ opacity: 0, scale: 0.95, y: -4 }}
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                              initial={{ opacity: 0, scale: 0.95, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -4 }}
                               transition={{ duration: 0.1 }}
                               className="absolute right-0 top-full mt-1 z-50 rounded-xl overflow-hidden shadow-lg py-1 min-w-[160px]"
                               style={{ background: "var(--color-surface)", border: "1px solid var(--color-hairline)" }}
                             >
                               <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted-soft)" }}>Pindah ke</p>
-                              {/* Global option */}
                               <button
                                 onClick={() => { moveItem(item.id, null); setMoveMenuItemId(null); }}
                                 className="w-full text-left px-3.5 py-2 text-[12.5px] font-medium hover:bg-[var(--color-canvas)] flex items-center gap-2"
@@ -490,8 +594,7 @@ export default function MoodboardPage() {
                                 {!item.projectId && <Icon name="check" size={10} className="ml-auto" />}
                               </button>
                               {projects.map(p => (
-                                <button
-                                  key={p.id}
+                                <button key={p.id}
                                   onClick={() => { moveItem(item.id, p.id); setMoveMenuItemId(null); }}
                                   className="w-full text-left px-3.5 py-2 text-[12.5px] font-medium hover:bg-[var(--color-canvas)] flex items-center gap-2"
                                   style={{ color: item.projectId === p.id ? "var(--color-primary-ink)" : "var(--color-ink)", background: item.projectId === p.id ? "var(--color-primary-light)" : undefined }}
@@ -549,7 +652,6 @@ export default function MoodboardPage() {
                       {lightbox.source_domain || new Date(lightbox.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
                     </p>
                   </div>
-                  {/* Folder badge in lightbox */}
                   <div className="text-[11px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5"
                     style={{ background: "rgba(255,255,255,0.15)", color: "#fff" }}>
                     <Icon name={lightbox.projectId ? "folder" : "image"} size={10} />
@@ -573,7 +675,6 @@ export default function MoodboardPage() {
             <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden"
               onChange={(e) => handleFiles(e.target.files)} />
 
-            {/* Upload / preview */}
             {mediaData ? (
               <div className="relative rounded-[10px] overflow-hidden" style={{ border: "1px solid var(--color-hairline)" }}>
                 {mediaType === "video"
@@ -604,12 +705,10 @@ export default function MoodboardPage() {
               <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Title</label>
               <Input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Reference title" />
             </div>
-
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Source link (optional)</label>
               <Input value={newUrl} onChange={(e) => setNewUrl(e.target.value)} placeholder="https://dribbble.com/shots/..." />
             </div>
-
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Category</label>
@@ -624,23 +723,18 @@ export default function MoodboardPage() {
                 <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Simpan ke</label>
                 <Select value={newProjectId} onChange={(e) => setNewProjectId(e.target.value)}>
                   <option value="__global__">Global</option>
-                  {projects.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </Select>
               </div>
             </div>
-
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Tags (comma separated)</label>
               <Input value={newTags} onChange={(e) => setNewTags(e.target.value)} placeholder="typography, branding, minimal" />
             </div>
-
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--color-muted)" }}>Note (optional)</label>
               <Textarea value={newNote} onChange={(e) => setNewNote(e.target.value)} rows={2} placeholder="What do you like about this?" />
             </div>
-
             <div className="flex gap-3 pt-1">
               <Button variant="outline" className="flex-1" onClick={() => { setShowModal(false); resetForm(); }}>Cancel</Button>
               <Button className="flex-1" onClick={handleAddItem} disabled={!mediaData || saving}>
