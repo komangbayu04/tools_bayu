@@ -350,7 +350,7 @@ export default function ImageGeneratorPage() {
   if (view === "result") {
     return (
       <ShellLayout>
-        <div className="flex flex-col min-h-[calc(100vh-4rem)]">
+        <div className="flex flex-col min-h-[calc(100vh-7rem)]">
           {/* Top bar */}
           <div className="flex items-center justify-between mb-4">
             <button
@@ -413,7 +413,7 @@ export default function ImageGeneratorPage() {
   // ── LANDING VIEW ─────────────────────────────────────────────────
   return (
     <ShellLayout>
-      <div className="relative min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center py-12">
+      <div className="relative min-h-[calc(100vh-7rem)] flex flex-col items-center justify-center">
 
         <div className="absolute top-0 left-0">{HistoryPill}</div>
 
