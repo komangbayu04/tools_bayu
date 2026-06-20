@@ -83,11 +83,11 @@ function PillSelect({
   );
 }
 
-// ─── Image upload slot ────────────────────────────────────────────────
-function ImageSlot({
-  value, onChange, label, hint,
+// ─── Compact image upload tile ("+") ─────────────────────────────────
+function ImageTile({
+  value, onChange, title,
 }: {
-  value: string | null; onChange: (v: string | null) => void; label: string; hint: string;
+  value: string | null; onChange: (v: string | null) => void; title: string;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
@@ -98,34 +98,32 @@ function ImageSlot({
   };
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: TEAL }}>{label}</span>
+    <>
       <input ref={ref} type="file" accept="image/*" className="hidden"
         onChange={(e) => { handle(e.target.files?.[0]); e.target.value = ""; }} />
       {value ? (
-        <div className="relative rounded-[12px] overflow-hidden border aspect-square" style={{ borderColor: "rgba(0,0,0,0.08)" }}>
+        <div className="relative w-[64px] h-[64px] rounded-[12px] overflow-hidden border" style={{ borderColor: "rgba(0,0,0,0.10)" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value} alt={label} className="w-full h-full object-cover" />
+          <img src={value} alt={title} className="w-full h-full object-cover" />
           <button onClick={() => onChange(null)}
-            className="absolute top-2 right-2 w-7 h-7 rounded-lg flex items-center justify-center bg-black/55 backdrop-blur-sm hover:bg-black/75 transition-colors">
-            <Icon name="x" size={13} className="text-white" />
+            className="absolute top-1 right-1 w-5 h-5 rounded-md flex items-center justify-center bg-black/55 backdrop-blur-sm hover:bg-black/75 transition-colors">
+            <Icon name="x" size={11} className="text-white" />
           </button>
         </div>
       ) : (
-        <button type="button" onClick={() => ref.current?.click()}
+        <button type="button" title={title} onClick={() => ref.current?.click()}
           onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
           onDragLeave={() => setDrag(false)}
           onDrop={(e) => { e.preventDefault(); setDrag(false); handle(e.dataTransfer.files?.[0]); }}
-          className="aspect-square rounded-[12px] flex flex-col items-center justify-center gap-1.5 transition-colors p-3 text-center"
+          className="w-[64px] h-[64px] rounded-[12px] flex items-center justify-center transition-colors"
           style={{
-            border: `2px dashed ${drag ? ACCENT : "rgba(0,0,0,0.12)"}`,
-            background: drag ? PILL_BG : "#fff",
+            border: `1.5px solid ${drag ? ACCENT : "rgba(0,0,0,0.14)"}`,
+            background: drag ? PILL_BG : "rgba(255,255,255,0.6)",
           }}>
-          <Icon name="upload-cloud" size={22} style={{ color: ACCENT }} />
-          <span className="text-[11.5px] leading-snug" style={{ color: TEAL }}>{hint}</span>
+          <Icon name="plus" size={20} style={{ color: drag ? ACCENT : TEAL }} />
         </button>
       )}
-    </div>
+    </>
   );
 }
 
@@ -241,34 +239,28 @@ export default function ImageGeneratorPage() {
             })}
           </div>
 
-          {/* Upload slots for combine / texture */}
-          <AnimatePresence>
-            {needsImages && (
-              <motion.div
-                key="slots"
-                initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                animate={{ opacity: 1, height: "auto", marginTop: 15 }}
-                exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
-                  <ImageSlot
-                    value={imgA} onChange={setImgA}
-                    label={mode === "texture" ? "Subjek (Foto 1)" : "Foto 1"}
-                    hint={mode === "texture" ? "Objek yang akan diberi tekstur" : "Objek / subjek utama"}
-                  />
-                  <ImageSlot
-                    value={imgB} onChange={setImgB}
-                    label={mode === "texture" ? "Referensi Tekstur (Foto 2)" : "Foto 2"}
-                    hint={mode === "texture" ? "Material / tekstur referensi" : "Elemen / latar yang digabung"}
-                  />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           {/* Prompt panel */}
           <div className="mt-4 rounded-[20px] p-2" style={{ background: PANEL_BG }}>
+            {/* Photo tiles — shown for modes that accept extra images */}
+            <AnimatePresence>
+              {needsImages && (
+                <motion.div
+                  key="tiles"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex items-center gap-2.5 px-3 pt-3">
+                    <ImageTile value={imgA} onChange={setImgA}
+                      title={mode === "texture" ? "Subjek utama" : "Foto 1 — objek utama"} />
+                    <ImageTile value={imgB} onChange={setImgB}
+                      title={mode === "texture" ? "Referensi tekstur" : "Foto 2 — elemen/latar"} />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <textarea
               rows={4}
               value={prompt}
