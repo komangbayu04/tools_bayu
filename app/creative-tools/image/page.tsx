@@ -14,7 +14,13 @@ const PANEL_BG = "#eff0f0";
 const PILL_BG = "#e0f0f0";
 
 // ─── Constants ───────────────────────────────────────────────────────
-const MODELS = [{ value: "gpt-image-1", label: "gpt-image-1" }];
+// `edit: true` → the model supports image-to-image (combine / transfer texture).
+const ALL_MODELS = [
+  { value: "gpt-image-1", label: "GPT Image 1", edit: true },
+  { value: "gpt-image-1-mini", label: "GPT Image 1 Mini", edit: true },
+  { value: "dall-e-3", label: "DALL·E 3", edit: false },
+  { value: "dall-e-2", label: "DALL·E 2", edit: false },
+];
 const SIZES = [
   { value: "1024x1024", label: "Persegi 1:1" },
   { value: "1024x1536", label: "Potrait 3:4" },
@@ -148,6 +154,7 @@ function ImageTile({
 function PromptPanel(props: {
   mode: Mode;
   needsImages: boolean;
+  models: { value: string; label: string }[];
   imgA: string | null; setImgA: (v: string | null) => void;
   imgB: string | null; setImgB: (v: string | null) => void;
   prompt: string; setPrompt: (v: string) => void;
@@ -157,7 +164,7 @@ function PromptPanel(props: {
   n: number; setN: (v: number) => void;
   canRun: boolean; loading: boolean; onGenerate: () => void;
 }) {
-  const { mode, needsImages, imgA, setImgA, imgB, setImgB, prompt, setPrompt,
+  const { mode, needsImages, models, imgA, setImgA, imgB, setImgB, prompt, setPrompt,
     model, setModel, size, setSize, style, setStyle, n, setN, canRun, loading, onGenerate } = props;
 
   return (
@@ -193,7 +200,7 @@ function PromptPanel(props: {
 
       <div className="flex flex-wrap items-center gap-2 px-1 pb-1">
         <PillSelect value={model} onChange={setModel}>
-          {MODELS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+          {models.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
         </PillSelect>
         <PillSelect value={size} onChange={setSize}>
           {SIZES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
@@ -244,6 +251,20 @@ export default function ImageGeneratorPage() {
   const needsImages = mode !== "generate";
   const imagesReady = !needsImages || (!!imgA && !!imgB);
   const canRun = !loading && imagesReady && (mode !== "generate" || prompt.trim().length > 0);
+
+  // Image-to-image modes only work with edit-capable models.
+  const availableModels = (needsImages ? ALL_MODELS.filter((m) => m.edit) : ALL_MODELS)
+    .map((m) => ({ value: m.value, label: m.label }));
+
+  // Switching modes: pick a compatible model and a sensible photo count.
+  const switchMode = (next: Mode) => {
+    setMode(next);
+    setError(null);
+    const editOnly = next !== "generate";
+    if (editOnly && !ALL_MODELS.find((m) => m.value === model)?.edit) setModel("gpt-image-1");
+    // DALL·E 3 only ever returns a single image.
+    if (model === "dall-e-3") setN(1);
+  };
 
   const generate = async () => {
     if (!canRun) return;
@@ -305,12 +326,17 @@ export default function ImageGeneratorPage() {
     </button>
   );
 
+  const handleSetModel = (v: string) => {
+    setModel(v);
+    if (v === "dall-e-3") setN(1); // DALL·E 3 returns one image at a time.
+  };
+
   const promptPanel = (
     <PromptPanel
-      mode={mode} needsImages={needsImages}
+      mode={mode} needsImages={needsImages} models={availableModels}
       imgA={imgA} setImgA={setImgA} imgB={imgB} setImgB={setImgB}
       prompt={prompt} setPrompt={setPrompt}
-      model={model} setModel={setModel}
+      model={model} setModel={handleSetModel}
       size={size} setSize={setSize}
       style={style} setStyle={setStyle}
       n={n} setN={setN}
@@ -408,7 +434,7 @@ export default function ImageGeneratorPage() {
               return (
                 <button
                   key={card.value}
-                  onClick={() => { setMode(card.value); setError(null); }}
+                  onClick={() => switchMode(card.value)}
                   className="relative h-[141px] rounded-[20px] overflow-hidden text-left transition-all"
                   style={{ outline: active ? `2.5px solid ${ACCENT}` : "2.5px solid transparent", outlineOffset: -1 }}
                 >
