@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShellLayout } from "@/components/shell/Layout";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { Icon } from "@/components/ui/icon";
+import { Icon, type IconName } from "@/components/ui/icon";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
@@ -22,6 +22,13 @@ const QUALITIES = [
   { value: "high", label: "Terbaik (high)" },
 ];
 
+type Mode = "generate" | "combine" | "texture";
+const MODES: { value: Mode; label: string; icon: IconName }[] = [
+  { value: "generate", label: "Teks → Gambar", icon: "sparkles" },
+  { value: "combine", label: "Kombinasi Foto", icon: "clone" },
+  { value: "texture", label: "Transfer Tekstur", icon: "palette" },
+];
+
 function download(dataUrl: string, name: string) {
   const a = document.createElement("a");
   a.href = dataUrl;
@@ -29,31 +36,104 @@ function download(dataUrl: string, name: string) {
   a.click();
 }
 
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result as string);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+
+// ─── Image upload slot ────────────────────────────────────────────
+function ImageSlot({
+  value, onChange, label, hint,
+}: {
+  value: string | null; onChange: (v: string | null) => void; label: string; hint: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [drag, setDrag] = useState(false);
+
+  const handle = async (file?: File | null) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    onChange(await readFileAsDataUrl(file));
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted-soft)" }}>{label}</span>
+      <input ref={ref} type="file" accept="image/*" className="hidden"
+        onChange={(e) => { handle(e.target.files?.[0]); e.target.value = ""; }} />
+      {value ? (
+        <div className="relative rounded-[12px] overflow-hidden border aspect-square" style={{ borderColor: "var(--color-hairline)" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={value} alt={label} className="w-full h-full object-cover" />
+          <button onClick={() => onChange(null)}
+            className="absolute top-2 right-2 w-7 h-7 rounded-lg flex items-center justify-center bg-black/55 backdrop-blur-sm hover:bg-black/75 transition-colors">
+            <Icon name="x" size={13} className="text-white" />
+          </button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => ref.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+          onDragLeave={() => setDrag(false)}
+          onDrop={(e) => { e.preventDefault(); setDrag(false); handle(e.dataTransfer.files?.[0]); }}
+          className="aspect-square rounded-[12px] flex flex-col items-center justify-center gap-1.5 transition-colors p-3 text-center"
+          style={{
+            border: `2px dashed ${drag ? "var(--color-primary)" : "var(--color-hairline)"}`,
+            background: drag ? "var(--color-primary-light)" : "var(--color-canvas)",
+          }}>
+          <Icon name="upload-cloud" size={22} style={{ color: "var(--color-primary)" }} />
+          <span className="text-[11.5px] leading-snug" style={{ color: "var(--color-muted)" }}>{hint}</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function ImageGeneratorPage() {
   const { images, addImages, removeImage } = useCreativeImageStore();
+  const [mode, setMode] = useState<Mode>("generate");
   const [prompt, setPrompt] = useState("");
   const [size, setSize] = useState("1024x1024");
   const [quality, setQuality] = useState("medium");
   const [n, setN] = useState(1);
+  const [imgA, setImgA] = useState<string | null>(null);
+  const [imgB, setImgB] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const needsImages = mode !== "generate";
+  const imagesReady = !needsImages || (!!imgA && !!imgB);
+  // Combine/texture modes can run from images alone; generate needs a prompt.
+  const canRun = !loading && imagesReady && (mode !== "generate" || prompt.trim().length > 0);
+
+  const promptPlaceholder =
+    mode === "combine"
+      ? 'Opsional: arahkan hasilnya. Contoh: "letakkan produk di atas meja kayu, cahaya pagi".'
+      : mode === "texture"
+        ? 'Opsional: detail tambahan. Contoh: "buat permukaannya mengkilap seperti keramik".'
+        : 'Contoh: "Ilustrasi flat-design seorang freelancer bekerja di kafe, palet hangat, gaya minimalis."';
+
   const generate = async () => {
-    if (!prompt.trim() || loading) return;
+    if (!canRun) return;
     setLoading(true);
     setError(null);
     try {
+      const payload: Record<string, unknown> = { prompt, size, quality, n, mode };
+      if (needsImages) payload.images = [imgA, imgB];
+
       const res = await fetch("/api/creative/image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, size, quality, n }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok || data.error) {
         setError(data.error ?? "Terjadi kesalahan.");
         return;
       }
-      addImages((data.images as string[]).map((dataUrl) => ({ prompt, size, quality, dataUrl })));
+      const label = mode === "combine" ? "Kombinasi foto" : mode === "texture" ? "Transfer tekstur" : prompt;
+      addImages((data.images as string[]).map((dataUrl) => ({ prompt: prompt || label, size, quality, dataUrl })));
     } catch {
       setError("Koneksi gagal. Coba lagi.");
     } finally {
@@ -66,7 +146,7 @@ export default function ImageGeneratorPage() {
       <PageHeader
         eyebrow="Creative Tools"
         title="Image Generator"
-        subtitle="Hasilkan gambar dari teks dengan AI."
+        subtitle="Hasilkan gambar dari teks, gabungkan dua foto, atau transfer tekstur dari referensi."
         actions={
           <Link href="/creative-tools">
             <Button variant="outline">
@@ -77,19 +157,45 @@ export default function ImageGeneratorPage() {
       />
 
       {/* Generator card */}
-      <div
-        className="rounded-[20px] border mb-8 p-5"
-        style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface-card)" }}
-      >
+      <div className="rounded-[20px] border mb-8 p-5" style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface-card)" }}>
+        {/* Mode switch */}
+        <div className="flex flex-wrap gap-2 mb-5">
+          {MODES.map((m) => {
+            const on = mode === m.value;
+            return (
+              <button key={m.value} onClick={() => { setMode(m.value); setError(null); }}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-[10px] text-[13px] font-semibold border transition-all"
+                style={{
+                  borderColor: on ? "var(--color-primary)" : "var(--color-hairline)",
+                  background: on ? "var(--color-primary-light)" : "var(--color-surface)",
+                  color: on ? "var(--color-primary-ink)" : "var(--color-muted)",
+                }}>
+                <Icon name={m.icon} size={14} /> {m.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Image slots for combine / texture */}
+        {needsImages && (
+          <div className="grid grid-cols-2 gap-4 mb-5 max-w-md">
+            <ImageSlot
+              value={imgA} onChange={setImgA}
+              label={mode === "texture" ? "Subjek (Foto 1)" : "Foto 1"}
+              hint={mode === "texture" ? "Objek yang akan diberi tekstur" : "Objek / subjek utama"}
+            />
+            <ImageSlot
+              value={imgB} onChange={setImgB}
+              label={mode === "texture" ? "Referensi Tekstur (Foto 2)" : "Foto 2"}
+              hint={mode === "texture" ? "Material / tekstur referensi" : "Elemen / latar yang digabung"}
+            />
+          </div>
+        )}
+
         <label className="block text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--color-muted-soft)" }}>
-          Deskripsikan gambar
+          {mode === "generate" ? "Deskripsikan gambar" : "Arahan (opsional)"}
         </label>
-        <Textarea
-          rows={3}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder='Contoh: "Ilustrasi flat-design seorang freelancer bekerja di kafe, palet hangat, gaya minimalis."'
-        />
+        <Textarea rows={3} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={promptPlaceholder} />
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
           <div>
@@ -113,11 +219,15 @@ export default function ImageGeneratorPage() {
         </div>
 
         <div className="flex items-center gap-3 mt-4">
-          <Button onClick={generate} disabled={!prompt.trim() || loading}>
-            {loading ? <><Icon name="spinner" size={14} spin /> Generating…</> : <><Icon name="sparkles" size={14} /> Generate</>}
+          <Button onClick={generate} disabled={!canRun}>
+            {loading
+              ? <><Icon name="spinner" size={14} spin /> {mode === "generate" ? "Generating…" : "Memproses…"}</>
+              : <><Icon name="sparkles" size={14} /> {mode === "combine" ? "Gabungkan" : mode === "texture" ? "Transfer Tekstur" : "Generate"}</>}
           </Button>
           <p className="text-[11.5px]" style={{ color: "var(--color-muted-soft)" }}>
-            Riwayat disimpan lokal di browser ini (maks. 12 terbaru).
+            {needsImages
+              ? "Unggah kedua foto, lalu jalankan. Riwayat disimpan lokal (maks. 12)."
+              : "Riwayat disimpan lokal di browser ini (maks. 12 terbaru)."}
           </p>
         </div>
 
@@ -170,7 +280,7 @@ export default function ImageGeneratorPage() {
       ) : (
         <div className="text-center py-16">
           <Icon name="image" size={32} style={{ color: "var(--color-muted-soft)" }} />
-          <p className="mt-3 text-[14px]" style={{ color: "var(--color-muted)" }}>Belum ada gambar. Mulai dengan menulis prompt di atas.</p>
+          <p className="mt-3 text-[14px]" style={{ color: "var(--color-muted)" }}>Belum ada gambar. Mulai dengan menulis prompt atau unggah foto di atas.</p>
         </div>
       )}
     </ShellLayout>
