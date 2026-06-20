@@ -1,24 +1,32 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShellLayout } from "@/components/shell/Layout";
 import { Icon, type IconName } from "@/components/ui/icon";
-import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
 import { useCreativeImageStore } from "@/lib/creativeStore";
 
+// ─── Palette (from Figma) ────────────────────────────────────────────
+const TEAL = "#1c4f4f";
+const ACCENT = "#018786";
+const CARD_BG = "#f9fafa";
+const PANEL_BG = "#eff0f0";
+const PILL_BG = "#e0f0f0";
+
 // ─── Constants ───────────────────────────────────────────────────────
+const MODELS = [{ value: "gpt-image-1", label: "gpt-image-1" }];
 const SIZES = [
   { value: "1024x1024", label: "Persegi 1:1" },
   { value: "1024x1536", label: "Potrait 3:4" },
   { value: "1536x1024", label: "Landscape 4:3" },
 ];
-const QUALITIES = [
-  { value: "low", label: "Fast" },
-  { value: "medium", label: "Balanced" },
-  { value: "high", label: "Best" },
+const STYLES = [
+  { value: "", label: "Default" },
+  { value: "fotografi realistis, sangat detail", label: "Realistis" },
+  { value: "ilustrasi flat-design minimalis", label: "Minimalis" },
+  { value: "gaya anime, warna cerah", label: "Anime" },
+  { value: "render 3D, pencahayaan studio", label: "3D Render" },
+  { value: "sinematik, dramatic lighting", label: "Sinematik" },
 ];
 const COUNTS = [1, 2, 3, 4];
 
@@ -27,33 +35,14 @@ type Mode = "generate" | "combine" | "texture";
 interface ModeCard {
   value: Mode;
   label: string;
-  sub: string;
   icon: IconName;
-  bg: string; // gradient fallback
+  bg: string;
 }
 
 const MODE_CARDS: ModeCard[] = [
-  {
-    value: "generate",
-    label: "Generate Image",
-    sub: "Teks ke gambar AI",
-    icon: "sparkles",
-    bg: "linear-gradient(135deg,#1e1b4b 0%,#312e81 40%,#4f46e5 100%)",
-  },
-  {
-    value: "combine",
-    label: "Combine Image",
-    sub: "Gabungkan dua foto",
-    icon: "clone",
-    bg: "linear-gradient(135deg,#0f2027 0%,#203a43 40%,#2c5364 100%)",
-  },
-  {
-    value: "texture",
-    label: "Transfer Texture Image",
-    sub: "Terapkan tekstur referensi",
-    icon: "palette",
-    bg: "linear-gradient(135deg,#1a0533 0%,#4a0572 40%,#7b2ff7 100%)",
-  },
+  { value: "generate", label: "Generate Image", icon: "sparkles", bg: "linear-gradient(135deg,#3a1c1c 0%,#7a2e1e 45%,#d94a2b 100%)" },
+  { value: "combine", label: "Combine Image", icon: "clone", bg: "linear-gradient(135deg,#1a0808 0%,#3d0f0f 45%,#7a1a1a 100%)" },
+  { value: "texture", label: "Transfer texture Image", icon: "palette", bg: "linear-gradient(135deg,#3b4a1f 0%,#5c7a2e 50%,#8fae4a 100%)" },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -72,6 +61,28 @@ const readFileAsDataUrl = (file: File): Promise<string> =>
     r.readAsDataURL(file);
   });
 
+// ─── Pill dropdown ───────────────────────────────────────────────────
+function PillSelect({
+  value, onChange, children,
+}: {
+  value: string; onChange: (v: string) => void; children: React.ReactNode;
+}) {
+  return (
+    <div className="relative inline-flex items-center h-[32px] rounded-[20px] bg-white pl-4 pr-7"
+      style={{ boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="appearance-none bg-transparent outline-none text-[14px] font-medium cursor-pointer"
+        style={{ color: TEAL }}
+      >
+        {children}
+      </select>
+      <Icon name="chevron-down" size={12} className="absolute right-3 pointer-events-none" style={{ color: TEAL }} />
+    </div>
+  );
+}
+
 // ─── Image upload slot ────────────────────────────────────────────────
 function ImageSlot({
   value, onChange, label, hint,
@@ -88,11 +99,11 @@ function ImageSlot({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted-soft)" }}>{label}</span>
+      <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: TEAL }}>{label}</span>
       <input ref={ref} type="file" accept="image/*" className="hidden"
         onChange={(e) => { handle(e.target.files?.[0]); e.target.value = ""; }} />
       {value ? (
-        <div className="relative rounded-[12px] overflow-hidden border aspect-square" style={{ borderColor: "var(--color-hairline)" }}>
+        <div className="relative rounded-[12px] overflow-hidden border aspect-square" style={{ borderColor: "rgba(0,0,0,0.08)" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={value} alt={label} className="w-full h-full object-cover" />
           <button onClick={() => onChange(null)}
@@ -107,11 +118,11 @@ function ImageSlot({
           onDrop={(e) => { e.preventDefault(); setDrag(false); handle(e.dataTransfer.files?.[0]); }}
           className="aspect-square rounded-[12px] flex flex-col items-center justify-center gap-1.5 transition-colors p-3 text-center"
           style={{
-            border: `2px dashed ${drag ? "var(--color-primary)" : "var(--color-hairline)"}`,
-            background: drag ? "var(--color-primary-light)" : "var(--color-canvas)",
+            border: `2px dashed ${drag ? ACCENT : "rgba(0,0,0,0.12)"}`,
+            background: drag ? PILL_BG : "#fff",
           }}>
-          <Icon name="upload-cloud" size={22} style={{ color: "var(--color-primary)" }} />
-          <span className="text-[11.5px] leading-snug" style={{ color: "var(--color-muted)" }}>{hint}</span>
+          <Icon name="upload-cloud" size={22} style={{ color: ACCENT }} />
+          <span className="text-[11.5px] leading-snug" style={{ color: TEAL }}>{hint}</span>
         </button>
       )}
     </div>
@@ -124,8 +135,9 @@ export default function ImageGeneratorPage() {
 
   const [mode, setMode] = useState<Mode>("generate");
   const [prompt, setPrompt] = useState("");
+  const [model, setModel] = useState("gpt-image-1");
   const [size, setSize] = useState("1024x1024");
-  const [quality, setQuality] = useState("medium");
+  const [style, setStyle] = useState("");
   const [n, setN] = useState(1);
   const [imgA, setImgA] = useState<string | null>(null);
   const [imgB, setImgB] = useState<string | null>(null);
@@ -137,19 +149,13 @@ export default function ImageGeneratorPage() {
   const imagesReady = !needsImages || (!!imgA && !!imgB);
   const canRun = !loading && imagesReady && (mode !== "generate" || prompt.trim().length > 0);
 
-  const promptPlaceholder =
-    mode === "combine"
-      ? 'Opsional: arahkan hasilnya. Contoh: "letakkan produk di atas meja kayu"'
-      : mode === "texture"
-        ? 'Opsional: detail tambahan. Contoh: "buat permukaannya mengkilap"'
-        : "Masukan deskripsi prompt anda";
-
   const generate = async () => {
     if (!canRun) return;
     setLoading(true);
     setError(null);
     try {
-      const payload: Record<string, unknown> = { prompt, size, quality, n, mode };
+      const fullPrompt = style ? `${prompt}${prompt ? ", " : ""}${style}` : prompt;
+      const payload: Record<string, unknown> = { prompt: fullPrompt, size, quality: "medium", n, mode, model };
       if (needsImages) payload.images = [imgA, imgB];
 
       const res = await fetch("/api/creative/image", {
@@ -163,7 +169,7 @@ export default function ImageGeneratorPage() {
         return;
       }
       const label = mode === "combine" ? "Kombinasi foto" : mode === "texture" ? "Transfer tekstur" : prompt;
-      addImages((data.images as string[]).map((dataUrl) => ({ prompt: prompt || label, size, quality, dataUrl })));
+      addImages((data.images as string[]).map((dataUrl) => ({ prompt: prompt || label, size, quality: "medium", dataUrl })));
       setShowHistory(true);
     } catch {
       setError("Koneksi gagal. Coba lagi.");
@@ -174,188 +180,149 @@ export default function ImageGeneratorPage() {
 
   return (
     <ShellLayout>
-      <div className="min-h-[calc(100vh-4rem)] flex flex-col">
+      <div className="relative min-h-[calc(100vh-4rem)]">
 
-        {/* ── Top bar ─────────────────────────────────── */}
-        <div className="flex items-center justify-between px-1 pt-2 pb-4">
-          <Link href="/creative-tools">
-            <button className="flex items-center gap-2 text-[13px] font-semibold px-3 py-2 rounded-[10px] transition-colors hover:bg-[var(--color-surface-card)]"
-              style={{ color: "var(--color-muted)" }}>
-              <Icon name="arrow-left" size={14} /> Creative Tools
-            </button>
-          </Link>
-          <button
-            onClick={() => setShowHistory((v) => !v)}
-            className="flex items-center gap-2 text-[13px] font-semibold px-3 py-2 rounded-[10px] border transition-colors hover:bg-[var(--color-surface-card)]"
-            style={{ borderColor: "var(--color-hairline)", color: "var(--color-ink)" }}>
-            <Icon name="clock" size={14} /> History
-            {images.length > 0 && (
-              <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full"
-                style={{ background: "var(--color-primary)", color: "#fff" }}>
-                {images.length}
-              </span>
-            )}
-          </button>
-        </div>
+        {/* ── History pill (top-left) ─────────────────── */}
+        <button
+          onClick={() => setShowHistory((v) => !v)}
+          className="inline-flex items-center gap-1.5 h-[32px] px-4 rounded-[20px] text-[14px] font-medium transition-opacity hover:opacity-80"
+          style={{ background: PILL_BG, color: TEAL }}
+        >
+          <Icon name="clock" size={13} /> History
+          {images.length > 0 && (
+            <span className="text-[11px] font-bold px-1.5 rounded-full" style={{ background: ACCENT, color: "#fff" }}>
+              {images.length}
+            </span>
+          )}
+        </button>
 
         {/* ── Title ───────────────────────────────────── */}
-        <div className="text-center mb-8 px-4">
-          <h1 className="text-[28px] sm:text-[36px] font-extrabold tracking-tight mb-2" style={{ color: "var(--color-ink)" }}>
+        <div className="flex flex-col items-center gap-5 text-center mt-12 mb-8 px-4" style={{ color: TEAL }}>
+          <h1 className="font-extrabold tracking-tight leading-none text-[40px] sm:text-[56px]">
             Image Generator
           </h1>
-          <p className="text-[14px]" style={{ color: "var(--color-muted)" }}>
+          <p className="text-[16px] max-w-[442px] leading-7">
             Hasilkan gambar dari teks, gabungkan dua foto, atau transfer tekstur dari referensi.
           </p>
         </div>
 
-        {/* ── Mode tiles ──────────────────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 px-1">
-          {MODE_CARDS.map((card) => {
-            const active = mode === card.value;
-            return (
-              <button
-                key={card.value}
-                onClick={() => { setMode(card.value); setError(null); }}
-                className="relative rounded-[18px] overflow-hidden text-left transition-all"
-                style={{
-                  height: 160,
-                  outline: active ? "2.5px solid var(--color-primary)" : "2.5px solid transparent",
-                  outlineOffset: active ? 2 : 0,
-                  boxShadow: active ? "0 0 0 4px var(--color-primary-light)" : "none",
-                }}
-              >
-                {/* bg gradient */}
-                <div className="absolute inset-0" style={{ background: card.bg }} />
-                {/* noise overlay */}
-                <div className="absolute inset-0 opacity-20"
-                  style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")" }} />
-                {/* content */}
-                <div className="absolute inset-0 flex flex-col justify-end p-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Icon name={card.icon} size={16} className="text-white/80" />
-                    {active && (
-                      <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/20 text-white">
-                        Active
-                      </span>
-                    )}
+        {/* ── Main card (780px) ───────────────────────── */}
+        <div className="mx-auto w-full max-w-[780px] rounded-[24px] p-4" style={{ background: CARD_BG }}>
+
+          {/* Mode tiles */}
+          <div className="grid grid-cols-3 gap-[15px]">
+            {MODE_CARDS.map((card) => {
+              const active = mode === card.value;
+              return (
+                <button
+                  key={card.value}
+                  onClick={() => { setMode(card.value); setError(null); }}
+                  className="relative h-[141px] rounded-[20px] overflow-hidden text-left transition-all"
+                  style={{
+                    outline: active ? `2.5px solid ${ACCENT}` : "2.5px solid transparent",
+                    outlineOffset: -1,
+                  }}
+                >
+                  <div className="absolute inset-0" style={{ background: card.bg }} />
+                  <div className="absolute inset-0 opacity-25"
+                    style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")" }} />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />
+                  {active && (
+                    <span className="absolute top-2 left-2 text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-white/25 text-white">
+                      Active
+                    </span>
+                  )}
+                  <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-1.5 px-2">
+                    <Icon name={card.icon} size={14} className="text-white/85" />
+                    <span className="text-[15px] font-medium text-white text-center leading-tight">{card.label}</span>
                   </div>
-                  <p className="text-[15px] font-bold text-white leading-snug">{card.label}</p>
-                  <p className="text-[12px] text-white/70 mt-0.5">{card.sub}</p>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Upload slots for combine / texture */}
+          <AnimatePresence>
+            {needsImages && (
+              <motion.div
+                key="slots"
+                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: "auto", marginTop: 15 }}
+                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
+                  <ImageSlot
+                    value={imgA} onChange={setImgA}
+                    label={mode === "texture" ? "Subjek (Foto 1)" : "Foto 1"}
+                    hint={mode === "texture" ? "Objek yang akan diberi tekstur" : "Objek / subjek utama"}
+                  />
+                  <ImageSlot
+                    value={imgB} onChange={setImgB}
+                    label={mode === "texture" ? "Referensi Tekstur (Foto 2)" : "Foto 2"}
+                    hint={mode === "texture" ? "Material / tekstur referensi" : "Elemen / latar yang digabung"}
+                  />
                 </div>
-              </button>
-            );
-          })}
-        </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        {/* ── Image upload slots (combine / texture) ── */}
-        <AnimatePresence>
-          {needsImages && (
-            <motion.div
-              key="slots"
-              initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-              animate={{ opacity: 1, height: "auto", marginBottom: 24 }}
-              exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
-                <ImageSlot
-                  value={imgA} onChange={setImgA}
-                  label={mode === "texture" ? "Subjek (Foto 1)" : "Foto 1"}
-                  hint={mode === "texture" ? "Objek yang akan diberi tekstur" : "Objek / subjek utama"}
-                />
-                <ImageSlot
-                  value={imgB} onChange={setImgB}
-                  label={mode === "texture" ? "Referensi Tekstur (Foto 2)" : "Foto 2"}
-                  hint={mode === "texture" ? "Material / tekstur referensi" : "Elemen / latar yang digabung"}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          {/* Prompt panel */}
+          <div className="mt-4 rounded-[20px] p-2" style={{ background: PANEL_BG }}>
+            <textarea
+              rows={4}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Masukan deskripsi prompt anda"
+              className="w-full resize-none bg-transparent outline-none text-[16px] px-3 pt-2 pb-3 placeholder:opacity-60"
+              style={{ color: TEAL }}
+            />
 
-        {/* ── Prompt + bottom bar ─────────────────────── */}
-        <div className="rounded-[20px] border overflow-hidden mb-6"
-          style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface-card)" }}>
-
-          {/* Textarea */}
-          <textarea
-            rows={3}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder={promptPlaceholder}
-            className="w-full resize-none px-5 py-4 text-[14px] bg-transparent outline-none border-b"
-            style={{
-              borderColor: "var(--color-hairline)",
-              color: "var(--color-ink)",
-            }}
-          />
-
-          {/* Filter bar */}
-          <div className="flex flex-wrap items-center gap-2 px-4 py-3">
-            {/* Pilih Model — gpt-image-1 only for now */}
-            <div className="flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-[8px] border cursor-default"
-              style={{ borderColor: "var(--color-hairline)", color: "var(--color-muted)" }}>
-              <Icon name="sparkles" size={12} /> gpt-image-1
-            </div>
-
-            {/* Ratio */}
-            <div className="relative">
-              <Select
-                value={size}
-                onChange={(e) => setSize(e.target.value)}
-                className="text-[12px] pl-3 pr-7 py-1.5 rounded-[8px]"
-              >
+            {/* Dropdown bar */}
+            <div className="flex flex-wrap items-center gap-2 px-1 pb-1">
+              <PillSelect value={model} onChange={setModel}>
+                {MODELS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </PillSelect>
+              <PillSelect value={size} onChange={setSize}>
                 {SIZES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </Select>
-            </div>
-
-            {/* Kualitas / Style */}
-            <div className="relative">
-              <Select
-                value={quality}
-                onChange={(e) => setQuality(e.target.value)}
-                className="text-[12px] pl-3 pr-7 py-1.5 rounded-[8px]"
-              >
-                {QUALITIES.map((q) => <option key={q.value} value={q.value}>{q.label}</option>)}
-              </Select>
-            </div>
-
-            {/* Jumlah foto */}
-            <div className="relative">
-              <Select
-                value={String(n)}
-                onChange={(e) => setN(Number(e.target.value))}
-                className="text-[12px] pl-3 pr-7 py-1.5 rounded-[8px]"
-              >
+              </PillSelect>
+              <PillSelect value={style} onChange={setStyle}>
+                {STYLES.map((s) => <option key={s.label} value={s.value}>{s.label}</option>)}
+              </PillSelect>
+              <PillSelect value={String(n)} onChange={(v) => setN(Number(v))}>
                 {COUNTS.map((v) => <option key={v} value={v}>{v} foto</option>)}
-              </Select>
+              </PillSelect>
+
+              <div className="flex-1" />
+
+              <button
+                onClick={generate}
+                disabled={!canRun}
+                className="inline-flex items-center justify-center gap-1.5 h-[32px] px-5 rounded-[20px] text-[14px] font-semibold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ background: ACCENT }}
+              >
+                {loading
+                  ? <><Icon name="spinner" size={13} spin /> Generating…</>
+                  : <>{mode === "combine" ? "Combine" : mode === "texture" ? "Transfer" : "Generate"}</>}
+              </button>
             </div>
-
-            <div className="flex-1" />
-
-            {/* Generate button */}
-            <Button onClick={generate} disabled={!canRun}>
-              {loading
-                ? <><Icon name="spinner" size={14} spin /> Generating…</>
-                : <><Icon name="sparkles" size={14} /> {mode === "combine" ? "Combine" : mode === "texture" ? "Transfer" : "Generate"}</>}
-            </Button>
           </div>
         </div>
 
         {/* ── Error ───────────────────────────────────── */}
         {error && (
-          <div className="flex items-start gap-2.5 rounded-xl px-4 py-3 mb-6" style={{ background: "#fef2f2" }}>
+          <div className="mx-auto w-full max-w-[780px] flex items-start gap-2.5 rounded-xl px-4 py-3 mt-4" style={{ background: "#fef2f2" }}>
             <Icon name="alert-triangle" size={13} style={{ color: "#dc2626", flexShrink: 0, marginTop: 1 }} />
             <p className="text-[13px]" style={{ color: "#991b1b" }}>{error}</p>
           </div>
         )}
 
-        {/* ── History / Gallery ────────────────────────── */}
+        {/* ── History / Gallery ───────────────────────── */}
         {showHistory && images.length > 0 && (
-          <div>
+          <div className="mx-auto w-full max-w-[780px] mt-8">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[16px] font-bold" style={{ color: "var(--color-ink)" }}>Riwayat Gambar</h2>
-              <button onClick={() => setShowHistory(false)} className="text-[12px]" style={{ color: "var(--color-muted)" }}>
+              <h2 className="text-[16px] font-bold" style={{ color: TEAL }}>Riwayat Gambar</h2>
+              <button onClick={() => setShowHistory(false)} className="text-[12px]" style={{ color: TEAL }}>
                 Tutup
               </button>
             </div>
@@ -369,7 +336,7 @@ export default function ImageGeneratorPage() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.96 }}
                     className="group relative rounded-[14px] overflow-hidden border"
-                    style={{ borderColor: "var(--color-hairline)", background: "var(--color-canvas)" }}
+                    style={{ borderColor: "rgba(0,0,0,0.08)", background: "#fff" }}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={img.dataUrl} alt={img.prompt} className="w-full aspect-square object-cover" />
@@ -395,16 +362,6 @@ export default function ImageGeneratorPage() {
                 ))}
               </AnimatePresence>
             </div>
-          </div>
-        )}
-
-        {/* Empty state when history hidden */}
-        {!showHistory && images.length === 0 && (
-          <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
-            <Icon name="image" size={36} style={{ color: "var(--color-muted-soft)" }} />
-            <p className="mt-3 text-[14px]" style={{ color: "var(--color-muted)" }}>
-              Pilih mode, tulis prompt, lalu klik Generate.
-            </p>
           </div>
         )}
 
