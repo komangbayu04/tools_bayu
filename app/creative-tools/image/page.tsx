@@ -88,6 +88,36 @@ const readFileAsDataUrl = (file: File): Promise<string> =>
     r.readAsDataURL(file);
   });
 
+// Downscale + recompress a picked photo so the request body stays well under
+// the serverless body limit (Vercel ~4.5 MB). gpt-image edit input doesn't
+// need full-resolution source images.
+async function downscaleImage(file: File, maxDim = 1280, quality = 0.85): Promise<string> {
+  const dataUrl = await readFileAsDataUrl(file);
+  try {
+    const img = document.createElement("img");
+    await new Promise<void>((res, rej) => {
+      img.onload = () => res();
+      img.onerror = () => rej(new Error("decode failed"));
+      img.src = dataUrl;
+    });
+    let { width, height } = img;
+    if (Math.max(width, height) > maxDim) {
+      const scale = maxDim / Math.max(width, height);
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return dataUrl;
+    ctx.drawImage(img, 0, 0, width, height);
+    return canvas.toDataURL("image/jpeg", quality);
+  } catch {
+    return dataUrl; // fall back to the original if canvas processing fails
+  }
+}
+
 // ─── Zoomable lightbox ───────────────────────────────────────────────
 function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
   const [scale, setScale] = useState(1);
@@ -196,7 +226,7 @@ function ImageTile({
 
   const handle = async (file?: File | null) => {
     if (!file || !file.type.startsWith("image/")) return;
-    onChange(await readFileAsDataUrl(file));
+    onChange(await downscaleImage(file));
   };
 
   return (
