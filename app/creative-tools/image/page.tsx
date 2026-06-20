@@ -317,7 +317,7 @@ export default function ImageGeneratorPage() {
 
   const [mode, setMode] = useState<Mode>("generate");
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState("gpt-5.5");
+  const [model, setModel] = useState("gpt-image-1");
   const [size, setSize] = useState("1024x1024");
   const [style, setStyle] = useState("");
   const [n, setN] = useState(1);
@@ -370,19 +370,30 @@ export default function ImageGeneratorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        const msg = data.error ?? "Terjadi kesalahan.";
+
+      // The route should always return JSON, but on a crash/timeout it may
+      // return an HTML error page — surface the real reason either way.
+      const raw = await res.text();
+      let data: { images?: string[]; error?: string };
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        data = { error: `Server error ${res.status}: ${raw.slice(0, 200) || res.statusText}` };
+      }
+
+      if (!res.ok || data.error || !data.images) {
+        const msg = data.error ?? `Gagal (HTTP ${res.status}).`;
         setResults((r) => r.map((e) => (e.id === entryId ? { ...e, loading: false, error: msg } : e)));
         return;
       }
 
-      const imgs = data.images as string[];
+      const imgs = data.images;
       setResults((r) => r.map((e) => (e.id === entryId ? { ...e, loading: false, images: imgs } : e)));
       // Only the generated images go into history.
       addImages(imgs.map((dataUrl) => ({ prompt: entryPrompt, size, quality: "medium", dataUrl })));
-    } catch {
-      setResults((r) => r.map((e) => (e.id === entryId ? { ...e, loading: false, error: "Koneksi gagal. Coba lagi." } : e)));
+    } catch (err) {
+      const msg = err instanceof Error ? `Koneksi gagal: ${err.message}` : "Koneksi gagal. Coba lagi.";
+      setResults((r) => r.map((e) => (e.id === entryId ? { ...e, loading: false, error: msg } : e)));
     } finally {
       setLoading(false);
     }
