@@ -45,6 +45,23 @@ const MODE_CARDS: ModeCard[] = [
   { value: "texture", label: "Transfer texture Image", icon: "palette", bg: "linear-gradient(135deg,#3b4a1f 0%,#5c7a2e 50%,#8fae4a 100%)" },
 ];
 
+const MODE_LABEL: Record<Mode, string> = {
+  generate: "Generate Image",
+  combine: "Combine Image",
+  texture: "Transfer Texture",
+};
+
+// A single generation in the running session.
+interface ResultEntry {
+  id: string;
+  prompt: string;
+  mode: Mode;
+  count: number;
+  images: string[];
+  loading: boolean;
+  error?: string;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────
 function download(dataUrl: string, name: string) {
   const a = document.createElement("a");
@@ -127,9 +144,90 @@ function ImageTile({
   );
 }
 
+// ─── Shared prompt panel (#eff0f0) ───────────────────────────────────
+function PromptPanel(props: {
+  mode: Mode;
+  needsImages: boolean;
+  imgA: string | null; setImgA: (v: string | null) => void;
+  imgB: string | null; setImgB: (v: string | null) => void;
+  prompt: string; setPrompt: (v: string) => void;
+  model: string; setModel: (v: string) => void;
+  size: string; setSize: (v: string) => void;
+  style: string; setStyle: (v: string) => void;
+  n: number; setN: (v: number) => void;
+  canRun: boolean; loading: boolean; onGenerate: () => void;
+}) {
+  const { mode, needsImages, imgA, setImgA, imgB, setImgB, prompt, setPrompt,
+    model, setModel, size, setSize, style, setStyle, n, setN, canRun, loading, onGenerate } = props;
+
+  return (
+    <div className="rounded-[20px] p-2" style={{ background: PANEL_BG }}>
+      {/* Photo tiles for modes that accept extra images */}
+      <AnimatePresence>
+        {needsImages && (
+          <motion.div
+            key="tiles"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="flex items-center gap-2.5 px-3 pt-3">
+              <ImageTile value={imgA} onChange={setImgA}
+                title={mode === "texture" ? "Subjek utama" : "Foto 1 — objek utama"} />
+              <ImageTile value={imgB} onChange={setImgB}
+                title={mode === "texture" ? "Referensi tekstur" : "Foto 2 — elemen/latar"} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <textarea
+        rows={3}
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        placeholder="Masukan deskripsi prompt anda"
+        className="w-full resize-none bg-transparent outline-none text-[16px] px-3 pt-2 pb-3 placeholder:opacity-60"
+        style={{ color: TEAL }}
+      />
+
+      <div className="flex flex-wrap items-center gap-2 px-1 pb-1">
+        <PillSelect value={model} onChange={setModel}>
+          {MODELS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </PillSelect>
+        <PillSelect value={size} onChange={setSize}>
+          {SIZES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </PillSelect>
+        <PillSelect value={style} onChange={setStyle}>
+          {STYLES.map((s) => <option key={s.label} value={s.value}>{s.label}</option>)}
+        </PillSelect>
+        <PillSelect value={String(n)} onChange={(v) => setN(Number(v))}>
+          {COUNTS.map((v) => <option key={v} value={v}>{v} foto</option>)}
+        </PillSelect>
+
+        <div className="flex-1" />
+
+        <button
+          onClick={onGenerate}
+          disabled={!canRun}
+          className="inline-flex items-center justify-center gap-1.5 h-[32px] px-5 rounded-[20px] text-[14px] font-semibold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ background: ACCENT }}
+        >
+          {loading
+            ? <><Icon name="spinner" size={13} spin /> Generating…</>
+            : <>{mode === "combine" ? "Combine" : mode === "texture" ? "Transfer" : "Generate"}</>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────
 export default function ImageGeneratorPage() {
   const { images, addImages, removeImage } = useCreativeImageStore();
+
+  const [view, setView] = useState<"landing" | "result">("landing");
+  const [results, setResults] = useState<ResultEntry[]>([]);
 
   const [mode, setMode] = useState<Mode>("generate");
   const [prompt, setPrompt] = useState("");
@@ -149,11 +247,24 @@ export default function ImageGeneratorPage() {
 
   const generate = async () => {
     if (!canRun) return;
+
+    const entryId = crypto.randomUUID();
+    const entryPrompt = prompt.trim();
+    const entryMode = mode;
+    const entryCount = n;
+
+    // Show a pending result immediately, then move to the result view.
+    setResults((r) => [
+      { id: entryId, prompt: entryPrompt, mode: entryMode, count: entryCount, images: [], loading: true },
+      ...r,
+    ]);
+    setView("result");
     setLoading(true);
     setError(null);
+
     try {
-      const fullPrompt = style ? `${prompt}${prompt ? ", " : ""}${style}` : prompt;
-      const payload: Record<string, unknown> = { prompt: fullPrompt, size, quality: "medium", n, mode, model };
+      const fullPrompt = style ? `${entryPrompt}${entryPrompt ? ", " : ""}${style}` : entryPrompt;
+      const payload: Record<string, unknown> = { prompt: fullPrompt, size, quality: "medium", n, mode: entryMode, model };
       if (needsImages) payload.images = [imgA, imgB];
 
       const res = await fetch("/api/creative/image", {
@@ -163,38 +274,122 @@ export default function ImageGeneratorPage() {
       });
       const data = await res.json();
       if (!res.ok || data.error) {
-        setError(data.error ?? "Terjadi kesalahan.");
+        const msg = data.error ?? "Terjadi kesalahan.";
+        setResults((r) => r.map((e) => (e.id === entryId ? { ...e, loading: false, error: msg } : e)));
         return;
       }
-      const label = mode === "combine" ? "Kombinasi foto" : mode === "texture" ? "Transfer tekstur" : prompt;
-      addImages((data.images as string[]).map((dataUrl) => ({ prompt: prompt || label, size, quality: "medium", dataUrl })));
-      setShowHistory(true);
+
+      const imgs = data.images as string[];
+      setResults((r) => r.map((e) => (e.id === entryId ? { ...e, loading: false, images: imgs } : e)));
+      // Only the generated images go into history.
+      addImages(imgs.map((dataUrl) => ({ prompt: entryPrompt, size, quality: "medium", dataUrl })));
     } catch {
-      setError("Koneksi gagal. Coba lagi.");
+      setResults((r) => r.map((e) => (e.id === entryId ? { ...e, loading: false, error: "Koneksi gagal. Coba lagi." } : e)));
     } finally {
       setLoading(false);
     }
   };
 
+  const HistoryPill = (
+    <button
+      onClick={() => setShowHistory((v) => !v)}
+      className="inline-flex items-center gap-1.5 h-[32px] px-4 rounded-[20px] text-[14px] font-medium transition-opacity hover:opacity-80"
+      style={{ background: PILL_BG, color: TEAL }}
+    >
+      <Icon name="clock" size={13} /> History
+      {images.length > 0 && (
+        <span className="text-[11px] font-bold px-1.5 rounded-full" style={{ background: ACCENT, color: "#fff" }}>
+          {images.length}
+        </span>
+      )}
+    </button>
+  );
+
+  const promptPanel = (
+    <PromptPanel
+      mode={mode} needsImages={needsImages}
+      imgA={imgA} setImgA={setImgA} imgB={imgB} setImgB={setImgB}
+      prompt={prompt} setPrompt={setPrompt}
+      model={model} setModel={setModel}
+      size={size} setSize={setSize}
+      style={style} setStyle={setStyle}
+      n={n} setN={setN}
+      canRun={canRun} loading={loading} onGenerate={generate}
+    />
+  );
+
+  // ── RESULT VIEW ──────────────────────────────────────────────────
+  if (view === "result") {
+    return (
+      <ShellLayout>
+        <div className="flex flex-col min-h-[calc(100vh-4rem)]">
+          {/* Top bar */}
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => setView("landing")}
+              className="inline-flex items-center gap-1.5 text-[16px] font-medium transition-opacity hover:opacity-70"
+              style={{ color: TEAL }}
+            >
+              <Icon name="chevron-down" size={14} className="rotate-90" /> Back
+            </button>
+            <div className="inline-flex items-center gap-2 h-[32px] px-4 rounded-[20px] text-[14px] font-medium"
+              style={{ background: PILL_BG, color: TEAL }}>
+              <span className="w-2.5 h-2.5 rounded-full" style={{ background: ACCENT }} />
+              {MODE_LABEL[mode]}
+            </div>
+          </div>
+
+          {/* Results list */}
+          <div className="flex-1 space-y-5 pb-6">
+            {results.map((r) => (
+              <div key={r.id} className="rounded-[20px] p-6" style={{ background: CARD_BG }}>
+                <div className="flex flex-wrap gap-4">
+                  {r.loading
+                    ? Array.from({ length: r.count }).map((_, i) => (
+                        <div key={i} className="w-[240px] h-[240px] rounded-[12px] animate-pulse"
+                          style={{ background: "#d9dcdc" }} />
+                      ))
+                    : r.images.map((src, i) => (
+                        <div key={i} className="group relative w-[240px] h-[240px] rounded-[12px] overflow-hidden border"
+                          style={{ borderColor: "rgba(0,0,0,0.06)" }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={src} alt={r.prompt} className="w-full h-full object-cover" />
+                          <button
+                            onClick={() => download(src, `image-${r.id}-${i}.png`)}
+                            className="absolute bottom-2 right-2 w-8 h-8 rounded-lg flex items-center justify-center bg-black/55 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Icon name="download" size={13} className="text-white" />
+                          </button>
+                        </div>
+                      ))}
+                </div>
+
+                {r.error ? (
+                  <p className="mt-4 text-[14px]" style={{ color: "#dc2626" }}>{r.error}</p>
+                ) : (
+                  r.prompt && <p className="mt-4 text-[16px]" style={{ color: TEAL }}>{r.prompt}</p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Sticky prompt bar */}
+          <div className="sticky bottom-0 pt-3 pb-2" style={{ background: "var(--color-surface, #fff)" }}>
+            {promptPanel}
+          </div>
+        </div>
+      </ShellLayout>
+    );
+  }
+
+  // ── LANDING VIEW ─────────────────────────────────────────────────
   return (
     <ShellLayout>
       <div className="relative min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center py-12">
 
-        {/* ── History pill (top-left) ─────────────────── */}
-        <button
-          onClick={() => setShowHistory((v) => !v)}
-          className="absolute top-0 left-0 inline-flex items-center gap-1.5 h-[32px] px-4 rounded-[20px] text-[14px] font-medium transition-opacity hover:opacity-80"
-          style={{ background: PILL_BG, color: TEAL }}
-        >
-          <Icon name="clock" size={13} /> History
-          {images.length > 0 && (
-            <span className="text-[11px] font-bold px-1.5 rounded-full" style={{ background: ACCENT, color: "#fff" }}>
-              {images.length}
-            </span>
-          )}
-        </button>
+        <div className="absolute top-0 left-0">{HistoryPill}</div>
 
-        {/* ── Title ───────────────────────────────────── */}
+        {/* Title */}
         <div className="flex flex-col items-center gap-5 text-center mb-8 px-4" style={{ color: TEAL }}>
           <h1 className="font-extrabold tracking-tight leading-none text-[40px] sm:text-[56px]">
             Image Generator
@@ -204,9 +399,8 @@ export default function ImageGeneratorPage() {
           </p>
         </div>
 
-        {/* ── Main card (780px) ───────────────────────── */}
+        {/* Main card (780px) */}
         <div className="mx-auto w-full max-w-[780px] rounded-[24px] p-4" style={{ background: CARD_BG }}>
-
           {/* Mode tiles */}
           <div className="grid grid-cols-3 gap-[15px]">
             {MODE_CARDS.map((card) => {
@@ -216,10 +410,7 @@ export default function ImageGeneratorPage() {
                   key={card.value}
                   onClick={() => { setMode(card.value); setError(null); }}
                   className="relative h-[141px] rounded-[20px] overflow-hidden text-left transition-all"
-                  style={{
-                    outline: active ? `2.5px solid ${ACCENT}` : "2.5px solid transparent",
-                    outlineOffset: -1,
-                  }}
+                  style={{ outline: active ? `2.5px solid ${ACCENT}` : "2.5px solid transparent", outlineOffset: -1 }}
                 >
                   <div className="absolute inset-0" style={{ background: card.bg }} />
                   <div className="absolute inset-0 opacity-25"
@@ -240,68 +431,10 @@ export default function ImageGeneratorPage() {
           </div>
 
           {/* Prompt panel */}
-          <div className="mt-4 rounded-[20px] p-2" style={{ background: PANEL_BG }}>
-            {/* Photo tiles — shown for modes that accept extra images */}
-            <AnimatePresence>
-              {needsImages && (
-                <motion.div
-                  key="tiles"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="flex items-center gap-2.5 px-3 pt-3">
-                    <ImageTile value={imgA} onChange={setImgA}
-                      title={mode === "texture" ? "Subjek utama" : "Foto 1 — objek utama"} />
-                    <ImageTile value={imgB} onChange={setImgB}
-                      title={mode === "texture" ? "Referensi tekstur" : "Foto 2 — elemen/latar"} />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <textarea
-              rows={4}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Masukan deskripsi prompt anda"
-              className="w-full resize-none bg-transparent outline-none text-[16px] px-3 pt-2 pb-3 placeholder:opacity-60"
-              style={{ color: TEAL }}
-            />
-
-            {/* Dropdown bar */}
-            <div className="flex flex-wrap items-center gap-2 px-1 pb-1">
-              <PillSelect value={model} onChange={setModel}>
-                {MODELS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </PillSelect>
-              <PillSelect value={size} onChange={setSize}>
-                {SIZES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </PillSelect>
-              <PillSelect value={style} onChange={setStyle}>
-                {STYLES.map((s) => <option key={s.label} value={s.value}>{s.label}</option>)}
-              </PillSelect>
-              <PillSelect value={String(n)} onChange={(v) => setN(Number(v))}>
-                {COUNTS.map((v) => <option key={v} value={v}>{v} foto</option>)}
-              </PillSelect>
-
-              <div className="flex-1" />
-
-              <button
-                onClick={generate}
-                disabled={!canRun}
-                className="inline-flex items-center justify-center gap-1.5 h-[32px] px-5 rounded-[20px] text-[14px] font-semibold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ background: ACCENT }}
-              >
-                {loading
-                  ? <><Icon name="spinner" size={13} spin /> Generating…</>
-                  : <>{mode === "combine" ? "Combine" : mode === "texture" ? "Transfer" : "Generate"}</>}
-              </button>
-            </div>
-          </div>
+          <div className="mt-4">{promptPanel}</div>
         </div>
 
-        {/* ── Error ───────────────────────────────────── */}
+        {/* Error */}
         {error && (
           <div className="mx-auto w-full max-w-[780px] flex items-start gap-2.5 rounded-xl px-4 py-3 mt-4" style={{ background: "#fef2f2" }}>
             <Icon name="alert-triangle" size={13} style={{ color: "#dc2626", flexShrink: 0, marginTop: 1 }} />
@@ -309,14 +442,12 @@ export default function ImageGeneratorPage() {
           </div>
         )}
 
-        {/* ── History / Gallery ───────────────────────── */}
+        {/* History / Gallery */}
         {showHistory && images.length > 0 && (
           <div className="mx-auto w-full max-w-[780px] mt-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-[16px] font-bold" style={{ color: TEAL }}>Riwayat Gambar</h2>
-              <button onClick={() => setShowHistory(false)} className="text-[12px]" style={{ color: TEAL }}>
-                Tutup
-              </button>
+              <button onClick={() => setShowHistory(false)} className="text-[12px]" style={{ color: TEAL }}>Tutup</button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 pb-8">
               <AnimatePresence>
