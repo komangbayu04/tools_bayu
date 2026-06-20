@@ -29,6 +29,34 @@ async function dataUrlToFile(dataUrl: string, name: string) {
   return toFile(buffer, name, { type });
 }
 
+// Build a strict template prompt for the edit modes. The user's own prompt
+// is treated as ADDITIONAL guidance only, to reduce AI hallucination.
+function buildEditPrompt(mode: Mode, userPrompt: string): string {
+  const template =
+    mode === "combine"
+      ? [
+          "TUGAS: Gabungkan kedua gambar referensi menjadi SATU gambar yang menyatu secara fotografis dan realistis.",
+          "- Gambar 1 = subjek/objek utama. Pertahankan identitas, bentuk, proporsi, warna, dan detail aslinya dengan akurat.",
+          "- Gambar 2 = elemen atau latar yang ingin digabungkan.",
+          "- Samakan arah pencahayaan, bayangan, perspektif, skala, dan suhu warna agar terlihat seperti satu foto nyata.",
+          "ATURAN KETAT: Jangan menambah objek, orang, teks, logo, atau watermark yang tidak ada pada kedua gambar. Jangan mengarang detail yang tidak terlihat. Gunakan HANYA elemen yang benar-benar ada pada gambar referensi.",
+        ].join("\n")
+      : [
+          "TUGAS: Transfer tekstur/material dari gambar referensi ke subjek secara realistis.",
+          "- Gambar 1 = SUBJEK. Pertahankan bentuk, siluet, proporsi, sudut, dan komposisi PERSIS seperti aslinya. JANGAN mengubah bentuk objek.",
+          "- Gambar 2 = REFERENSI TEKSTUR/MATERIAL. Ambil pola permukaan, jenis material, warna material, dan finishing-nya.",
+          "- Terapkan tekstur dari gambar 2 ke permukaan subjek gambar 1 mengikuti kontur, lipatan, dan pencahayaan asli subjek.",
+          "ATURAN KETAT: Jangan mengubah bentuk/siluet subjek. Jangan menambah objek, teks, atau latar baru. Jangan mengarang detail di luar kedua gambar.",
+        ].join("\n");
+
+  if (!userPrompt) return template;
+  return (
+    `${template}\n\n` +
+    "ARAHAN TAMBAHAN DARI PENGGUNA (hanya pelengkap, tidak menggantikan tugas & aturan di atas):\n" +
+    userPrompt
+  );
+}
+
 // Pull base64 PNGs out of a Responses API result (image_generation tool).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractFromResponses(response: any): string[] {
@@ -94,13 +122,10 @@ export async function POST(req: NextRequest) {
         return Response.json({ error: "Prompt tidak boleh kosong." }, { status: 400 });
       }
 
-      const directive =
-        mode === "combine"
-          ? "Gabungkan kedua gambar menjadi satu komposisi yang menyatu dan natural — gambar pertama subjek utama, gambar kedua elemen/latar. Padukan pencahayaan, perspektif, dan warna."
-          : mode === "texture"
-            ? "Terapkan tekstur/material dari gambar kedua ke subjek pada gambar pertama, pertahankan bentuk dan siluet aslinya. Hasil realistis dan tajam."
-            : "";
-      const text = [directive, userPrompt].filter(Boolean).join("\n\n") || "Buat sebuah gambar.";
+      const text =
+        mode === "generate"
+          ? userPrompt || "Buat sebuah gambar."
+          : buildEditPrompt(mode, userPrompt);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const content: any[] = [{ type: "input_text", text }];
@@ -163,17 +188,7 @@ export async function POST(req: NextRequest) {
         srcUrls.slice(0, 2).map((url, i) => dataUrlToFile(url, `image-${i}.png`))
       );
 
-      const instruction =
-        mode === "combine"
-          ? "Gabungkan kedua gambar ini menjadi satu komposisi yang menyatu dan natural. " +
-            "Gambar pertama adalah subjek/objek utama, gambar kedua adalah elemen atau latar yang ingin digabungkan. " +
-            "Padukan pencahayaan, perspektif, dan warna agar terlihat seperti satu foto yang utuh."
-          : "Gambar pertama adalah subjek utama (jaga bentuk, struktur, dan komposisinya). " +
-            "Gambar kedua adalah REFERENSI TEKSTUR/MATERIAL. " +
-            "Terapkan tekstur, material, pola permukaan, dan finishing dari gambar kedua ke subjek pada gambar pertama, " +
-            "sambil mempertahankan siluet dan bentuk asli subjek. Hasilkan render yang realistis dan tajam.";
-
-      const prompt = userPrompt ? `${instruction}\n\nCatatan tambahan: ${userPrompt}` : instruction;
+      const prompt = buildEditPrompt(mode, userPrompt);
 
       const result = await client.images.edit({
         model,

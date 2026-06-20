@@ -88,6 +88,81 @@ const readFileAsDataUrl = (file: File): Promise<string> =>
     r.readAsDataURL(file);
   });
 
+// ─── Zoomable lightbox ───────────────────────────────────────────────
+function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  const [scale, setScale] = useState(1);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const drag = useRef<{ ox: number; oy: number; px: number; py: number } | null>(null);
+
+  const clampScale = (s: number) => Math.min(Math.max(s, 1), 5);
+
+  const zoom = (delta: number) => {
+    setScale((s) => {
+      const next = clampScale(s + delta);
+      if (next === 1) setPos({ x: 0, y: 0 });
+      return next;
+    });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      className="fixed inset-0 z-[100] flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.82)" }}
+    >
+      {/* Toolbar */}
+      <div className="absolute top-4 right-4 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <button onClick={() => zoom(-0.5)} className="w-10 h-10 rounded-full flex items-center justify-center bg-white/15 hover:bg-white/25 text-white">
+          <Icon name="minus" size={16} />
+        </button>
+        <span className="text-white text-[13px] font-semibold w-12 text-center">{Math.round(scale * 100)}%</span>
+        <button onClick={() => zoom(0.5)} className="w-10 h-10 rounded-full flex items-center justify-center bg-white/15 hover:bg-white/25 text-white">
+          <Icon name="plus" size={16} />
+        </button>
+        <button onClick={() => download(src, "image.png")} className="w-10 h-10 rounded-full flex items-center justify-center bg-white/15 hover:bg-white/25 text-white">
+          <Icon name="download" size={16} />
+        </button>
+        <button onClick={onClose} className="w-10 h-10 rounded-full flex items-center justify-center bg-white/15 hover:bg-white/25 text-white">
+          <Icon name="x" size={16} />
+        </button>
+      </div>
+
+      {/* Image */}
+      <div
+        className="overflow-hidden flex items-center justify-center w-full h-full p-8"
+        onClick={(e) => e.stopPropagation()}
+        onWheel={(e) => zoom(e.deltaY < 0 ? 0.25 : -0.25)}
+        onDoubleClick={() => (scale > 1 ? (setScale(1), setPos({ x: 0, y: 0 })) : setScale(2))}
+        onPointerDown={(e) => {
+          if (scale === 1) return;
+          drag.current = { ox: pos.x, oy: pos.y, px: e.clientX, py: e.clientY };
+          setDragging(true);
+          (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          if (!drag.current) return;
+          setPos({ x: drag.current.ox + (e.clientX - drag.current.px), y: drag.current.oy + (e.clientY - drag.current.py) });
+        }}
+        onPointerUp={() => { drag.current = null; setDragging(false); }}
+        style={{ cursor: scale > 1 ? "grab" : "zoom-in" }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt="preview"
+          draggable={false}
+          className="max-w-full max-h-full object-contain select-none rounded-lg"
+          style={{ transform: `translate(${pos.x}px, ${pos.y}px) scale(${scale})`, transition: dragging ? "none" : "transform 0.12s ease-out" }}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
 // ─── Pill dropdown ───────────────────────────────────────────────────
 function PillSelect({
   value, onChange, children,
@@ -251,6 +326,7 @@ export default function ImageGeneratorPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [zoomSrc, setZoomSrc] = useState<string | null>(null);
 
   const needsImages = mode !== "generate";
   const imagesReady = !needsImages || (!!imgA && !!imgB);
@@ -346,6 +422,12 @@ export default function ImageGeneratorPage() {
     />
   );
 
+  const lightbox = (
+    <AnimatePresence>
+      {zoomSrc && <Lightbox src={zoomSrc} onClose={() => setZoomSrc(null)} />}
+    </AnimatePresence>
+  );
+
   // ── RESULT VIEW ──────────────────────────────────────────────────
   if (view === "result") {
     return (
@@ -380,14 +462,26 @@ export default function ImageGeneratorPage() {
                     : r.images.map((src, i) => (
                         <div key={i} className="group relative w-[240px] h-[240px] rounded-[12px] overflow-hidden border"
                           style={{ borderColor: "rgba(0,0,0,0.06)" }}>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={src} alt={r.prompt} className="w-full h-full object-cover" />
-                          <button
-                            onClick={() => download(src, `image-${r.id}-${i}.png`)}
-                            className="absolute bottom-2 right-2 w-8 h-8 rounded-lg flex items-center justify-center bg-black/55 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <Icon name="download" size={13} className="text-white" />
+                          <button onClick={() => setZoomSrc(src)} className="block w-full h-full cursor-zoom-in" title="Klik untuk perbesar">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={src} alt={r.prompt} className="w-full h-full object-cover" />
                           </button>
+                          <div className="absolute bottom-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => setZoomSrc(src)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center bg-black/55 backdrop-blur-sm"
+                              title="Perbesar"
+                            >
+                              <Icon name="expand" size={13} className="text-white" />
+                            </button>
+                            <button
+                              onClick={() => download(src, `image-${r.id}-${i}.png`)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center bg-black/55 backdrop-blur-sm"
+                              title="Unduh"
+                            >
+                              <Icon name="download" size={13} className="text-white" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                 </div>
@@ -406,6 +500,7 @@ export default function ImageGeneratorPage() {
             {promptPanel}
           </div>
         </div>
+        {lightbox}
       </ShellLayout>
     );
   }
@@ -489,8 +584,10 @@ export default function ImageGeneratorPage() {
                     className="group relative rounded-[14px] overflow-hidden border"
                     style={{ borderColor: "rgba(0,0,0,0.08)", background: "#fff" }}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img.dataUrl} alt={img.prompt} className="w-full aspect-square object-cover" />
+                    <button onClick={() => setZoomSrc(img.dataUrl)} className="block w-full cursor-zoom-in" title="Klik untuk perbesar">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.dataUrl} alt={img.prompt} className="w-full aspect-square object-cover" />
+                    </button>
                     <div className="absolute inset-x-0 bottom-0 p-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
                       style={{ background: "linear-gradient(to top, rgba(0,0,0,0.65), transparent)" }}>
                       <button
@@ -517,6 +614,7 @@ export default function ImageGeneratorPage() {
         )}
 
       </div>
+      {lightbox}
     </ShellLayout>
   );
 }
