@@ -180,12 +180,12 @@ export default function ImageGeneratorPage() {
 
   return (
     <ShellLayout>
-      <div className="relative min-h-[calc(100vh-4rem)]">
+      <div className="relative min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center py-12">
 
         {/* ── History pill (top-left) ─────────────────── */}
         <button
           onClick={() => setShowHistory((v) => !v)}
-          className="inline-flex items-center gap-1.5 h-[32px] px-4 rounded-[20px] text-[14px] font-medium transition-opacity hover:opacity-80"
+          className="absolute top-0 left-0 inline-flex items-center gap-1.5 h-[32px] px-4 rounded-[20px] text-[14px] font-medium transition-opacity hover:opacity-80"
           style={{ background: PILL_BG, color: TEAL }}
         >
           <Icon name="clock" size={13} /> History
@@ -197,7 +197,7 @@ export default function ImageGeneratorPage() {
         </button>
 
         {/* ── Title ───────────────────────────────────── */}
-        <div className="flex flex-col items-center gap-5 text-center mt-12 mb-8 px-4" style={{ color: TEAL }}>
+        <div className="flex flex-col items-center gap-5 text-center mb-8 px-4" style={{ color: TEAL }}>
           <h1 className="font-extrabold tracking-tight leading-none text-[40px] sm:text-[56px]">
             Image Generator
           </h1>
