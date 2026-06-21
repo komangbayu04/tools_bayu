@@ -757,12 +757,11 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                 {(["design", "animate"] as const).map((t) => {
                   const on = layerTab === t;
                   return (
-                    <button key={t}
-                      onClick={() => { setLayerTab(t); if (t === "animate") { setAnimView("list"); setAnimProp(null); } }}
-                      className="flex-1 py-2.5 text-[12px] font-semibold capitalize tracking-wide transition-colors relative"
+                    <button key={t} onClick={() => { setLayerTab(t); if (t === "animate") { setAnimView("list"); setAnimProp(null); } }}
+                      className="flex-1 py-2.5 text-[11px] font-semibold capitalize tracking-wide transition-colors relative"
                       style={{ color: on ? "#e8e8e8" : "#666", background: "transparent" }}>
                       {t.charAt(0).toUpperCase() + t.slice(1)}
-                      {on && <span className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full" style={{ background: "#8a76ff" }} />}
+                      {on && <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full" style={{ background: "#8a76ff" }} />}
                     </button>
                   );
                 })}
@@ -809,7 +808,7 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                           <input type="color" value={selected.strokeColor ?? "#000000"} onChange={(e) => patchLayer(selected.id, { strokeColor: e.target.value })} className="w-full h-8 rounded-[6px] border cursor-pointer" style={{ borderColor: "#3a3a3a" }} />
                         </div>
                         <div>
-                          <label className={fieldLabel} style={fieldLabelStyle}>Tebal</label>
+                          <label className={fieldLabel} style={fieldLabelStyle}>Stroke Tebal</label>
                           <input type="number" min={0} max={60} value={selected.strokeWidth ?? 0} onChange={(e) => patchLayer(selected.id, { strokeWidth: Number(e.target.value) })} className={numInput} style={numStyle} />
                         </div>
                       </div>
@@ -822,13 +821,14 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                       { key: "contrast" as const, label: "Contrast", min: 0, max: 2, step: 0.05, def: 1, unit: "×" },
                       { key: "saturate" as const, label: "Saturation", min: 0, max: 3, step: 0.05, def: 1, unit: "×" },
                       { key: "grayscale" as const, label: "Grayscale", min: 0, max: 1, step: 0.05, def: 0, unit: "" },
+                      { key: "sepia" as const, label: "Sepia", min: 0, max: 1, step: 0.05, def: 0, unit: "" },
                     ]).map((fx) => {
                       const val = (selected[fx.key] as number | undefined) ?? fx.def;
                       return (
-                        <div key={fx.key} className="mb-2.5">
+                        <div key={fx.key} className="mb-2">
                           <div className="flex items-center justify-between mb-1">
-                            <label className="text-[10px] font-medium" style={{ color: "#999" }}>{fx.label}</label>
-                            <span className="text-[10px] tabular-nums" style={{ color: "#777" }}>{val}{fx.unit}</span>
+                            <label className="text-[10px] font-medium" style={{ color: "#aaa" }}>{fx.label}</label>
+                            <span className="text-[10px] tabular-nums" style={{ color: "#888" }}>{val}{fx.unit}</span>
                           </div>
                           <input type="range" min={fx.min} max={fx.max} step={fx.step} value={val}
                             onChange={(e) => patchLayer(selected.id, { [fx.key]: Number(e.target.value) } as Partial<MotionLayer>)}
@@ -851,38 +851,39 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                           style={{ background: "#7c6fff", color: "#fff" }}>
                           + New Animation
                         </button>
-                        {/* Existing anim cards */}
+                        {/* Current preset summary cards */}
                         {selected.preset !== "none" && (
                           <div className="rounded-[10px] border mb-2 p-3 cursor-pointer hover:border-[#555] transition-colors"
-                            onClick={() => { setAnimView("detail"); setAnimProp(null); }}
-                            style={{ borderColor: "#333", background: "#252525" }}>
+                            style={{ borderColor: "#333", background: "#252525" }}
+                            onClick={() => { setAnimView("picker"); }}>
                             <div className="flex items-center justify-between">
                               <div>
-                                <p className="text-[12px] font-semibold capitalize" style={{ color: "#e8e8e8" }}>Entry · {selected.preset}</p>
-                                <p className="text-[10px] mt-0.5" style={{ color: "#888" }}>{selected.duration}s · delay {selected.delay}s</p>
+                                <p className="text-[12px] font-semibold" style={{ color: "#e8e8e8" }}>Entry · {selected.preset}</p>
+                                <p className="text-[10px] mt-0.5" style={{ color: "#888" }}>{selected.duration}s · delay {selected.delay}s · {selected.easing}</p>
                               </div>
-                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: "#5cf0a0" }} />
+                              <span className="w-2 h-2 rounded-full" style={{ background: "#5cf0a0", flexShrink: 0 }} />
                             </div>
                           </div>
                         )}
                         {selected.outPreset && selected.outPreset !== "none" && (
                           <div className="rounded-[10px] border mb-2 p-3 cursor-pointer hover:border-[#555] transition-colors"
-                            onClick={() => { setAnimView("detail"); setAnimProp(null); }}
-                            style={{ borderColor: "#333", background: "#252525" }}>
+                            style={{ borderColor: "#333", background: "#252525" }}
+                            onClick={() => { setAnimView("picker"); }}>
                             <div className="flex items-center justify-between">
                               <div>
-                                <p className="text-[12px] font-semibold capitalize" style={{ color: "#e8e8e8" }}>Exit · {selected.outPreset}</p>
-                                <p className="text-[10px] mt-0.5" style={{ color: "#888" }}>{selected.outDuration ?? 0.6}s</p>
+                                <p className="text-[12px] font-semibold" style={{ color: "#e8e8e8" }}>Exit · {selected.outPreset}</p>
+                                <p className="text-[10px] mt-0.5" style={{ color: "#888" }}>{selected.outDuration ?? 0.6}s · {selected.outEasing ?? "ease-in"}</p>
                               </div>
-                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: "#f0a05c" }} />
+                              <span className="w-2 h-2 rounded-full" style={{ background: "#f0a05c", flexShrink: 0 }} />
                             </div>
                           </div>
                         )}
+
                         {selected.preset === "none" && (!selected.outPreset || selected.outPreset === "none") && (
-                          <div className="rounded-[14px] p-4 mt-1" style={{ background: "#252525", border: "1px solid #2e2e2e" }}>
-                            <div className="text-xl mb-2">🤖</div>
+                          <div className="rounded-[14px] p-4 mb-4" style={{ background: "#252525", border: "1px solid #333" }}>
+                            <div className="text-2xl mb-2">🤖</div>
                             <p className="text-[13px] font-bold mb-1" style={{ color: "#e8e8e8" }}>Idea → Motion</p>
-                            <p className="text-[11px] mb-3 leading-relaxed" style={{ color: "#888" }}>Pilih animasi dari preset atau buat gerakan custom.</p>
+                            <p className="text-[11px] mb-3" style={{ color: "#888" }}>Buat animasi dari deskripsi teks, pilih preset, lalu sesuaikan.</p>
                             <button onClick={() => setAnimView("picker")} className="w-full py-2 rounded-[8px] text-[12px] font-semibold" style={{ background: "#1a1a1a", color: "#e8e8e8", border: "1px solid #444" }}>
                               ✦ Pilih Animasi
                             </button>
@@ -903,7 +904,7 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                             const on = selected.preset === t.value;
                             return (
                               <button key={t.value}
-                                onClick={() => { patchLayer(selected.id, { preset: t.value }); replay(); setAnimView("detail"); setAnimProp(null); }}
+                                onClick={() => { patchLayer(selected.id, { preset: t.value }); if (t.value !== "none" && t.value !== "custom") { setAnimProp(null); setAnimView("detail"); } replay(); }}
                                 className="px-2 py-2.5 rounded-[8px] text-[11px] font-medium border transition-all text-center"
                                 style={{ borderColor: on ? "#5cf0a0" : "#333", background: on ? "rgba(92,240,160,0.1)" : "#262626", color: on ? "#c2f0df" : "#aaa" }}>
                                 {t.label}
@@ -917,7 +918,7 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                             const on = (!selected.outPreset && t.value === "none") || selected.outPreset === t.value;
                             return (
                               <button key={t.value}
-                                onClick={() => { patchLayer(selected.id, { outPreset: t.value }); replay(); setAnimView("detail"); setAnimProp(null); }}
+                                onClick={() => { patchLayer(selected.id, { outPreset: t.value }); if (t.value !== "none" && t.value !== "custom-out") { setAnimProp(null); setAnimView("detail"); } replay(); }}
                                 className="px-2 py-2.5 rounded-[8px] text-[11px] font-medium border transition-all text-center"
                                 style={{ borderColor: on ? "#f0a05c" : "#333", background: on ? "rgba(240,160,92,0.1)" : "#262626", color: on ? "#ffd0a0" : "#aaa" }}>
                                 {t.label}
@@ -925,40 +926,31 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                             );
                           })}
                         </div>
-                        <p className="text-[9px] font-bold uppercase tracking-wider mb-1" style={{ color: "#888" }}>Custom Property</p>
+                        <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "#888" }}>Custom Property</p>
                         {([
                           { section: "Transform", items: [
-                            { id: "scale" as const, label: "Scale" },
-                            { id: "rotate" as const, label: "Rotate" },
-                            { id: "move" as const, label: "Move" },
+                            { id: "scale" as AnimProp, label: "Scale", icon: "expand" },
+                            { id: "rotate" as AnimProp, label: "Rotate", icon: "rotate" },
+                            { id: "move" as AnimProp, label: "Move", icon: "move" },
                           ]},
                           { section: "Style", items: [
-                            { id: "opacity" as const, label: "Opacity" },
-                            { id: "color" as const, label: "Color" },
-                            { id: "corner-radius" as const, label: "Corner Radius" },
-                            { id: "stroke" as const, label: "Stroke" },
+                            { id: "opacity" as AnimProp, label: "Opacity", icon: "eye" },
+                            { id: "color" as AnimProp, label: "Color", icon: "palette" },
+                            { id: "corner-radius" as AnimProp, label: "Corner Radius", icon: "square" },
+                            { id: "stroke" as AnimProp, label: "Stroke", icon: "minus" },
                           ]},
                           { section: "Effects", items: [
-                            { id: "layer-blur" as const, label: "Layer Blur" },
+                            { id: "layer-blur" as AnimProp, label: "Layer Blur", icon: "circle" },
                           ]},
-                        ] as { section: string; items: { id: AnimProp; label: string }[] }[]).map(({ section, items }) => (
-                          <div key={section} className="mb-2">
-                            <p className="text-[9px] font-semibold uppercase tracking-wider mb-1 px-1" style={{ color: "#555" }}>{section}</p>
+                        ] as { section: string; items: { id: AnimProp; label: string; icon: string }[] }[]).map(({ section, items }) => (
+                          <div key={section} className="mb-3">
+                            <p className="text-[9px] font-semibold uppercase tracking-wider mb-1 px-1" style={{ color: "#666" }}>{section}</p>
                             {items.map((item) => (
                               <button key={item.id}
-                                onClick={() => {
-                                  setAnimProp(item.id);
-                                  setAnimView("detail");
-                                  if (item.id === "scale") patchLayer(selected.id, { preset: "custom", fromScale: 0.5, fromOpacity: 0 });
-                                  else if (item.id === "rotate") patchLayer(selected.id, { preset: "custom", fromRotate: 90, fromOpacity: 0 });
-                                  else if (item.id === "move") patchLayer(selected.id, { preset: "custom", fromDX: -80, fromOpacity: 0 });
-                                  else if (item.id === "opacity") patchLayer(selected.id, { preset: "fade" });
-                                  else if (item.id === "layer-blur") patchLayer(selected.id, { blur: (selected.blur ?? 0) > 0 ? selected.blur : 8 });
-                                  replay();
-                                }}
-                                className="w-full flex items-center px-2.5 py-2 rounded-[7px] text-left text-[12px] transition-colors hover:bg-white/5"
+                                onClick={() => { setAnimProp(item.id); setAnimView("detail"); if (item.id === "scale") patchLayer(selected.id, { preset: "custom", fromScale: 0.5, fromOpacity: 0 }); else if (item.id === "rotate") patchLayer(selected.id, { preset: "custom", fromRotate: 90, fromOpacity: 0 }); else if (item.id === "move") patchLayer(selected.id, { preset: "custom", fromDX: -80, fromOpacity: 0 }); else if (item.id === "opacity") patchLayer(selected.id, { preset: "fade" }); else if (item.id === "layer-blur") patchLayer(selected.id, { blur: 8 }); replay(); }}
+                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[7px] text-left text-[12px] transition-colors hover:bg-white/5"
                                 style={{ color: "#ccc" }}>
-                                <span className="w-1.5 h-1.5 rounded-full mr-2.5 flex-shrink-0" style={{ background: "#8a76ff" }} />
+                                <Icon name={item.icon as never} size={13} style={{ color: "#8a76ff", flexShrink: 0 }} />
                                 {item.label}
                               </button>
                             ))}
@@ -973,15 +965,18 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                         <button onClick={() => setAnimView("picker")} className="flex items-center gap-1.5 text-[11px] mb-3 hover:opacity-80" style={{ color: "#888" }}>
                           <Icon name="arrow-left" size={11} /> Kembali
                         </button>
-                        <p className="text-[13px] font-bold mb-4 capitalize" style={{ color: "#e8e8e8" }}>
-                          {animProp ? animProp.replace(/-/g, " ") : selected.preset !== "none" ? selected.preset : "Animation"}
-                        </p>
+                        <div className="flex items-center gap-2 mb-4">
+                          <Icon name="expand" size={14} style={{ color: "#8a76ff" }} />
+                          <p className="text-[13px] font-bold" style={{ color: "#e8e8e8" }}>
+                            {animProp ? animProp.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "Animation"}
+                          </p>
+                        </div>
 
                         {/* Entry section */}
                         <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "#5cf0a0" }}>Entry</p>
-                        <div className="rounded-[10px] p-3 mb-3" style={{ background: "#252525", border: "1px solid #2e2e2e" }}>
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="text-[11px]" style={{ color: "#aaa" }}>Preset</span>
+                        <div className="rounded-[10px] p-3 mb-3" style={{ background: "#252525", border: "1px solid #333" }}>
+                          <div className="flex items-center justify-between mb-2.5">
+                            <label className="text-[11px]" style={{ color: "#aaa" }}>Preset</label>
                             <Select value={selected.preset} onChange={(e) => { patchLayer(selected.id, { preset: e.target.value as AnimPreset }); replay(); }} className="!text-[11px] !py-0.5 !px-2 w-[110px]">
                               {IN_TEMPLATES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                             </Select>
