@@ -2,7 +2,7 @@
 
 import { ShellLayout } from "@/components/shell/Layout";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { useRef, useState, useMemo } from "react";
+import { useRef, useState, useMemo, useEffect } from "react";
 import { Icon } from "@/components/ui/icon";
 import { useMoodStore, type MoodCategory, type MediaType } from "@/lib/store";
 import { uploadMedia } from "@/lib/supabase";
@@ -186,6 +186,98 @@ export default function MoodboardPage() {
       setSaving(false);
     }
   };
+
+  // ── Paste from clipboard (Figma export, image file, web image, image URL) ──
+  const [pasteToast, setPasteToast] = useState<string | null>(null);
+  useEffect(() => {
+    // Add a reference straight to the board from an image file.
+    const addPastedFile = async (file: File, title?: string) => {
+      setPasteToast("Menempelkan ke moodboard…");
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+        const uploaded = await uploadMedia(file);
+        addItem({
+          url: "",
+          title: title || "Pasted reference",
+          source_domain: "",
+          category: activeCategory === "all" ? "graphic_design" : activeCategory,
+          tags: [],
+          note: "",
+          color: "linear-gradient(135deg,#6ba539,#2e4d1b)",
+          image_url: uploaded || dataUrl,
+          media_type: file.type.startsWith("video/") ? "video" : "image",
+          createdAt: Date.now(),
+          projectId: activeFolder ?? undefined,
+        });
+      } catch (err) {
+        console.error("[moodboard] gagal paste:", err);
+      }
+      setPasteToast(null);
+    };
+
+    // Add from an image URL (web page <img> or pasted link).
+    const addPastedUrl = async (url: string) => {
+      setPasteToast("Menempelkan ke moodboard…");
+      let imageUrl = url;
+      let domain = "";
+      try { domain = new URL(url).hostname.replace("www.", ""); } catch {}
+      try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        if (blob.type.startsWith("image/")) {
+          const file = new File([blob], `pasted-${Date.now()}.png`, { type: blob.type });
+          const uploaded = await uploadMedia(file);
+          imageUrl = uploaded || (await readFileAsDataUrl(file));
+        }
+      } catch {
+        // CORS / fetch failure — keep the original URL as the image source.
+      }
+      addItem({
+        url: "", title: "Pasted reference", source_domain: domain,
+        category: activeCategory === "all" ? "graphic_design" : activeCategory,
+        tags: [], note: "", color: "linear-gradient(135deg,#6ba539,#2e4d1b)",
+        image_url: imageUrl, media_type: "image",
+        createdAt: Date.now(), projectId: activeFolder ?? undefined,
+      });
+      setPasteToast(null);
+    };
+
+    const onPaste = async (e: ClipboardEvent) => {
+      // Don't intercept paste inside form fields (the Add dialog, folder inputs…)
+      const el = document.activeElement;
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el as HTMLElement | null)?.isContentEditable) return;
+      if (showModal) return;
+
+      const dt = e.clipboardData;
+      if (!dt) return;
+      const itemsArr = Array.from(dt.items ?? []);
+
+      // 1) Raw image/video bytes
+      const fileItem = itemsArr.find((i) => i.kind === "file" && (i.type.startsWith("image/") || i.type.startsWith("video/")));
+      if (fileItem) {
+        const file = fileItem.getAsFile();
+        if (file) { e.preventDefault(); await addPastedFile(file, file.name.replace(/\.[^.]+$/, "")); return; }
+      }
+      const dtFile = Array.from(dt.files ?? []).find((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
+      if (dtFile) { e.preventDefault(); await addPastedFile(dtFile, dtFile.name.replace(/\.[^.]+$/, "")); return; }
+
+      // 2) HTML fragment with <img src> (image copied from a web page)
+      const html = dt.getData("text/html");
+      if (html) {
+        const src = /<img[^>]+src=["']([^"']+)["']/i.exec(html)?.[1];
+        if (src) { e.preventDefault(); await addPastedUrl(src); return; }
+      }
+
+      // 3) Plain-text image URL
+      const text = dt.getData("text/plain").trim();
+      if (/^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg|avif)(\?\S*)?$/i.test(text)) {
+        e.preventDefault(); await addPastedUrl(text); return;
+      }
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFolder, activeCategory, showModal]);
 
   // ── Folder actions ──
   const handleCreateFolder = () => {
@@ -744,6 +836,19 @@ export default function MoodboardPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── Paste toast ── */}
+      <AnimatePresence>
+        {pasteToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] px-4 py-2 rounded-full text-[13px] font-medium shadow-xl pointer-events-none"
+            style={{ background: "var(--color-ink)", color: "var(--color-surface)" }}
+          >
+            {pasteToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </ShellLayout>
   );
 }
