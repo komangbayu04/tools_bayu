@@ -982,95 +982,83 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                             </Select>
                           </div>
                           {/* Property-specific from value */}
-                          {animProp === "scale" && selected.preset === "custom" && (
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="text-[11px]" style={{ color: "#aaa" }}>Initial value</span>
-                              <div className="flex items-center gap-1.5">
-                                <input type="number" step={0.05} value={selected.fromScale ?? 0} onChange={(e) => { patchLayer(selected.id, { fromScale: Number(e.target.value) }); replay(); }} className="w-[64px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
-                                <span className="text-[10px]" style={{ color: "#666" }}>→ 1.0</span>
+                          {(animProp === "scale" || animProp === null) && selected.preset === "custom" && (
+                            <div className="flex items-center justify-between mb-2.5">
+                              <label className="text-[11px]" style={{ color: "#aaa" }}>Initial Scale</label>
+                              <div className="flex items-center gap-1">
+                                <input type="number" step={0.05} value={selected.fromScale ?? 0} onChange={(e) => { patchLayer(selected.id, { fromScale: Number(e.target.value) }); replay(); }} className="w-[70px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                <span className="text-[10px]" style={{ color: "#777" }}>→ 1.0</span>
                               </div>
                             </div>
                           )}
                           {animProp === "rotate" && selected.preset === "custom" && (
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="text-[11px]" style={{ color: "#aaa" }}>Initial value</span>
-                              <div className="flex items-center gap-1.5">
-                                <input type="number" step={15} value={selected.fromRotate ?? 0} onChange={(e) => { patchLayer(selected.id, { fromRotate: Number(e.target.value) }); replay(); }} className="w-[64px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
-                                <span className="text-[10px]" style={{ color: "#666" }}>°→ 0°</span>
+                            <div className="flex items-center justify-between mb-2.5">
+                              <label className="text-[11px]" style={{ color: "#aaa" }}>From Rotation</label>
+                              <div className="flex items-center gap-1">
+                                <input type="number" step={15} value={selected.fromRotate ?? 0} onChange={(e) => { patchLayer(selected.id, { fromRotate: Number(e.target.value) }); replay(); }} className="w-[70px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                <span className="text-[10px]" style={{ color: "#777" }}>° → 0°</span>
                               </div>
                             </div>
                           )}
                           {animProp === "move" && selected.preset === "custom" && (
-                            <>
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="text-[11px]" style={{ color: "#aaa" }}>From X</span>
-                                <input type="number" step={10} value={selected.fromDX ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDX: Number(e.target.value) }); replay(); }} className="w-[72px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                            <div className="flex items-center justify-between mb-2.5">
+                              <label className="text-[11px]" style={{ color: "#aaa" }}>From X Offset</label>
+                              <div className="flex items-center gap-1">
+                                <input type="number" step={10} value={selected.fromDX ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDX: Number(e.target.value) }); replay(); }} className="w-[70px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                <span className="text-[10px]" style={{ color: "#777" }}>→ 0</span>
                               </div>
-                              <div className="flex items-center justify-between mb-3">
-                                <span className="text-[11px]" style={{ color: "#aaa" }}>From Y</span>
-                                <input type="number" step={10} value={selected.fromDY ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDY: Number(e.target.value) }); replay(); }} className="w-[72px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
-                              </div>
-                            </>
+                            </div>
                           )}
                           {animProp === "opacity" && (
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="text-[11px]" style={{ color: "#aaa" }}>Initial value</span>
-                              <div className="flex items-center gap-1.5">
-                                <input type="number" min={0} max={1} step={0.1} value={selected.fromOpacity ?? 0} onChange={(e) => { patchLayer(selected.id, { fromOpacity: Number(e.target.value) }); replay(); }} className="w-[64px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
-                                <span className="text-[10px]" style={{ color: "#666" }}>→ 1.0</span>
+                            <div className="flex items-center justify-between mb-2.5">
+                              <label className="text-[11px]" style={{ color: "#aaa" }}>From Opacity</label>
+                              <div className="flex items-center gap-1">
+                                <input type="number" min={0} max={1} step={0.1} value={selected.fromOpacity ?? 0} onChange={(e) => { patchLayer(selected.id, { fromOpacity: Number(e.target.value) }); replay(); }} className="w-[70px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                <span className="text-[10px]" style={{ color: "#777" }}>→ 1.0</span>
                               </div>
                             </div>
                           )}
                           {animProp === "layer-blur" && (
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="text-[11px]" style={{ color: "#aaa" }}>Blur amount</span>
-                              <div className="flex items-center gap-1.5">
-                                <input type="number" min={0} max={40} step={1} value={selected.blur ?? 0} onChange={(e) => patchLayer(selected.id, { blur: Number(e.target.value) })} className="w-[64px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
-                                <span className="text-[10px]" style={{ color: "#666" }}>px</span>
-                              </div>
+                            <div className="flex items-center justify-between mb-2.5">
+                              <label className="text-[11px]" style={{ color: "#aaa" }}>Blur Amount</label>
+                              <input type="number" min={0} max={40} step={1} value={selected.blur ?? 0} onChange={(e) => patchLayer(selected.id, { blur: Number(e.target.value) })} className="w-[70px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
                             </div>
                           )}
                           {animProp === "corner-radius" && selected.kind === "rect" && (
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="text-[11px]" style={{ color: "#aaa" }}>To (radius)</span>
-                              <input type="number" min={0} max={400} step={4} value={selected.radius ?? 0} onChange={(e) => patchLayer(selected.id, { radius: Number(e.target.value) })} className="w-[72px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                            <div className="flex items-center justify-between mb-2.5">
+                              <label className="text-[11px]" style={{ color: "#aaa" }}>Radius</label>
+                              <input type="number" min={0} max={400} step={4} value={selected.radius ?? 0} onChange={(e) => patchLayer(selected.id, { radius: Number(e.target.value) })} className="w-[70px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
                             </div>
                           )}
-                          {animProp === "stroke" && (
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="text-[11px]" style={{ color: "#aaa" }}>Stroke width</span>
-                              <input type="number" min={0} max={60} step={1} value={selected.strokeWidth ?? 0} onChange={(e) => patchLayer(selected.id, { strokeWidth: Number(e.target.value) })} className="w-[72px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
-                            </div>
-                          )}
-                          <div className="h-px mb-3" style={{ background: "#333" }} />
-                          <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "#666" }}>Animation</p>
+                          <div className="h-px mb-2.5" style={{ background: "#333" }} />
+                          <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "#777" }}>Timing</p>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-[11px]" style={{ color: "#aaa" }}>Duration</span>
+                            <label className="text-[11px]" style={{ color: "#aaa" }}>Duration</label>
                             <div className="flex items-center gap-1">
-                              <input type="number" min={0.1} step={0.1} value={selected.duration} onChange={(e) => patchLayer(selected.id, { duration: Math.max(0.1, Number(e.target.value)) })} className="w-[56px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
-                              <span className="text-[10px]" style={{ color: "#666" }}>s</span>
+                              <input type="number" min={0.1} step={0.1} value={selected.duration} onChange={(e) => patchLayer(selected.id, { duration: Math.max(0.1, Number(e.target.value)) })} className="w-[60px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                              <span className="text-[10px]" style={{ color: "#777" }}>s</span>
                             </div>
                           </div>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-[11px]" style={{ color: "#aaa" }}>Delay</span>
+                            <label className="text-[11px]" style={{ color: "#aaa" }}>Delay</label>
                             <div className="flex items-center gap-1">
-                              <input type="number" min={0} step={0.1} value={selected.delay} onChange={(e) => patchLayer(selected.id, { delay: Math.max(0, Number(e.target.value)) })} className="w-[56px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
-                              <span className="text-[10px]" style={{ color: "#666" }}>s</span>
+                              <input type="number" min={0} step={0.1} value={selected.delay} onChange={(e) => patchLayer(selected.id, { delay: Math.max(0, Number(e.target.value)) })} className="w-[60px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                              <span className="text-[10px]" style={{ color: "#777" }}>s</span>
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-[11px]" style={{ color: "#aaa" }}>Easing</span>
+                            <label className="text-[11px]" style={{ color: "#aaa" }}>Easing</label>
                             <Select value={selected.easing} onChange={(e) => { patchLayer(selected.id, { easing: e.target.value as Easing }); replay(); }} className="!text-[11px] !py-0.5 !px-2 w-[110px]">
                               {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                             </Select>
                           </div>
                         </div>
 
-                        {/* Exit section */}
+                        {/* Exit timing */}
                         <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "#f0a05c" }}>Exit</p>
-                        <div className="rounded-[10px] p-3 mb-4" style={{ background: "#252525", border: "1px solid #2e2e2e" }}>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-[11px]" style={{ color: "#aaa" }}>Preset</span>
+                        <div className="rounded-[10px] p-3 mb-4" style={{ background: "#252525", border: "1px solid #333" }}>
+                          <div className="flex items-center justify-between mb-2.5">
+                            <label className="text-[11px]" style={{ color: "#aaa" }}>Preset</label>
                             <Select value={selected.outPreset ?? "none"} onChange={(e) => { patchLayer(selected.id, { outPreset: e.target.value as AnimOut }); replay(); }} className="!text-[11px] !py-0.5 !px-2 w-[110px]">
                               {OUT_TEMPLATES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                             </Select>
@@ -1078,14 +1066,14 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                           {selected.outPreset && selected.outPreset !== "none" && (
                             <>
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-[11px]" style={{ color: "#aaa" }}>Duration</span>
+                                <label className="text-[11px]" style={{ color: "#aaa" }}>Duration</label>
                                 <div className="flex items-center gap-1">
-                                  <input type="number" min={0.1} step={0.1} value={selected.outDuration ?? 0.6} onChange={(e) => patchLayer(selected.id, { outDuration: Math.max(0.1, Number(e.target.value)) })} className="w-[56px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
-                                  <span className="text-[10px]" style={{ color: "#666" }}>s</span>
+                                  <input type="number" min={0.1} step={0.1} value={selected.outDuration ?? 0.6} onChange={(e) => patchLayer(selected.id, { outDuration: Math.max(0.1, Number(e.target.value)) })} className="w-[60px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                  <span className="text-[10px]" style={{ color: "#777" }}>s</span>
                                 </div>
                               </div>
                               <div className="flex items-center justify-between">
-                                <span className="text-[11px]" style={{ color: "#aaa" }}>Easing</span>
+                                <label className="text-[11px]" style={{ color: "#aaa" }}>Easing</label>
                                 <Select value={selected.outEasing ?? "ease-in"} onChange={(e) => { patchLayer(selected.id, { outEasing: e.target.value as Easing }); replay(); }} className="!text-[11px] !py-0.5 !px-2 w-[110px]">
                                   {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                                 </Select>
@@ -1097,7 +1085,7 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                         <button
                           onClick={() => { replay(); setAnimView("list"); }}
                           className="w-full py-2.5 rounded-[10px] text-[13px] font-semibold transition-colors hover:opacity-90"
-                          style={{ background: "rgba(124,111,255,0.15)", color: "#c2b6ff", border: "1px solid rgba(124,111,255,0.3)" }}>
+                          style={{ background: "rgba(138,118,255,0.15)", color: "#c2b6ff", border: "1px solid rgba(138,118,255,0.35)" }}>
                           ✓ Apply Animation
                         </button>
                       </div>
@@ -1116,17 +1104,21 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
         </div>
       </div>
 
-      {/* ── Bottom: Timeline (resizable) ── */}
-      <div className="flex-shrink-0 border-t flex flex-col" style={{ background: "#1e1e1e", borderColor: "#333", height: timelineH }}
-        onPointerMove={onTlResizeMove} onPointerUp={onTlResizeUp}>
-        {/* Drag handle — pull up to expand */}
+      {/* ── Bottom: Timeline ── */}
+      <div
+        className="flex-shrink-0 border-t flex flex-col"
+        style={{ background: "#1e1e1e", borderColor: "#333", height: timelineH }}
+        onPointerMove={onTlResizeMove}
+        onPointerUp={onTlResizeUp}
+      >
+        {/* Drag-to-resize handle */}
         <div
-          className="w-full flex-shrink-0 flex items-center justify-center hover:bg-[#8a76ff]/20 transition-colors cursor-ns-resize touch-none"
-          style={{ height: 8 }}
-          onPointerDown={onTlResizeDown}>
-          <div className="w-8 h-[3px] rounded-full" style={{ background: "#3a3a3a" }} />
-        </div>
-        <div className="flex items-center justify-between px-3 py-1 border-b flex-shrink-0" style={{ borderColor: "#333" }}>
+          className="h-1.5 w-full cursor-ns-resize flex-shrink-0 hover:bg-[#8a76ff]/20 transition-colors"
+          style={{ background: "transparent" }}
+          onPointerDown={onTlResizeDown}
+        />
+        <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-3 py-1.5 border-b" style={{ borderColor: "#333" }}>
           <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "#666" }}>Timeline · {project.layers.length} layer</p>
           <div className="flex items-center gap-3 text-[9px]" style={{ color: "#666" }}>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm inline-block" style={{ background: "#5cf0a0" }} /> Masuk</span>
@@ -1221,6 +1213,7 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
