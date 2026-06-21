@@ -509,32 +509,73 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
     reader.readAsDataURL(file);
   };
 
-  // ── Paste from clipboard (Figma / any image source) ──
+  // ── Paste from clipboard (Figma export, image file, or web image) ──
   const [pasteToast, setPasteToast] = useState<string | null>(null);
   useEffect(() => {
+    // Turn a fetched image URL into a layer (uploads to storage when possible).
+    const addImageFromUrl = async (url: string) => {
+      setPasteToast("Menempelkan gambar…");
+      try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        if (!blob.type.startsWith("image/")) throw new Error("bukan gambar");
+        const file = new File([blob], `pasted-${Date.now()}.png`, { type: blob.type });
+        const uploaded = await uploadMedia(file);
+        if (uploaded) { addLayer("image", uploaded); }
+        else {
+          const reader = new FileReader();
+          reader.onload = () => addLayer("image", reader.result as string);
+          reader.readAsDataURL(blob);
+        }
+      } catch {
+        // CORS or fetch failure — fall back to using the URL directly.
+        addLayer("image", url);
+      }
+      setPasteToast(null);
+    };
+
+    const addImageFromFile = async (file: File) => {
+      setPasteToast("Menempelkan gambar…");
+      const uploaded = await uploadMedia(file);
+      if (uploaded) { addLayer("image", uploaded); }
+      else {
+        const reader = new FileReader();
+        reader.onload = () => addLayer("image", reader.result as string);
+        reader.readAsDataURL(file);
+      }
+      setPasteToast(null);
+    };
+
     const onPaste = async (e: ClipboardEvent) => {
       // Don't intercept paste inside text inputs
       const el = document.activeElement;
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el as HTMLElement | null)?.isContentEditable) return;
 
-      const items = Array.from(e.clipboardData?.items ?? []);
-      const imgItem = items.find((i) => i.type.startsWith("image/"));
-      if (!imgItem) return;
-      e.preventDefault();
+      const dt = e.clipboardData;
+      if (!dt) return;
+      const items = Array.from(dt.items ?? []);
 
-      const file = imgItem.getAsFile();
-      if (!file) return;
-
-      setPasteToast("Menempelkan gambar…");
-      const uploaded = await uploadMedia(file);
-      if (uploaded) {
-        addLayer("image", uploaded);
-      } else {
-        const reader = new FileReader();
-        reader.onload = () => { addLayer("image", reader.result as string); };
-        reader.readAsDataURL(file);
+      // 1) Raw image bytes (Figma export, screenshot, copied image file)
+      const imgItem = items.find((i) => i.kind === "file" && i.type.startsWith("image/"));
+      if (imgItem) {
+        const file = imgItem.getAsFile();
+        if (file) { e.preventDefault(); await addImageFromFile(file); return; }
       }
-      setPasteToast(null);
+      const fileImg = Array.from(dt.files ?? []).find((f) => f.type.startsWith("image/"));
+      if (fileImg) { e.preventDefault(); await addImageFromFile(fileImg); return; }
+
+      // 2) HTML fragment with an <img> (image copied from a web page)
+      const html = dt.getData("text/html");
+      if (html) {
+        const src = /<img[^>]+src=["']([^"']+)["']/i.exec(html)?.[1];
+        if (src) { e.preventDefault(); await addImageFromUrl(src); return; }
+      }
+
+      // 3) Plain-text image URL
+      const text = dt.getData("text/plain").trim();
+      if (/^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg|avif)(\?\S*)?$/i.test(text)) {
+        e.preventDefault(); await addImageFromUrl(text); return;
+      }
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
