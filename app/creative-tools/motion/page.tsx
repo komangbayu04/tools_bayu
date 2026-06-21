@@ -172,6 +172,18 @@ function getImage(src: string, onLoad: () => void): HTMLImageElement | null {
   return null;
 }
 
+// Build a CSS filter string from a layer's static-effect props (or "" for none).
+function layerFilter(l: MotionLayer): string {
+  const parts: string[] = [];
+  if (l.blur && l.blur > 0) parts.push(`blur(${l.blur}px)`);
+  if (l.grayscale && l.grayscale > 0) parts.push(`grayscale(${l.grayscale})`);
+  if (l.sepia && l.sepia > 0) parts.push(`sepia(${l.sepia})`);
+  if (l.saturate !== undefined && l.saturate !== 1) parts.push(`saturate(${l.saturate})`);
+  if (l.brightness !== undefined && l.brightness !== 1) parts.push(`brightness(${l.brightness})`);
+  if (l.contrast !== undefined && l.contrast !== 1) parts.push(`contrast(${l.contrast})`);
+  return parts.join(" ");
+}
+
 // ─── Canvas drawing ───────────────────────────────────────────────
 function drawFrame(ctx: CanvasRenderingContext2D, project: MotionProject, time: number, onImgLoad: () => void) {
   const { w, h } = DIMS[project.ratio];
@@ -189,16 +201,22 @@ function drawFrame(ctx: CanvasRenderingContext2D, project: MotionProject, time: 
     ctx.rotate(t.rotate);
     ctx.scale(t.scale, t.scale);
     ctx.translate(-layer.w / 2, -layer.h / 2);
+    // Static visual effects (canvas filters). Built once per layer.
+    const filter = layerFilter(layer);
+    if (filter) ctx.filter = filter;
+    const sw = layer.strokeWidth ?? 0;
     if (layer.kind === "rect") {
       ctx.fillStyle = layer.color;
       ctx.beginPath();
       ctx.roundRect(0, 0, layer.w, layer.h, layer.radius ?? 0);
       ctx.fill();
+      if (sw > 0) { ctx.lineWidth = sw; ctx.strokeStyle = layer.strokeColor ?? "#000"; ctx.stroke(); }
     } else if (layer.kind === "circle") {
       ctx.fillStyle = layer.color;
       ctx.beginPath();
       ctx.ellipse(layer.w / 2, layer.h / 2, layer.w / 2, layer.h / 2, 0, 0, Math.PI * 2);
       ctx.fill();
+      if (sw > 0) { ctx.lineWidth = sw; ctx.strokeStyle = layer.strokeColor ?? "#000"; ctx.stroke(); }
     } else if (layer.kind === "text") {
       ctx.fillStyle = layer.color;
       ctx.font = `700 ${layer.fontSize ?? 64}px ui-sans-serif, system-ui, sans-serif`;
@@ -244,6 +262,7 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [scrubTime, setScrubTime] = useState(0);
   const [tick, setTick] = useState(0);
+  const [propTab, setPropTab] = useState<"presets" | "custom" | "effects">("presets");
 
   const { w: W, h: H } = DIMS[project.ratio];
   const selected = project.layers.find((l) => l.id === selectedId) ?? null;
@@ -347,12 +366,22 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
   };
   const onHandleUp = () => { resizing.current = null; };
 
-  // ── Timeline bar drag ──
-  const barDrag = useRef<{ id: string; type: "in" | "out"; startX: number; orig: number } | null>(null);
-  const onBarDown = (e: React.PointerEvent, l: MotionLayer, type: "in" | "out") => {
+  // ── Timeline bar drag — move OR resize either edge (keyframe editing) ──
+  // edge: "move" shifts the whole bar; "start"/"end" trim it so the timeframe
+  // (entry/exit duration) can be shortened or lengthened by dragging the edges.
+  type BarEdge = "move" | "start" | "end";
+  const barDrag = useRef<{
+    id: string; type: "in" | "out"; edge: BarEdge; startX: number;
+    origStart: number; origDur: number;
+  } | null>(null);
+  const onBarDown = (e: React.PointerEvent, l: MotionLayer, type: "in" | "out", edge: BarEdge) => {
     e.stopPropagation();
     setSelectedId(l.id); setPlaying(false);
-    barDrag.current = { id: l.id, type, startX: e.clientX, orig: type === "in" ? l.delay : layerOutStart(l, project.duration) };
+    barDrag.current = {
+      id: l.id, type, edge, startX: e.clientX,
+      origStart: type === "in" ? l.delay : layerOutStart(l, project.duration),
+      origDur: type === "in" ? l.duration : (l.outDuration ?? 0.6),
+    };
     (e.target as Element).setPointerCapture(e.pointerId);
   };
   const onBarMove = (e: React.PointerEvent) => {
@@ -364,11 +393,32 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
     const dt = ((e.clientX - d.startX) / r.width) * project.duration;
     const l = project.layers.find((x) => x.id === d.id);
     if (!l) return;
+    const MIN = 0.1;
     if (d.type === "in") {
-      patchLayer(d.id, { delay: Math.max(0, Math.min(project.duration - l.duration, d.orig + dt)) });
+      if (d.edge === "move") {
+        patchLayer(d.id, { delay: Math.max(0, Math.min(project.duration - l.duration, d.origStart + dt)) });
+      } else if (d.edge === "start") {
+        // Move the start (delay) but keep the END fixed → changes duration.
+        const end = d.origStart + d.origDur;
+        const delay = Math.max(0, Math.min(end - MIN, d.origStart + dt));
+        patchLayer(d.id, { delay, duration: Math.max(MIN, end - delay) });
+      } else {
+        // Drag end → change duration only.
+        const dur = Math.max(MIN, Math.min(project.duration - d.origStart, d.origDur + dt));
+        patchLayer(d.id, { duration: dur });
+      }
     } else {
-      const dur = l.outDuration ?? 0.6;
-      patchLayer(d.id, { outStart: Math.max(layerInEnd(l), Math.min(project.duration - dur, d.orig + dt)) });
+      if (d.edge === "move") {
+        const dur = l.outDuration ?? 0.6;
+        patchLayer(d.id, { outStart: Math.max(layerInEnd(l), Math.min(project.duration - dur, d.origStart + dt)) });
+      } else if (d.edge === "start") {
+        const end = d.origStart + d.origDur;
+        const start = Math.max(layerInEnd(l), Math.min(end - MIN, d.origStart + dt));
+        patchLayer(d.id, { outStart: start, outDuration: Math.max(MIN, end - start) });
+      } else {
+        const dur = Math.max(MIN, Math.min(project.duration - d.origStart, d.origDur + dt));
+        patchLayer(d.id, { outDuration: dur });
+      }
     }
   };
   const onBarUp = () => { barDrag.current = null; };
@@ -638,132 +688,230 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
           </div>
         </div>
 
-        {/* ── Right panel: Properties ── */}
-        <div className="flex-shrink-0 border-l overflow-y-auto" style={{ width: 260, background: "#1e1e1e", borderColor: "#333" }}>
+        {/* ── Right panel: Properties (tabbed) ── */}
+        <div className="flex-shrink-0 border-l flex flex-col overflow-hidden" style={{ width: 264, background: "#1e1e1e", borderColor: "#333" }}>
           {selected ? (
-            <div className="p-3">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#888" }}>Properti Layer</p>
-                <button onClick={() => deleteLayer(selected.id)} className="flex items-center gap-1 text-[11px] hover:opacity-80" style={{ color: "#c46" }}>
-                  <Icon name="trash" size={11} /> Hapus
+            <>
+              {/* Layer header */}
+              <div className="flex items-center justify-between px-3 py-2.5 border-b flex-shrink-0" style={{ borderColor: "#333" }}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <Icon name={layerIcon(selected) as never} size={13} style={{ color: "#7ecfb0", flexShrink: 0 }} />
+                  <span className="text-[12px] font-semibold truncate" style={{ color: "#e8e8e8" }}>{layerLabel(selected)}</span>
+                </div>
+                <button onClick={() => deleteLayer(selected.id)} className="p-1 rounded hover:bg-red-900/40 transition-colors" style={{ color: "#c46" }}>
+                  <Icon name="trash" size={12} />
                 </button>
               </div>
 
-              {/* Position & size */}
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <div><label className={fieldLabel} style={fieldLabelStyle}>X</label><input type="number" value={selected.x} onChange={(e) => patchLayer(selected.id, { x: Number(e.target.value) })} className={numInput} style={numStyle} /></div>
-                <div><label className={fieldLabel} style={fieldLabelStyle}>Y</label><input type="number" value={selected.y} onChange={(e) => patchLayer(selected.id, { y: Number(e.target.value) })} className={numInput} style={numStyle} /></div>
-                <div><label className={fieldLabel} style={fieldLabelStyle}>Lebar</label><input type="number" value={selected.w} onChange={(e) => patchLayer(selected.id, { w: Number(e.target.value) })} className={numInput} style={numStyle} /></div>
-                <div><label className={fieldLabel} style={fieldLabelStyle}>Tinggi</label><input type="number" value={selected.h} onChange={(e) => patchLayer(selected.id, { h: Number(e.target.value) })} className={numInput} style={numStyle} /></div>
-              </div>
-
-              {selected.kind === "text" && (
-                <>
-                  <label className={fieldLabel} style={fieldLabelStyle}>Teks</label>
-                  <input value={selected.text ?? ""} onChange={(e) => patchLayer(selected.id, { text: e.target.value })} className={`${numInput} mb-2`} style={numStyle} />
-                  <label className={fieldLabel} style={fieldLabelStyle}>Ukuran Font</label>
-                  <input type="number" min={12} max={300} value={selected.fontSize ?? 64} onChange={(e) => patchLayer(selected.id, { fontSize: Number(e.target.value) })} className={`${numInput} mb-2`} style={numStyle} />
-                </>
-              )}
-              {selected.kind === "rect" && (
-                <>
-                  <label className={fieldLabel} style={fieldLabelStyle}>Sudut (radius)</label>
-                  <input type="number" min={0} max={400} value={selected.radius ?? 0} onChange={(e) => patchLayer(selected.id, { radius: Number(e.target.value) })} className={`${numInput} mb-2`} style={numStyle} />
-                </>
-              )}
-              {selected.kind !== "image" && (
-                <>
-                  <label className={fieldLabel} style={fieldLabelStyle}>Warna</label>
-                  <input type="color" value={selected.color} onChange={(e) => patchLayer(selected.id, { color: e.target.value })} className="w-full h-8 rounded-[6px] border cursor-pointer mb-3" style={{ borderColor: "#3a3a3a" }} />
-                </>
-              )}
-
-              <div className="h-px my-3" style={{ background: "#333" }} />
-
-              {/* In animation */}
-              <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "#5cf0a0" }}>Animasi Masuk</p>
-              <div className="grid grid-cols-2 gap-1 mb-2">
-                {IN_TEMPLATES.map((t) => {
-                  const on = selected.preset === t.value;
+              {/* Tabs */}
+              <div className="flex flex-shrink-0 border-b" style={{ borderColor: "#333" }}>
+                {([
+                  { id: "presets" as const, label: "PRESETS" },
+                  { id: "custom" as const, label: "CUSTOM" },
+                  { id: "effects" as const, label: "EFFECTS" },
+                ]).map((t) => {
+                  const on = propTab === t.id;
                   return (
-                    <button key={t.value}
-                      onClick={() => { patchLayer(selected.id, { preset: t.value }); replay(); }}
-                      className="px-2 py-1.5 rounded-md text-[11px] font-medium border transition-all text-left"
-                      style={{ borderColor: on ? "#5cf0a0" : "#333", background: on ? "rgba(92,240,160,0.1)" : "#2a2a2a", color: on ? "#c2f0df" : "#aaa" }}>
+                    <button key={t.id} onClick={() => setPropTab(t.id)}
+                      className="flex-1 py-2 text-[10px] font-bold tracking-wider transition-colors relative"
+                      style={{ color: on ? "#c2b6ff" : "#777", background: on ? "rgba(124,108,255,0.12)" : "transparent" }}>
                       {t.label}
+                      {on && <span className="absolute bottom-0 left-0 right-0 h-[2px]" style={{ background: "#8a76ff" }} />}
                     </button>
                   );
                 })}
               </div>
-              <div className="grid grid-cols-3 gap-1.5 mb-2">
-                <div><label className={fieldLabel} style={fieldLabelStyle}>Durasi</label>
-                  <input type="number" min={0.1} step={0.1} value={selected.duration} onChange={(e) => patchLayer(selected.id, { duration: Math.max(0.1, Number(e.target.value)) })} className={numInput} style={numStyle} /></div>
-                <div><label className={fieldLabel} style={fieldLabelStyle}>Delay</label>
-                  <input type="number" min={0} step={0.1} value={selected.delay} onChange={(e) => patchLayer(selected.id, { delay: Math.max(0, Number(e.target.value)) })} className={numInput} style={numStyle} /></div>
-                <div><label className={fieldLabel} style={fieldLabelStyle}>Easing</label>
-                  <Select value={selected.easing} onChange={(e) => { patchLayer(selected.id, { easing: e.target.value as Easing }); replay(); }} className="!text-[10px] !px-1 !py-1">
-                    {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                  </Select></div>
-              </div>
-              {selected.preset === "custom" && (
-                <div className="rounded-[8px] p-2 mb-2" style={{ background: "#252525", border: "1px solid #333" }}>
-                  <p className="text-[9px] font-semibold mb-2" style={{ color: "#888" }}>Mulai dari</p>
-                  <div className="grid grid-cols-2 gap-1.5 mb-1.5">
-                    <div><label className={fieldLabel} style={fieldLabelStyle}>DX</label><input type="number" step={10} value={selected.fromDX ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDX: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                    <div><label className={fieldLabel} style={fieldLabelStyle}>DY</label><input type="number" step={10} value={selected.fromDY ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDY: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <div><label className={fieldLabel} style={fieldLabelStyle}>Scale</label><input type="number" step={0.1} value={selected.fromScale ?? 1} onChange={(e) => { patchLayer(selected.id, { fromScale: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                    <div><label className={fieldLabel} style={fieldLabelStyle}>Rotasi°</label><input type="number" step={15} value={selected.fromRotate ?? 0} onChange={(e) => { patchLayer(selected.id, { fromRotate: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                    <div><label className={fieldLabel} style={fieldLabelStyle}>Opasitas</label><input type="number" min={0} max={1} step={0.1} value={selected.fromOpacity ?? 0} onChange={(e) => { patchLayer(selected.id, { fromOpacity: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                  </div>
-                </div>
-              )}
 
-              <div className="h-px my-3" style={{ background: "#333" }} />
-
-              {/* Out animation */}
-              <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "#f0a05c" }}>Animasi Keluar</p>
-              <div className="grid grid-cols-2 gap-1 mb-2">
-                {OUT_TEMPLATES.map((t) => {
-                  const on = (!selected.outPreset && t.value === "none") || selected.outPreset === t.value;
-                  return (
-                    <button key={t.value}
-                      onClick={() => { patchLayer(selected.id, { outPreset: t.value }); replay(); }}
-                      className="px-2 py-1.5 rounded-md text-[11px] font-medium border transition-all text-left"
-                      style={{ borderColor: on ? "#f0a05c" : "#333", background: on ? "rgba(240,160,92,0.1)" : "#2a2a2a", color: on ? "#ffd0a0" : "#aaa" }}>
-                      {t.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {selected.outPreset && selected.outPreset !== "none" && (
-                <>
-                  <div className="grid grid-cols-3 gap-1.5 mb-2">
-                    <div><label className={fieldLabel} style={fieldLabelStyle}>Durasi</label><input type="number" min={0.1} step={0.1} value={selected.outDuration ?? 0.6} onChange={(e) => patchLayer(selected.id, { outDuration: Math.max(0.1, Number(e.target.value)) })} className={numInput} style={numStyle} /></div>
-                    <div><label className={fieldLabel} style={fieldLabelStyle}>Mulai</label><input type="number" min={0} step={0.1} value={Number(layerOutStart(selected, project.duration).toFixed(2))} onChange={(e) => patchLayer(selected.id, { outStart: Math.max(layerInEnd(selected), Number(e.target.value)) })} className={numInput} style={numStyle} /></div>
-                    <div><label className={fieldLabel} style={fieldLabelStyle}>Easing</label>
-                      <Select value={selected.outEasing ?? "ease-in"} onChange={(e) => { patchLayer(selected.id, { outEasing: e.target.value as Easing }); replay(); }} className="!text-[10px] !px-1 !py-1">
-                        {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                      </Select></div>
-                  </div>
-                  {selected.outPreset === "custom-out" && (
-                    <div className="rounded-[8px] p-2" style={{ background: "#252525", border: "1px solid #333" }}>
-                      <p className="text-[9px] font-semibold mb-2" style={{ color: "#888" }}>Akhiri di</p>
-                      <div className="grid grid-cols-2 gap-1.5 mb-1.5">
-                        <div><label className={fieldLabel} style={fieldLabelStyle}>DX</label><input type="number" step={10} value={selected.toDX ?? 0} onChange={(e) => { patchLayer(selected.id, { toDX: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                        <div><label className={fieldLabel} style={fieldLabelStyle}>DY</label><input type="number" step={10} value={selected.toDY ?? 0} onChange={(e) => { patchLayer(selected.id, { toDY: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        <div><label className={fieldLabel} style={fieldLabelStyle}>Scale</label><input type="number" step={0.1} value={selected.toScale ?? 1} onChange={(e) => { patchLayer(selected.id, { toScale: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                        <div><label className={fieldLabel} style={fieldLabelStyle}>Rotasi°</label><input type="number" step={15} value={selected.toRotate ?? 0} onChange={(e) => { patchLayer(selected.id, { toRotate: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                        <div><label className={fieldLabel} style={fieldLabelStyle}>Opasitas</label><input type="number" min={0} max={1} step={0.1} value={selected.toOpacity ?? 0} onChange={(e) => { patchLayer(selected.id, { toOpacity: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                      </div>
+              <div className="flex-1 overflow-y-auto p-3">
+                {/* ── PRESETS TAB ── */}
+                {propTab === "presets" && (
+                  <>
+                    {/* Entry presets */}
+                    <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "#5cf0a0" }}>Animasi Masuk</p>
+                    <div className="grid grid-cols-2 gap-1.5 mb-2">
+                      {IN_TEMPLATES.map((t) => {
+                        const on = selected.preset === t.value;
+                        return (
+                          <button key={t.value}
+                            onClick={() => { patchLayer(selected.id, { preset: t.value }); replay(); }}
+                            className="px-2 py-2 rounded-md text-[11px] font-medium border transition-all text-center"
+                            style={{ borderColor: on ? "#5cf0a0" : "#333", background: on ? "rgba(92,240,160,0.1)" : "#262626", color: on ? "#c2f0df" : "#aaa" }}>
+                            {t.label}
+                          </button>
+                        );
+                      })}
                     </div>
-                  )}
-                </>
-              )}
-            </div>
+                    <div className="grid grid-cols-3 gap-1.5 mb-4">
+                      <div><label className={fieldLabel} style={fieldLabelStyle}>Durasi</label>
+                        <input type="number" min={0.1} step={0.1} value={selected.duration} onChange={(e) => patchLayer(selected.id, { duration: Math.max(0.1, Number(e.target.value)) })} className={numInput} style={numStyle} /></div>
+                      <div><label className={fieldLabel} style={fieldLabelStyle}>Delay</label>
+                        <input type="number" min={0} step={0.1} value={selected.delay} onChange={(e) => patchLayer(selected.id, { delay: Math.max(0, Number(e.target.value)) })} className={numInput} style={numStyle} /></div>
+                      <div><label className={fieldLabel} style={fieldLabelStyle}>Easing</label>
+                        <Select value={selected.easing} onChange={(e) => { patchLayer(selected.id, { easing: e.target.value as Easing }); replay(); }} className="!text-[10px] !px-1 !py-1">
+                          {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                        </Select></div>
+                    </div>
+
+                    {/* Exit presets */}
+                    <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "#f0a05c" }}>Animasi Keluar</p>
+                    <div className="grid grid-cols-2 gap-1.5 mb-2">
+                      {OUT_TEMPLATES.map((t) => {
+                        const on = (!selected.outPreset && t.value === "none") || selected.outPreset === t.value;
+                        return (
+                          <button key={t.value}
+                            onClick={() => { patchLayer(selected.id, { outPreset: t.value }); replay(); }}
+                            className="px-2 py-2 rounded-md text-[11px] font-medium border transition-all text-center"
+                            style={{ borderColor: on ? "#f0a05c" : "#333", background: on ? "rgba(240,160,92,0.1)" : "#262626", color: on ? "#ffd0a0" : "#aaa" }}>
+                            {t.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {selected.outPreset && selected.outPreset !== "none" && (
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <div><label className={fieldLabel} style={fieldLabelStyle}>Durasi</label><input type="number" min={0.1} step={0.1} value={selected.outDuration ?? 0.6} onChange={(e) => patchLayer(selected.id, { outDuration: Math.max(0.1, Number(e.target.value)) })} className={numInput} style={numStyle} /></div>
+                        <div><label className={fieldLabel} style={fieldLabelStyle}>Mulai</label><input type="number" min={0} step={0.1} value={Number(layerOutStart(selected, project.duration).toFixed(2))} onChange={(e) => patchLayer(selected.id, { outStart: Math.max(layerInEnd(selected), Number(e.target.value)) })} className={numInput} style={numStyle} /></div>
+                        <div><label className={fieldLabel} style={fieldLabelStyle}>Easing</label>
+                          <Select value={selected.outEasing ?? "ease-in"} onChange={(e) => { patchLayer(selected.id, { outEasing: e.target.value as Easing }); replay(); }} className="!text-[10px] !px-1 !py-1">
+                            {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                          </Select></div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* ── CUSTOM TAB ── */}
+                {propTab === "custom" && (
+                  <>
+                    {/* Transform */}
+                    <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "#888" }}>Transform</p>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div><label className={fieldLabel} style={fieldLabelStyle}>X</label><input type="number" value={selected.x} onChange={(e) => patchLayer(selected.id, { x: Number(e.target.value) })} className={numInput} style={numStyle} /></div>
+                      <div><label className={fieldLabel} style={fieldLabelStyle}>Y</label><input type="number" value={selected.y} onChange={(e) => patchLayer(selected.id, { y: Number(e.target.value) })} className={numInput} style={numStyle} /></div>
+                      <div><label className={fieldLabel} style={fieldLabelStyle}>Lebar</label><input type="number" value={selected.w} onChange={(e) => patchLayer(selected.id, { w: Number(e.target.value) })} className={numInput} style={numStyle} /></div>
+                      <div><label className={fieldLabel} style={fieldLabelStyle}>Tinggi</label><input type="number" value={selected.h} onChange={(e) => patchLayer(selected.id, { h: Number(e.target.value) })} className={numInput} style={numStyle} /></div>
+                    </div>
+
+                    {/* Style */}
+                    <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "#888" }}>Style</p>
+                    {selected.kind === "text" && (
+                      <>
+                        <label className={fieldLabel} style={fieldLabelStyle}>Teks</label>
+                        <input value={selected.text ?? ""} onChange={(e) => patchLayer(selected.id, { text: e.target.value })} className={`${numInput} mb-2`} style={numStyle} />
+                        <label className={fieldLabel} style={fieldLabelStyle}>Ukuran Font</label>
+                        <input type="number" min={12} max={300} value={selected.fontSize ?? 64} onChange={(e) => patchLayer(selected.id, { fontSize: Number(e.target.value) })} className={`${numInput} mb-2`} style={numStyle} />
+                      </>
+                    )}
+                    {selected.kind === "rect" && (
+                      <>
+                        <label className={fieldLabel} style={fieldLabelStyle}>Sudut (radius)</label>
+                        <input type="number" min={0} max={400} value={selected.radius ?? 0} onChange={(e) => patchLayer(selected.id, { radius: Number(e.target.value) })} className={`${numInput} mb-2`} style={numStyle} />
+                      </>
+                    )}
+                    {selected.kind !== "image" && (
+                      <>
+                        <label className={fieldLabel} style={fieldLabelStyle}>Warna</label>
+                        <input type="color" value={selected.color} onChange={(e) => patchLayer(selected.id, { color: e.target.value })} className="w-full h-8 rounded-[6px] border cursor-pointer mb-3" style={{ borderColor: "#3a3a3a" }} />
+                      </>
+                    )}
+                    {(selected.kind === "rect" || selected.kind === "circle") && (
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <div>
+                          <label className={fieldLabel} style={fieldLabelStyle}>Stroke</label>
+                          <input type="color" value={selected.strokeColor ?? "#000000"} onChange={(e) => patchLayer(selected.id, { strokeColor: e.target.value })} className="w-full h-8 rounded-[6px] border cursor-pointer" style={{ borderColor: "#3a3a3a" }} />
+                        </div>
+                        <div>
+                          <label className={fieldLabel} style={fieldLabelStyle}>Tebal Stroke</label>
+                          <input type="number" min={0} max={60} value={selected.strokeWidth ?? 0} onChange={(e) => patchLayer(selected.id, { strokeWidth: Math.max(0, Number(e.target.value)) })} className={numInput} style={numStyle} />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="h-px my-3" style={{ background: "#333" }} />
+
+                    {/* Custom movement — entry (active when preset = custom) */}
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#5cf0a0" }}>Gerakan Masuk</p>
+                      {selected.preset !== "custom" && (
+                        <button onClick={() => { patchLayer(selected.id, { preset: "custom" }); replay(); }} className="text-[10px] font-medium" style={{ color: "#7c6fff" }}>Aktifkan</button>
+                      )}
+                    </div>
+                    {selected.preset === "custom" ? (
+                      <div className="rounded-[8px] p-2 mb-3" style={{ background: "#252525", border: "1px solid #333" }}>
+                        <div className="grid grid-cols-2 gap-1.5 mb-1.5">
+                          <div><label className={fieldLabel} style={fieldLabelStyle}>Geser X</label><input type="number" step={10} value={selected.fromDX ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDX: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                          <div><label className={fieldLabel} style={fieldLabelStyle}>Geser Y</label><input type="number" step={10} value={selected.fromDY ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDY: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <div><label className={fieldLabel} style={fieldLabelStyle}>Scale</label><input type="number" step={0.1} value={selected.fromScale ?? 1} onChange={(e) => { patchLayer(selected.id, { fromScale: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                          <div><label className={fieldLabel} style={fieldLabelStyle}>Rotasi°</label><input type="number" step={15} value={selected.fromRotate ?? 0} onChange={(e) => { patchLayer(selected.id, { fromRotate: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                          <div><label className={fieldLabel} style={fieldLabelStyle}>Opasitas</label><input type="number" min={0} max={1} step={0.1} value={selected.fromOpacity ?? 0} onChange={(e) => { patchLayer(selected.id, { fromOpacity: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] mb-3" style={{ color: "#666" }}>Pilih preset “Custom” untuk mengatur gerakan masuk manual.</p>
+                    )}
+
+                    {/* Custom movement — exit (active when outPreset = custom-out) */}
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#f0a05c" }}>Gerakan Keluar</p>
+                      {selected.outPreset !== "custom-out" && (
+                        <button onClick={() => { patchLayer(selected.id, { outPreset: "custom-out" }); replay(); }} className="text-[10px] font-medium" style={{ color: "#7c6fff" }}>Aktifkan</button>
+                      )}
+                    </div>
+                    {selected.outPreset === "custom-out" ? (
+                      <div className="rounded-[8px] p-2" style={{ background: "#252525", border: "1px solid #333" }}>
+                        <div className="grid grid-cols-2 gap-1.5 mb-1.5">
+                          <div><label className={fieldLabel} style={fieldLabelStyle}>Geser X</label><input type="number" step={10} value={selected.toDX ?? 0} onChange={(e) => { patchLayer(selected.id, { toDX: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                          <div><label className={fieldLabel} style={fieldLabelStyle}>Geser Y</label><input type="number" step={10} value={selected.toDY ?? 0} onChange={(e) => { patchLayer(selected.id, { toDY: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <div><label className={fieldLabel} style={fieldLabelStyle}>Scale</label><input type="number" step={0.1} value={selected.toScale ?? 1} onChange={(e) => { patchLayer(selected.id, { toScale: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                          <div><label className={fieldLabel} style={fieldLabelStyle}>Rotasi°</label><input type="number" step={15} value={selected.toRotate ?? 0} onChange={(e) => { patchLayer(selected.id, { toRotate: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                          <div><label className={fieldLabel} style={fieldLabelStyle}>Opasitas</label><input type="number" min={0} max={1} step={0.1} value={selected.toOpacity ?? 0} onChange={(e) => { patchLayer(selected.id, { toOpacity: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[10px]" style={{ color: "#666" }}>Pilih preset keluar “Custom” untuk mengatur gerakan keluar manual.</p>
+                    )}
+                  </>
+                )}
+
+                {/* ── EFFECTS TAB ── */}
+                {propTab === "effects" && (
+                  <>
+                    <p className="text-[10px] font-bold uppercase tracking-wider mb-3" style={{ color: "#888" }}>Filter Visual</p>
+                    {([
+                      { key: "blur" as const, label: "Layer Blur", min: 0, max: 40, step: 1, def: 0, unit: "px" },
+                      { key: "grayscale" as const, label: "Grayscale", min: 0, max: 1, step: 0.05, def: 0, unit: "" },
+                      { key: "sepia" as const, label: "Sepia", min: 0, max: 1, step: 0.05, def: 0, unit: "" },
+                      { key: "saturate" as const, label: "Saturasi", min: 0, max: 3, step: 0.05, def: 1, unit: "×" },
+                      { key: "brightness" as const, label: "Brightness", min: 0, max: 2, step: 0.05, def: 1, unit: "×" },
+                      { key: "contrast" as const, label: "Contrast", min: 0, max: 2, step: 0.05, def: 1, unit: "×" },
+                    ]).map((fx) => {
+                      const val = (selected[fx.key] as number | undefined) ?? fx.def;
+                      return (
+                        <div key={fx.key} className="mb-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[10px] font-bold uppercase tracking-wider" style={fieldLabelStyle}>{fx.label}</label>
+                            <span className="text-[10px] tabular-nums" style={{ color: "#aaa" }}>{val}{fx.unit}</span>
+                          </div>
+                          <input type="range" min={fx.min} max={fx.max} step={fx.step} value={val}
+                            onChange={(e) => patchLayer(selected.id, { [fx.key]: Number(e.target.value) } as Partial<MotionLayer>)}
+                            className="w-full accent-[#8a76ff]" style={{ accentColor: "#8a76ff" }} />
+                        </div>
+                      );
+                    })}
+                    <button
+                      onClick={() => patchLayer(selected.id, { blur: 0, grayscale: 0, sepia: 0, saturate: 1, brightness: 1, contrast: 1 })}
+                      className="w-full mt-1 py-1.5 rounded-md text-[11px] font-medium border transition-colors hover:bg-white/5"
+                      style={{ borderColor: "#333", color: "#aaa" }}>
+                      Reset semua filter
+                    </button>
+                  </>
+                )}
+              </div>
+            </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full p-6 text-center">
               <Icon name="shapes" size={24} style={{ color: "#444" }} />
@@ -831,19 +979,29 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                     {/* Full lifespan bg */}
                     <div className="absolute top-1/2 -translate-y-1/2 h-3.5 rounded"
                       style={{ left: pct(inStart), width: pct(Math.max(0.001, (hasOut ? oStart + oDur : project.duration) - inStart)), background: "#2a2a2a", border: "1px solid #3a3a3a" }} />
-                    {/* Entry bar */}
+                    {/* Entry bar — body moves it, edges trim its duration */}
                     {l.preset !== "none" && (
                       <div className="absolute top-1/2 -translate-y-1/2 h-3.5 rounded cursor-grab active:cursor-grabbing touch-none"
-                        title="Geser untuk mengubah delay"
-                        onPointerDown={(e) => onBarDown(e, l, "in")}
-                        style={{ left: pct(inStart), width: pct(inW), background: "#5cf0a0", opacity: 0.85 }} />
+                        title="Geser untuk delay · tarik tepi untuk durasi"
+                        onPointerDown={(e) => onBarDown(e, l, "in", "move")}
+                        style={{ left: pct(inStart), width: pct(inW), background: "#5cf0a0", opacity: 0.85 }}>
+                        <div className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize touch-none rounded-l"
+                          onPointerDown={(e) => onBarDown(e, l, "in", "start")} style={{ background: "rgba(0,0,0,0.25)" }} />
+                        <div className="absolute right-0 top-0 bottom-0 w-1.5 cursor-ew-resize touch-none rounded-r"
+                          onPointerDown={(e) => onBarDown(e, l, "in", "end")} style={{ background: "rgba(0,0,0,0.25)" }} />
+                      </div>
                     )}
-                    {/* Exit bar */}
+                    {/* Exit bar — body moves it, edges trim its duration */}
                     {hasOut && (
                       <div className="absolute top-1/2 -translate-y-1/2 h-3.5 rounded cursor-grab active:cursor-grabbing touch-none"
-                        title="Geser untuk mengubah waktu keluar"
-                        onPointerDown={(e) => onBarDown(e, l, "out")}
-                        style={{ left: pct(oStart), width: pct(oDur), background: "#f0a05c", opacity: 0.85 }} />
+                        title="Geser untuk waktu keluar · tarik tepi untuk durasi"
+                        onPointerDown={(e) => onBarDown(e, l, "out", "move")}
+                        style={{ left: pct(oStart), width: pct(oDur), background: "#f0a05c", opacity: 0.85 }}>
+                        <div className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize touch-none rounded-l"
+                          onPointerDown={(e) => onBarDown(e, l, "out", "start")} style={{ background: "rgba(0,0,0,0.25)" }} />
+                        <div className="absolute right-0 top-0 bottom-0 w-1.5 cursor-ew-resize touch-none rounded-r"
+                          onPointerDown={(e) => onBarDown(e, l, "out", "end")} style={{ background: "rgba(0,0,0,0.25)" }} />
+                      </div>
                     )}
                   </div>
                 );

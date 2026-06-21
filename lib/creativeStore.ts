@@ -140,6 +140,16 @@ export interface MotionLayer {
   fromDX?: number; fromDY?: number; fromScale?: number; fromRotate?: number; fromOpacity?: number;
   // manual ("custom") exit transform — where the layer animates TO
   toDX?: number; toDY?: number; toScale?: number; toRotate?: number; toOpacity?: number;
+  // outline / stroke (rect + circle)
+  strokeColor?: string;
+  strokeWidth?: number; // px, 0 = none
+  // static visual effects (canvas filters) applied to the whole layer
+  blur?: number;       // px
+  grayscale?: number;  // 0..1
+  sepia?: number;      // 0..1
+  saturate?: number;   // 1 = normal, >1 boosts
+  brightness?: number; // 1 = normal
+  contrast?: number;   // 1 = normal
 }
 
 export type CanvasRatio = "1:1" | "16:9" | "9:16";
