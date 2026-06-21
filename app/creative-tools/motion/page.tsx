@@ -509,6 +509,38 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
     reader.readAsDataURL(file);
   };
 
+  // ── Paste from clipboard (Figma / any image source) ──
+  const [pasteToast, setPasteToast] = useState<string | null>(null);
+  useEffect(() => {
+    const onPaste = async (e: ClipboardEvent) => {
+      // Don't intercept paste inside text inputs
+      const el = document.activeElement;
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el as HTMLElement | null)?.isContentEditable) return;
+
+      const items = Array.from(e.clipboardData?.items ?? []);
+      const imgItem = items.find((i) => i.type.startsWith("image/"));
+      if (!imgItem) return;
+      e.preventDefault();
+
+      const file = imgItem.getAsFile();
+      if (!file) return;
+
+      setPasteToast("Menempelkan gambar…");
+      const uploaded = await uploadMedia(file);
+      if (uploaded) {
+        addLayer("image", uploaded);
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => { addLayer("image", reader.result as string); };
+        reader.readAsDataURL(file);
+      }
+      setPasteToast(null);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.layers, project.ratio]);
+
   const exportWebM = async () => {
     const cv = canvasRef.current;
     if (!cv || exporting) return;
@@ -703,6 +735,11 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
         {/* ── Center: Canvas ── */}
         <div ref={canvasWrapRef} className="flex-1 overflow-hidden flex items-center justify-center relative"
           style={{ background: "#111", backgroundImage: "radial-gradient(#2a2a2a 1px, transparent 1px)", backgroundSize: "24px 24px" }}>
+          {/* Paste hint */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-full text-[10px] pointer-events-none select-none" style={{ background: "rgba(24,24,24,0.75)", color: "#555", border: "1px solid #2a2a2a" }}>
+            ⌘V / Ctrl+V untuk paste dari Figma
+          </div>
+
           {/* Zoom controls */}
           <div className="absolute bottom-3 right-3 flex items-center gap-1 z-20" style={{ background: "rgba(24,24,24,0.92)", borderRadius: 8, padding: "3px 8px", border: "1px solid #333" }}>
             <button onClick={() => setZoom((z) => Math.max(0.25, +(z - 0.1).toFixed(2)))} className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-base leading-none" style={{ color: "#aaa" }}>−</button>
@@ -1221,6 +1258,13 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
           )}
         </div>
       </div>
+
+      {/* ── Paste toast ── */}
+      {pasteToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] px-4 py-2 rounded-full text-[13px] font-medium shadow-xl pointer-events-none" style={{ background: "#2d2d2d", color: "#e8e8e8", border: "1px solid #444" }}>
+          {pasteToast}
+        </div>
+      )}
 
       {/* ── Bottom: Timeline ── */}
       <div
