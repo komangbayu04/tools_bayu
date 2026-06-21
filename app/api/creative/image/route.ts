@@ -47,6 +47,7 @@ function buildEditPrompt(mode: Mode, userPrompt: string): string {
           "- Gambar 2 = REFERENSI TEKSTUR/MATERIAL. Ambil pola permukaan, jenis material, warna material, dan finishing-nya.",
           "- Terapkan tekstur dari gambar 2 ke permukaan subjek gambar 1 mengikuti kontur, lipatan, dan pencahayaan asli subjek.",
           "ATURAN KETAT: Jangan mengubah bentuk/siluet subjek. Jangan menambah objek, teks, atau latar baru. Jangan mengarang detail di luar kedua gambar.",
+          "WARNA & TONE: JANGAN mengubah warna, tone warna, saturasi, kecerahan, atau palet warna subjek asli kecuali pengguna secara eksplisit memintanya dalam arahan tambahan.",
         ].join("\n");
 
   if (!userPrompt) return template;

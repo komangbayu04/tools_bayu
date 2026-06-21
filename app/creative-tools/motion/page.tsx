@@ -48,7 +48,6 @@ interface Transform { opacity: number; dx: number; dy: number; scale: number; ro
 
 const OFF = 120;
 
-// Layer lifespan helpers (so timeline + engine agree on timing).
 const layerInEnd = (l: MotionLayer) => l.delay + l.duration;
 const layerOutStart = (l: MotionLayer, total: number) => {
   if (!l.outPreset || l.outPreset === "none") return total;
@@ -67,7 +66,6 @@ function applyIn(tr: Transform, layer: MotionLayer, p: number) {
     case "pop": tr.opacity = p; tr.scale = 0.6 + 0.4 * p; break;
     case "rotate": tr.opacity = p; tr.scale = 0.9 + 0.1 * p; tr.rotate = (1 - p) * -0.26; break;
     case "custom": {
-      // Animate FROM the user-defined offsets to the resting state.
       const fDX = layer.fromDX ?? 0, fDY = layer.fromDY ?? 0;
       const fS = layer.fromScale ?? 1, fR = (layer.fromRotate ?? 0) * DEG;
       const fO = layer.fromOpacity ?? 0;
@@ -91,7 +89,6 @@ function applyOut(tr: Transform, layer: MotionLayer, q: number) {
     case "pop-out": tr.opacity *= 1 - q; tr.scale *= 1 - 0.4 * q; break;
     case "rotate-out": tr.opacity *= 1 - q; tr.rotate += q * 0.26; break;
     case "custom-out": {
-      // Animate TO the user-defined offsets.
       const tDX = layer.toDX ?? 0, tDY = layer.toDY ?? 0;
       const tS = layer.toScale ?? 1, tR = (layer.toRotate ?? 0) * DEG;
       const tO = layer.toOpacity ?? 0;
@@ -107,14 +104,7 @@ function applyOut(tr: Transform, layer: MotionLayer, q: number) {
 
 function computeTransform(layer: MotionLayer, time: number, total: number): Transform {
   const tr: Transform = { opacity: 1, dx: 0, dy: 0, scale: 1, rotate: 0 };
-
-  // Before the entry begins, the layer is hidden (unless it has no entry anim).
-  if (layer.preset !== "none" && time < layer.delay) {
-    tr.opacity = 0;
-    return tr;
-  }
-
-  // Entry
+  if (layer.preset !== "none" && time < layer.delay) { tr.opacity = 0; return tr; }
   if (layer.preset !== "none") {
     const raw = clamp01((time - layer.delay) / Math.max(0.0001, layer.duration));
     if (layer.preset === "bounce") {
@@ -125,8 +115,6 @@ function computeTransform(layer: MotionLayer, time: number, total: number): Tran
       applyIn(tr, layer, EASE[layer.easing](raw));
     }
   }
-
-  // Exit
   if (layer.outPreset && layer.outPreset !== "none") {
     const start = layerOutStart(layer, total);
     const dur = layer.outDuration ?? 0.6;
@@ -135,35 +123,35 @@ function computeTransform(layer: MotionLayer, time: number, total: number): Tran
       applyOut(tr, layer, q);
     }
   }
-
   return tr;
 }
 
-// ─── Presets / options ────────────────────────────────────────────
-type TemplateDef = { value: AnimPreset; label: string; icon: string };
+// ─── Presets ──────────────────────────────────────────────────────
+type TemplateDef = { value: AnimPreset; label: string };
 const IN_TEMPLATES: TemplateDef[] = [
-  { value: "fade", label: "Fade In", icon: "circle" },
-  { value: "slide-up", label: "Slide Up", icon: "chevron-down" },
-  { value: "slide-down", label: "Slide Down", icon: "chevron-down" },
-  { value: "slide-left", label: "Slide Left", icon: "chevron-right" },
-  { value: "slide-right", label: "Slide Right", icon: "chevron-right" },
-  { value: "pop", label: "Pop / Scale", icon: "expand" },
-  { value: "rotate", label: "Rotate In", icon: "rotate" },
-  { value: "bounce", label: "Bounce", icon: "play" },
-  { value: "custom", label: "Custom", icon: "edit" },
+  { value: "none", label: "Langsung" },
+  { value: "fade", label: "Fade In" },
+  { value: "slide-up", label: "Slide Up" },
+  { value: "slide-down", label: "Slide Down" },
+  { value: "slide-left", label: "Slide Left" },
+  { value: "slide-right", label: "Slide Right" },
+  { value: "pop", label: "Pop" },
+  { value: "rotate", label: "Rotate" },
+  { value: "bounce", label: "Bounce" },
+  { value: "custom", label: "Custom" },
 ];
-type OutTemplateDef = { value: AnimOut; label: string; icon: string };
+type OutTemplateDef = { value: AnimOut; label: string };
 const OUT_TEMPLATES: OutTemplateDef[] = [
-  { value: "fade-out", label: "Fade Out", icon: "circle" },
-  { value: "slide-up-out", label: "Slide Up Out", icon: "chevron-down" },
-  { value: "slide-down-out", label: "Slide Down Out", icon: "chevron-down" },
-  { value: "slide-left-out", label: "Slide Left Out", icon: "chevron-right" },
-  { value: "slide-right-out", label: "Slide Right Out", icon: "chevron-right" },
-  { value: "pop-out", label: "Pop Out", icon: "expand" },
-  { value: "rotate-out", label: "Rotate Out", icon: "rotate" },
-  { value: "custom-out", label: "Custom", icon: "edit" },
+  { value: "none", label: "Tidak ada" },
+  { value: "fade-out", label: "Fade Out" },
+  { value: "slide-up-out", label: "Slide Up" },
+  { value: "slide-down-out", label: "Slide Down" },
+  { value: "slide-left-out", label: "Slide Left" },
+  { value: "slide-right-out", label: "Slide Right" },
+  { value: "pop-out", label: "Pop Out" },
+  { value: "rotate-out", label: "Rotate Out" },
+  { value: "custom-out", label: "Custom" },
 ];
-
 const EASINGS: { value: Easing; label: string }[] = [
   { value: "ease-out", label: "Ease Out" },
   { value: "ease-in", label: "Ease In" },
@@ -171,14 +159,12 @@ const EASINGS: { value: Easing; label: string }[] = [
   { value: "linear", label: "Linear" },
 ];
 
-// ─── Image cache (shared across renders) ──────────────────────────
+// ─── Image cache ──────────────────────────────────────────────────
 const imgCache = new Map<string, HTMLImageElement>();
 function getImage(src: string, onLoad: () => void): HTMLImageElement | null {
   const cached = imgCache.get(src);
   if (cached) return cached.complete ? cached : null;
   const img = new window.Image();
-  // Remote (Storage) images must be CORS-enabled or drawing them taints the
-  // canvas and breaks WebM export. Data URLs are same-origin, so skip it there.
   if (!src.startsWith("data:")) img.crossOrigin = "anonymous";
   img.onload = onLoad;
   img.src = src;
@@ -187,30 +173,22 @@ function getImage(src: string, onLoad: () => void): HTMLImageElement | null {
 }
 
 // ─── Canvas drawing ───────────────────────────────────────────────
-function drawFrame(
-  ctx: CanvasRenderingContext2D,
-  project: MotionProject,
-  time: number,
-  onImgLoad: () => void
-) {
+function drawFrame(ctx: CanvasRenderingContext2D, project: MotionProject, time: number, onImgLoad: () => void) {
   const { w, h } = DIMS[project.ratio];
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = project.bg;
   ctx.fillRect(0, 0, w, h);
-
   for (const layer of project.layers) {
     const t = computeTransform(layer, time, project.duration);
     if (t.opacity <= 0.001) continue;
     const cx = layer.x + layer.w / 2;
     const cy = layer.y + layer.h / 2;
-
     ctx.save();
     ctx.globalAlpha = t.opacity;
     ctx.translate(cx + t.dx, cy + t.dy);
     ctx.rotate(t.rotate);
     ctx.scale(t.scale, t.scale);
     ctx.translate(-layer.w / 2, -layer.h / 2);
-
     if (layer.kind === "rect") {
       ctx.fillStyle = layer.color;
       ctx.beginPath();
@@ -239,42 +217,33 @@ function drawFrame(
 function newLayer(kind: LayerKind, ratio: CanvasRatio, src?: string): MotionLayer {
   const { w, h } = DIMS[ratio];
   const base = {
-    id: crypto.randomUUID(),
-    kind,
+    id: crypto.randomUUID(), kind,
     color: kind === "text" ? "#1c1917" : "#7c6f64",
-    preset: "fade" as AnimPreset,
-    duration: 0.8,
-    delay: 0,
-    easing: "ease-out" as Easing,
-    outPreset: "none" as AnimOut,
-    outDuration: 0.6,
-    outEasing: "ease-in" as Easing,
+    preset: "fade" as AnimPreset, duration: 0.8, delay: 0, easing: "ease-out" as Easing,
+    outPreset: "none" as AnimOut, outDuration: 0.6, outEasing: "ease-in" as Easing,
   };
-  if (kind === "text")
-    return { ...base, x: w / 2 - 250, y: h / 2 - 50, w: 500, h: 100, text: "Teks Kamu", fontSize: 64 };
-  if (kind === "rect")
-    return { ...base, x: w / 2 - 150, y: h / 2 - 90, w: 300, h: 180, radius: 24 };
-  if (kind === "circle")
-    return { ...base, x: w / 2 - 110, y: h / 2 - 110, w: 220, h: 220 };
+  if (kind === "text") return { ...base, x: w / 2 - 250, y: h / 2 - 50, w: 500, h: 100, text: "Teks Kamu", fontSize: 64 };
+  if (kind === "rect") return { ...base, x: w / 2 - 150, y: h / 2 - 90, w: 300, h: 180, radius: 24 };
+  if (kind === "circle") return { ...base, x: w / 2 - 110, y: h / 2 - 110, w: 220, h: 220 };
   return { ...base, x: w / 2 - 200, y: h / 2 - 150, w: 400, h: 300, src };
 }
 
-// ─── Editor ───────────────────────────────────────────────────────
+// ─── Full-page Editor ─────────────────────────────────────────────
 function Editor({ project, onBack }: { project: MotionProject; onBack: () => void }) {
   const { updateProject, deleteProject } = useMotionStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const rafRef = useRef<number>(0);
   const startRef = useRef<number>(0);
-  const timeRef = useRef<number>(0);            // live playback time
+  const timeRef = useRef<number>(0);
   const playheadRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const timeLabelRef = useRef<HTMLSpanElement>(null);
   const [playing, setPlaying] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [scrubTime, setScrubTime] = useState(0); // time shown when paused
-  const [tick, setTick] = useState(0); // forces redraw on data change
+  const [scrubTime, setScrubTime] = useState(0);
+  const [tick, setTick] = useState(0);
 
   const { w: W, h: H } = DIMS[project.ratio];
   const selected = project.layers.find((l) => l.id === selectedId) ?? null;
@@ -283,21 +252,14 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
   const patchLayer = (id: string, p: Partial<MotionLayer>) =>
     patch({ layers: project.layers.map((l) => (l.id === id ? { ...l, ...p } : l)) });
 
-  const redraw = useCallback(
-    (time: number) => {
-      const cv = canvasRef.current;
-      if (!cv) return;
-      const ctx = cv.getContext("2d");
-      if (!ctx) return;
-      drawFrame(ctx, project, time, () => setTick((t) => t + 1));
-    },
-    [project]
-  );
+  const redraw = useCallback((time: number) => {
+    const cv = canvasRef.current;
+    if (!cv) return;
+    const ctx = cv.getContext("2d");
+    if (!ctx) return;
+    drawFrame(ctx, project, time, () => setTick((t) => t + 1));
+  }, [project]);
 
-  // Preview loop. NOTE: `tick` is deliberately NOT a dependency — it bumps only
-  // to force a one-shot redraw when an async image finishes loading. Including it
-  // would tear down and recreate the rAF loop on every image load, resetting
-  // `startRef` and snapping the animation back to t=0.
   useEffect(() => {
     if (exporting || !playing) return;
     startRef.current = performance.now();
@@ -306,8 +268,6 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
       const t = elapsed % project.duration;
       timeRef.current = t;
       redraw(t);
-      // Move the timeline playhead + time readout imperatively — avoids a
-      // React re-render every animation frame (which would make it janky).
       if (playheadRef.current) playheadRef.current.style.left = `${(t / project.duration) * 100}%`;
       if (timeLabelRef.current) timeLabelRef.current.textContent = t.toFixed(2);
       rafRef.current = requestAnimationFrame(loop);
@@ -316,8 +276,6 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
     return () => cancelAnimationFrame(rafRef.current);
   }, [playing, exporting, redraw, project.duration]);
 
-  // Paused: show the frame at the current scrub position, and redraw once
-  // whenever a layer image loads (tick) so it appears without hitting play.
   useEffect(() => {
     if (exporting || playing) return;
     redraw(scrubTime);
@@ -325,13 +283,11 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
     if (timeLabelRef.current) timeLabelRef.current.textContent = scrubTime.toFixed(2);
   }, [playing, exporting, redraw, project.duration, scrubTime, tick]);
 
-  // ── Play / pause: when pausing, freeze the scrubber at the live time. ──
   const togglePlay = () => {
     if (playing) { setScrubTime(timeRef.current); setPlaying(false); }
     else setPlaying(true);
   };
 
-  // Spacebar toggles play/pause — but not while typing in a field.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== "Space" && e.key !== " ") return;
@@ -355,18 +311,14 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
   };
   const scrubbing = useRef(false);
   const onScrubDown = (e: React.PointerEvent) => {
-    setPlaying(false);
-    scrubbing.current = true;
+    setPlaying(false); scrubbing.current = true;
     setScrubTime(pxToTime(e.clientX));
     (e.target as Element).setPointerCapture(e.pointerId);
   };
-  const onScrubMove = (e: React.PointerEvent) => {
-    if (!scrubbing.current) return;
-    setScrubTime(pxToTime(e.clientX));
-  };
+  const onScrubMove = (e: React.PointerEvent) => { if (scrubbing.current) setScrubTime(pxToTime(e.clientX)); };
   const onScrubUp = () => { scrubbing.current = false; };
 
-  // ── Resize the selected layer via on-canvas handles ──
+  // ── Resize handles ──
   const resizing = useRef<{ handle: string; sx: number; sy: number; box: { x: number; y: number; w: number; h: number } } | null>(null);
   const onHandleDown = (e: React.PointerEvent, handle: string) => {
     e.stopPropagation();
@@ -395,16 +347,12 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
   };
   const onHandleUp = () => { resizing.current = null; };
 
-  // ── Drag a layer's in/out bar along the timeline to retime it ──
+  // ── Timeline bar drag ──
   const barDrag = useRef<{ id: string; type: "in" | "out"; startX: number; orig: number } | null>(null);
   const onBarDown = (e: React.PointerEvent, l: MotionLayer, type: "in" | "out") => {
     e.stopPropagation();
-    setSelectedId(l.id);
-    setPlaying(false);
-    barDrag.current = {
-      id: l.id, type, startX: e.clientX,
-      orig: type === "in" ? l.delay : layerOutStart(l, project.duration),
-    };
+    setSelectedId(l.id); setPlaying(false);
+    barDrag.current = { id: l.id, type, startX: e.clientX, orig: type === "in" ? l.delay : layerOutStart(l, project.duration) };
     (e.target as Element).setPointerCapture(e.pointerId);
   };
   const onBarMove = (e: React.PointerEvent) => {
@@ -417,18 +365,15 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
     const l = project.layers.find((x) => x.id === d.id);
     if (!l) return;
     if (d.type === "in") {
-      const max = project.duration - l.duration;
-      patchLayer(d.id, { delay: Math.max(0, Math.min(max, d.orig + dt)) });
+      patchLayer(d.id, { delay: Math.max(0, Math.min(project.duration - l.duration, d.orig + dt)) });
     } else {
       const dur = l.outDuration ?? 0.6;
-      const min = layerInEnd(l);
-      const max = project.duration - dur;
-      patchLayer(d.id, { outStart: Math.max(min, Math.min(max, d.orig + dt)) });
+      patchLayer(d.id, { outStart: Math.max(layerInEnd(l), Math.min(project.duration - dur, d.orig + dt)) });
     }
   };
   const onBarUp = () => { barDrag.current = null; };
 
-  // ── Pointer drag to reposition selected layer ──
+  // ── Canvas pointer drag ──
   const drag = useRef<{ id: string; offX: number; offY: number } | null>(null);
   const toStage = (e: React.PointerEvent) => {
     const cv = canvasRef.current!;
@@ -437,16 +382,13 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
   };
   const onPointerDown = (e: React.PointerEvent) => {
     const { x, y } = toStage(e);
-    // hit-test top-most
     const hit = [...project.layers].reverse().find((l) => x >= l.x && x <= l.x + l.w && y >= l.y && y <= l.y + l.h);
     if (hit) {
       setSelectedId(hit.id);
       drag.current = { id: hit.id, offX: x - hit.x, offY: y - hit.y };
       (e.target as Element).setPointerCapture(e.pointerId);
       setPlaying(false);
-    } else {
-      setSelectedId(null);
-    }
+    } else { setSelectedId(null); }
   };
   const onPointerMove = (e: React.PointerEvent) => {
     if (!drag.current) return;
@@ -455,550 +397,471 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
   };
   const onPointerUp = () => { drag.current = null; };
 
-  // ── Remove a layer (from timeline row or properties panel) ──
   const deleteLayer = (id: string) => {
     patch({ layers: project.layers.filter((l) => l.id !== id) });
     setSelectedId((cur) => (cur === id ? null : cur));
   };
-
-  // ── Add layers ──
   const addLayer = (kind: LayerKind, src?: string) => {
     const l = newLayer(kind, project.ratio, src);
     patch({ layers: [...project.layers, l] });
-    setSelectedId(l.id);
-    setPlaying(false);
+    setSelectedId(l.id); setPlaying(false);
   };
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
-    // Prefer a Storage URL so the persisted project stays small — embedding
-    // base64 images can blow the localStorage quota and silently drop the save.
     const uploaded = await uploadMedia(file);
-    if (uploaded) {
-      addLayer("image", uploaded);
-      return;
-    }
-    // Offline / not signed in: fall back to an inline data URL.
+    if (uploaded) { addLayer("image", uploaded); return; }
     const reader = new FileReader();
     reader.onload = () => addLayer("image", reader.result as string);
     reader.readAsDataURL(file);
   };
 
-  // ── Export to WebM ──
   const exportWebM = async () => {
     const cv = canvasRef.current;
     if (!cv || exporting) return;
-    setExporting(true);
-    setPlaying(false);
-    cancelAnimationFrame(rafRef.current);
+    setExporting(true); setPlaying(false); cancelAnimationFrame(rafRef.current);
     await new Promise((r) => setTimeout(r, 50));
-
     const stream = cv.captureStream(30);
     const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
     const rec = new MediaRecorder(stream, { mimeType: mime });
     const chunks: BlobPart[] = [];
     rec.ondataavailable = (ev) => ev.data.size && chunks.push(ev.data);
-
     const done = new Promise<void>((resolve) => {
       rec.onstop = () => {
         const blob = new Blob(chunks, { type: "video/webm" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = url;
-        a.download = `${project.name || "motion"}.webm`;
-        a.click();
-        URL.revokeObjectURL(url);
-        resolve();
+        a.href = url; a.download = `${project.name || "motion"}.webm`; a.click();
+        URL.revokeObjectURL(url); resolve();
       };
     });
-
     rec.start();
     const ctx = cv.getContext("2d")!;
-    const total = project.duration + 0.4; // small tail so the final state is visible
+    const total = project.duration + 0.4;
     const begin = performance.now();
     await new Promise<void>((resolve) => {
       const loop = () => {
         const t = (performance.now() - begin) / 1000;
         drawFrame(ctx, project, Math.min(t, project.duration), () => {});
-        if (t >= total) resolve();
-        else requestAnimationFrame(loop);
+        if (t >= total) resolve(); else requestAnimationFrame(loop);
       };
       requestAnimationFrame(loop);
     });
-    rec.stop();
-    await done;
-    setExporting(false);
-    setPlaying(true);
+    rec.stop(); await done;
+    setExporting(false); setPlaying(true);
   };
 
   const replay = () => { setScrubTime(0); setPlaying(false); setTimeout(() => setPlaying(true), 20); };
 
-  // Layer display helpers for the timeline
-  const layerLabel = (l: MotionLayer) =>
-    l.kind === "text" ? (l.text || "Teks") : l.kind === "rect" ? "Kotak" : l.kind === "circle" ? "Lingkaran" : "Gambar";
-  const layerIcon = (l: MotionLayer) =>
-    l.kind === "text" ? "type" : l.kind === "rect" ? "square" : l.kind === "circle" ? "circle" : "image";
+  const layerLabel = (l: MotionLayer) => l.kind === "text" ? (l.text?.slice(0, 14) || "Teks") : l.kind === "rect" ? "Kotak" : l.kind === "circle" ? "Lingkaran" : "Gambar";
+  const layerIcon = (l: MotionLayer) => l.kind === "text" ? "type" : l.kind === "rect" ? "square" : l.kind === "circle" ? "circle" : "image";
   const pct = (t: number) => `${(t / project.duration) * 100}%`;
-  // Ruler ticks roughly every 0.5s, but cap the count for long durations.
   const tickStep = project.duration > 8 ? 1 : 0.5;
   const ticks: number[] = [];
   for (let t = 0; t <= project.duration + 0.0001; t += tickStep) ticks.push(Number(t.toFixed(2)));
 
-  const fieldLabel = "block text-[11px] font-bold uppercase tracking-wider mb-1.5";
-  const numInput = "w-full rounded-[8px] border px-2.5 py-1.5 text-[13px] outline-none focus:ring-2";
-  const numStyle = { background: "var(--color-surface)", borderColor: "var(--color-hairline)", color: "var(--color-body)" };
+  const fieldLabel = "block text-[10px] font-bold uppercase tracking-wider mb-1";
+  const numInput = "w-full rounded-[6px] border px-2 py-1 text-[12px] outline-none focus:ring-1";
+  const numStyle = { background: "#1e1e1e", borderColor: "#3a3a3a", color: "#e8e8e8" };
+  const fieldLabelStyle = { color: "#8a8a8a" };
 
+  // ── Full-page layout (dark, Figma-like) ──────────────────────────
   return (
-    <ShellLayout>
-      <PageHeader
-        eyebrow="Creative Tools"
-        title="Motion Editor"
-        actions={
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={onBack}>
-              <Icon name="arrow-left" size={13} /> Semua Proyek
-            </Button>
-            <Button size="sm" onClick={exportWebM} disabled={exporting}>
-              {exporting ? <><Icon name="spinner" size={13} spin /> Mengekspor…</> : <><Icon name="download" size={13} /> Ekspor WebM</>}
-            </Button>
-            <Button variant="danger" size="sm" onClick={() => { deleteProject(project.id); onBack(); }}>
-              <Icon name="trash" size={13} /> Hapus
-            </Button>
-          </div>
-        }
-      />
+    <div className="fixed inset-0 flex flex-col overflow-hidden" style={{ background: "#1a1a1a", color: "#e0e0e0", fontFamily: "ui-sans-serif, system-ui, sans-serif", zIndex: 50 }}>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5 lg:items-start">
-        {/* ── Stage (sticky so canvas + timeline stay visible while scrolling) ── */}
-        <div className="flex flex-col gap-3 lg:sticky lg:top-4 lg:self-start">
-          {/* Toolbar */}
-          <div className="flex items-center gap-2 flex-wrap rounded-[12px] border p-2"
-            style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface-card)" }}>
-            <Button size="sm" variant="outline" onClick={() => addLayer("text")}><Icon name="type" size={13} /> Teks</Button>
-            <Button size="sm" variant="outline" onClick={() => addLayer("rect")}><Icon name="square" size={13} /> Kotak</Button>
-            <Button size="sm" variant="outline" onClick={() => addLayer("circle")}><Icon name="circle" size={13} /> Lingkaran</Button>
-            <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}><Icon name="image" size={13} /> Gambar</Button>
-            <input ref={fileRef} type="file" accept="image/*" onChange={onUpload} className="hidden" />
-            <div className="w-px h-5 mx-1" style={{ background: "var(--color-hairline)" }} />
-            <Button size="sm" variant="outline" onClick={togglePlay}>
-              <Icon name={playing ? "pause" : "play"} size={13} /> {playing ? "Jeda" : "Main"}
-            </Button>
-            <Button size="sm" variant="outline" onClick={replay}><Icon name="rotate" size={13} /> Ulang</Button>
-            <span className="ml-1 text-[12px] tabular-nums" style={{ color: "var(--color-muted)" }}>
-              <span ref={timeLabelRef}>{scrubTime.toFixed(2)}</span>s / {project.duration.toFixed(1)}s
-            </span>
-          </div>
+      {/* ── Top bar ── */}
+      <div className="flex items-center gap-3 px-3 h-11 border-b flex-shrink-0" style={{ background: "#242424", borderColor: "#333" }}>
+        <button onClick={onBack} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-medium hover:bg-white/10 transition-colors" style={{ color: "#aaa" }}>
+          <Icon name="arrow-left" size={13} /> Kembali
+        </button>
 
-          {/* Canvas */}
-          <div className="rounded-[16px] border overflow-hidden flex items-center justify-center p-4"
-            style={{ borderColor: "var(--color-hairline)", background: "var(--color-canvas)",
-              backgroundImage: "radial-gradient(var(--color-hairline) 1px, transparent 1px)", backgroundSize: "20px 20px" }}>
-            {/* Wrapper sizes exactly to the canvas so the selection overlay maps 1:1 */}
-            <div className="relative" style={{ lineHeight: 0, maxWidth: "100%", maxHeight: "62vh" }}>
-              <canvas
-                ref={canvasRef}
-                width={W}
-                height={H}
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={onPointerUp}
-                className="rounded-[8px] shadow-lg touch-none cursor-move"
-                style={{ display: "block", maxWidth: "100%", maxHeight: "62vh", aspectRatio: `${W} / ${H}`, background: project.bg }}
-              />
+        <div className="w-px h-5" style={{ background: "#333" }} />
 
-              {/* Selection rectangle with resize handles (paused editing only) */}
-              {selected && !playing && (
-                <div className="absolute inset-0 pointer-events-none">
-                  <div
-                    className="absolute"
-                    onPointerMove={onHandleMove}
-                    onPointerUp={onHandleUp}
-                    style={{
-                      left: `${(selected.x / W) * 100}%`,
-                      top: `${(selected.y / H) * 100}%`,
-                      width: `${(selected.w / W) * 100}%`,
-                      height: `${(selected.h / H) * 100}%`,
-                      border: "1.5px solid var(--color-primary)",
-                      boxShadow: "0 0 0 1px rgba(255,255,255,0.5)",
-                      pointerEvents: "none",
-                    }}
-                  >
-                    {[
-                      { id: "nw", l: 0, t: 0, c: "nwse-resize" },
-                      { id: "n", l: 0.5, t: 0, c: "ns-resize" },
-                      { id: "ne", l: 1, t: 0, c: "nesw-resize" },
-                      { id: "e", l: 1, t: 0.5, c: "ew-resize" },
-                      { id: "se", l: 1, t: 1, c: "nwse-resize" },
-                      { id: "s", l: 0.5, t: 1, c: "ns-resize" },
-                      { id: "sw", l: 0, t: 1, c: "nesw-resize" },
-                      { id: "w", l: 0, t: 0.5, c: "ew-resize" },
-                    ].map((h) => (
-                      <div
-                        key={h.id}
-                        onPointerDown={(e) => onHandleDown(e, h.id)}
-                        className="absolute rounded-[2px] touch-none"
-                        style={{
-                          left: `${h.l * 100}%`, top: `${h.t * 100}%`,
-                          width: 10, height: 10, transform: "translate(-50%, -50%)",
-                          background: "#fff", border: "1.5px solid var(--color-primary)",
-                          cursor: h.c, pointerEvents: "auto",
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
+        <input
+          value={project.name}
+          onChange={(e) => patch({ name: e.target.value })}
+          className="text-[13px] font-semibold bg-transparent border-none outline-none w-40 truncate"
+          style={{ color: "#e8e8e8" }}
+        />
+
+        <div className="flex-1" />
+
+        {/* Playback controls */}
+        <button onClick={replay} className="p-1.5 rounded hover:bg-white/10 transition-colors" title="Ulang (restart)" style={{ color: "#aaa" }}>
+          <Icon name="skip-back" size={14} />
+        </button>
+        <button onClick={togglePlay} className="flex items-center justify-center w-7 h-7 rounded-full transition-colors" style={{ background: playing ? "#5a9" : "#444" }} title="Play/Pause (Space)">
+          <Icon name={playing ? "pause" : "play"} size={13} style={{ color: "#fff" }} />
+        </button>
+        <span className="text-[11px] tabular-nums min-w-[64px] text-center" style={{ color: "#888" }}>
+          <span ref={timeLabelRef}>{scrubTime.toFixed(2)}</span>s / {project.duration.toFixed(1)}s
+        </span>
+
+        <div className="w-px h-5" style={{ background: "#333" }} />
+
+        <button onClick={exportWebM} disabled={exporting} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-semibold transition-colors disabled:opacity-50" style={{ background: "#2d5a4a", color: "#7ecfb0" }}>
+          {exporting ? <><Icon name="spinner" size={12} spin /> Ekspor…</> : <><Icon name="download" size={12} /> Ekspor WebM</>}
+        </button>
+        <button onClick={() => { if (confirm("Hapus proyek ini?")) { deleteProject(project.id); onBack(); } }} className="p-1.5 rounded hover:bg-red-900/40 transition-colors" style={{ color: "#c46" }}>
+          <Icon name="trash" size={14} />
+        </button>
+      </div>
+
+      {/* ── Main area (left panel + canvas + right panel) ── */}
+      <div className="flex flex-1 overflow-hidden">
+
+        {/* ── Left panel: Layers ── */}
+        <div className="flex flex-col flex-shrink-0 border-r overflow-hidden" style={{ width: 200, background: "#1e1e1e", borderColor: "#333" }}>
+          {/* Add layer buttons */}
+          <div className="p-2 border-b" style={{ borderColor: "#333" }}>
+            <p className="text-[9px] font-bold uppercase tracking-wider mb-2 px-1" style={{ color: "#666" }}>Tambah Elemen</p>
+            <div className="grid grid-cols-2 gap-1">
+              {([
+                { kind: "text" as LayerKind, label: "Teks", icon: "type" },
+                { kind: "rect" as LayerKind, label: "Kotak", icon: "square" },
+                { kind: "circle" as LayerKind, label: "Lingkaran", icon: "circle" },
+                { kind: "image" as LayerKind, label: "Gambar", icon: "image" },
+              ]).map((item) => (
+                <button key={item.kind}
+                  onClick={() => item.kind === "image" ? fileRef.current?.click() : addLayer(item.kind)}
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[11px] font-medium transition-colors hover:bg-white/10"
+                  style={{ color: "#bbb" }}>
+                  <Icon name={item.icon as never} size={11} style={{ color: "#888" }} />
+                  {item.label}
+                </button>
+              ))}
             </div>
+            <input ref={fileRef} type="file" accept="image/*" onChange={onUpload} className="hidden" />
           </div>
 
-          {/* ── Timeline ── */}
-          <div className="rounded-[12px] border overflow-hidden" style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface-card)" }}>
-            <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: "var(--color-hairline)" }}>
-              <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted-soft)" }}>
-                Timeline · {project.layers.length} layer
-              </p>
-              <div className="flex items-center gap-3 text-[10.5px]" style={{ color: "var(--color-muted)" }}>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: "var(--color-primary)" }} /> Masuk</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: "#d98a3c" }} /> Keluar</span>
+          {/* Layers list */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="px-3 py-2 border-b" style={{ borderColor: "#333" }}>
+              <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "#666" }}>Layer ({project.layers.length})</p>
+            </div>
+            {project.layers.length === 0 ? (
+              <p className="text-[11px] px-3 py-4 text-center" style={{ color: "#555" }}>Belum ada layer</p>
+            ) : (
+              <div className="py-1">
+                {[...project.layers].reverse().map((l) => {
+                  const isSel = selectedId === l.id;
+                  return (
+                    <button
+                      key={l.id}
+                      onClick={() => { setSelectedId(l.id); setPlaying(false); setScrubTime(timeRef.current); }}
+                      className="group/layer w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
+                      style={{ background: isSel ? "#2a3d33" : "transparent" }}
+                    >
+                      <Icon name={layerIcon(l) as never} size={12} style={{ color: isSel ? "#7ecfb0" : "#666", flexShrink: 0 }} />
+                      <span className="text-[12px] font-medium flex-1 truncate" style={{ color: isSel ? "#c2f0df" : "#bbb" }}>{layerLabel(l)}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteLayer(l.id); }}
+                        className="opacity-0 group-hover/layer:opacity-100 p-0.5 rounded transition-opacity hover:bg-red-900/60"
+                        style={{ color: "#c46", flexShrink: 0 }}
+                      >
+                        <Icon name="trash" size={10} />
+                      </button>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Stage settings (bottom of left panel) */}
+          <div className="border-t p-3 flex flex-col gap-2" style={{ borderColor: "#333" }}>
+            <p className="text-[9px] font-bold uppercase tracking-wider mb-1" style={{ color: "#666" }}>Stage</p>
+            <div>
+              <label className={fieldLabel} style={fieldLabelStyle}>Rasio</label>
+              <Select value={project.ratio} onChange={(e) => patch({ ratio: e.target.value as CanvasRatio })} className="!text-[12px] !py-1">
+                <option value="1:1">1:1 Persegi</option>
+                <option value="16:9">16:9 Landscape</option>
+                <option value="9:16">9:16 Potrait</option>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={fieldLabel} style={fieldLabelStyle}>Durasi</label>
+                <input type="number" min={0.5} max={20} step={0.5} value={project.duration}
+                  onChange={(e) => patch({ duration: Math.max(0.5, Number(e.target.value)) })}
+                  className={numInput} style={numStyle} />
+              </div>
+              <div>
+                <label className={fieldLabel} style={fieldLabelStyle}>BG</label>
+                <input type="color" value={project.bg} onChange={(e) => patch({ bg: e.target.value })}
+                  className="w-full h-[30px] rounded-[6px] border cursor-pointer" style={{ borderColor: "#3a3a3a" }} />
               </div>
             </div>
+          </div>
+        </div>
 
-            {project.layers.length === 0 ? (
-              <p className="text-[12.5px] px-3 py-4" style={{ color: "var(--color-muted)" }}>Tambahkan elemen dari toolbar di atas.</p>
-            ) : (
-              <div className="flex">
-                {/* Left: layer names */}
-                <div className="flex-shrink-0 border-r" style={{ width: 150, borderColor: "var(--color-hairline)" }}>
-                  <div className="h-6 border-b" style={{ borderColor: "var(--color-hairline)" }} />
-                  {[...project.layers].reverse().map((l) => (
-                    <div key={l.id}
-                      className="group/row flex items-center gap-1.5 px-2.5 h-9 w-full border-b"
-                      style={{
-                        borderColor: "var(--color-hairline)",
-                        background: selectedId === l.id ? "var(--color-primary-light)" : "transparent",
-                        color: selectedId === l.id ? "var(--color-primary-ink)" : "var(--color-body)",
-                      }}>
-                      <button onClick={() => { setScrubTime(timeRef.current); setSelectedId(l.id); setPlaying(false); }}
-                        className="flex items-center gap-2 flex-1 min-w-0 text-left">
-                        <Icon name={layerIcon(l)} size={12} style={{ color: selectedId === l.id ? "var(--color-primary)" : "var(--color-muted-soft)" }} />
-                        <span className="text-[12px] font-medium truncate">{layerLabel(l)}</span>
-                      </button>
-                      <button onClick={() => deleteLayer(l.id)} title="Hapus objek"
-                        className="flex-shrink-0 p-1 rounded opacity-0 group-hover/row:opacity-100 transition-opacity hover:bg-red-50"
-                        style={{ color: "#C64545" }}>
-                        <Icon name="trash" size={12} />
-                      </button>
-                    </div>
+        {/* ── Center: Canvas ── */}
+        <div className="flex-1 overflow-hidden flex items-center justify-center"
+          style={{ background: "#111", backgroundImage: "radial-gradient(#2a2a2a 1px, transparent 1px)", backgroundSize: "24px 24px" }}>
+          <div className="relative" style={{ lineHeight: 0, maxWidth: "calc(100% - 32px)", maxHeight: "calc(100% - 32px)" }}>
+            <canvas
+              ref={canvasRef}
+              width={W} height={H}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              className="rounded-[8px] shadow-2xl touch-none cursor-move"
+              style={{ display: "block", maxWidth: "100%", maxHeight: "calc(100vh - 11rem - 44px)", aspectRatio: `${W} / ${H}`, background: project.bg }}
+            />
+            {/* Selection handles */}
+            {selected && !playing && (
+              <div className="absolute inset-0 pointer-events-none">
+                <div
+                  className="absolute"
+                  onPointerMove={onHandleMove}
+                  onPointerUp={onHandleUp}
+                  style={{
+                    left: `${(selected.x / W) * 100}%`, top: `${(selected.y / H) * 100}%`,
+                    width: `${(selected.w / W) * 100}%`, height: `${(selected.h / H) * 100}%`,
+                    border: "1.5px solid #5cf0a0", boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
+                    pointerEvents: "none",
+                  }}>
+                  {[
+                    { id: "nw", l: 0, t: 0, c: "nwse-resize" }, { id: "n", l: 0.5, t: 0, c: "ns-resize" }, { id: "ne", l: 1, t: 0, c: "nesw-resize" },
+                    { id: "e", l: 1, t: 0.5, c: "ew-resize" }, { id: "se", l: 1, t: 1, c: "nwse-resize" }, { id: "s", l: 0.5, t: 1, c: "ns-resize" },
+                    { id: "sw", l: 0, t: 1, c: "nesw-resize" }, { id: "w", l: 0, t: 0.5, c: "ew-resize" },
+                  ].map((hnd) => (
+                    <div key={hnd.id}
+                      onPointerDown={(e) => onHandleDown(e, hnd.id)}
+                      className="absolute rounded-sm touch-none"
+                      style={{ left: `${hnd.l * 100}%`, top: `${hnd.t * 100}%`, width: 9, height: 9, transform: "translate(-50%,-50%)", background: "#fff", border: "1.5px solid #5cf0a0", cursor: hnd.c, pointerEvents: "auto" }} />
                   ))}
-                </div>
-
-                {/* Right: ruler + tracks + playhead */}
-                <div className="relative flex-1 overflow-hidden">
-                  {/* Ruler — also the scrub area */}
-                  <div ref={timelineRef}
-                    className="relative h-6 border-b cursor-ew-resize touch-none select-none"
-                    style={{ borderColor: "var(--color-hairline)", background: "var(--color-canvas)" }}
-                    onPointerDown={onScrubDown} onPointerMove={onScrubMove} onPointerUp={onScrubUp}>
-                    {ticks.map((t) => (
-                      <div key={t} className="absolute top-0 bottom-0 flex items-end pb-0.5" style={{ left: pct(t) }}>
-                        <div className="absolute top-0 w-px h-1.5" style={{ background: "var(--color-hairline)" }} />
-                        <span className="text-[8.5px] pl-0.5" style={{ color: "var(--color-muted-soft)" }}>{t}s</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Tracks */}
-                  {[...project.layers].reverse().map((l) => {
-                    const inStart = l.preset === "none" ? 0 : l.delay;
-                    const inW = l.preset === "none" ? 0 : l.duration;
-                    const hasOut = !!l.outPreset && l.outPreset !== "none";
-                    const oStart = layerOutStart(l, project.duration);
-                    const oDur = l.outDuration ?? 0.6;
-                    const isSel = selectedId === l.id;
-                    return (
-                      <div key={l.id} className="relative h-9 border-b" style={{ borderColor: "var(--color-hairline)" }}
-                        onPointerMove={onBarMove} onPointerUp={onBarUp}
-                        onClick={() => { setSelectedId(l.id); }}>
-                        {/* Full lifespan track background */}
-                        <div className="absolute top-1/2 -translate-y-1/2 h-4 rounded"
-                          style={{ left: pct(inStart), width: pct(Math.max(0.001, (hasOut ? oStart + oDur : project.duration) - inStart)),
-                            background: isSel ? "var(--color-primary-light)" : "var(--color-canvas)", border: "1px solid var(--color-hairline)" }} />
-                        {/* Entry bar (draggable to change delay) */}
-                        {l.preset !== "none" && (
-                          <div className="absolute top-1/2 -translate-y-1/2 h-4 rounded cursor-grab active:cursor-grabbing touch-none"
-                            title={`Masuk: ${l.preset} · ${l.duration}s (geser untuk delay)`}
-                            onPointerDown={(e) => onBarDown(e, l, "in")}
-                            style={{ left: pct(inStart), width: pct(inW), background: "var(--color-primary)", opacity: 0.92 }} />
-                        )}
-                        {/* Exit bar (draggable to change out start) */}
-                        {hasOut && (
-                          <div className="absolute top-1/2 -translate-y-1/2 h-4 rounded cursor-grab active:cursor-grabbing touch-none"
-                            title={`Keluar: ${l.outPreset} · ${oDur}s (geser untuk waktu keluar)`}
-                            onPointerDown={(e) => onBarDown(e, l, "out")}
-                            style={{ left: pct(oStart), width: pct(oDur), background: "#d98a3c", opacity: 0.92 }} />
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {/* Playhead spanning ruler + tracks — draggable via the handle */}
-                  <div ref={playheadRef} className="absolute top-0 bottom-0 z-10"
-                    style={{ left: pct(scrubTime), width: 0 }}>
-                    <div className="w-px h-full pointer-events-none" style={{ background: "#e0533c" }} />
-                    {/* Grab handle (wider hit area) */}
-                    <div
-                      className="absolute -top-[1px] -left-[7px] w-[15px] h-[15px] rounded-full cursor-ew-resize touch-none"
-                      title="Geser untuk pindah waktu"
-                      onPointerDown={onScrubDown} onPointerMove={onScrubMove} onPointerUp={onScrubUp}
-                      style={{ background: "transparent" }}
-                    >
-                      <div className="absolute top-[4px] left-[4px] w-[7px] h-[7px] rounded-full" style={{ background: "#e0533c" }} />
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* ── Properties panel ── */}
-        <div className="flex flex-col gap-4">
-          {/* Stage settings */}
-          <div className="rounded-[14px] border p-4" style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface-card)" }}>
-            <p className="text-[12px] font-bold mb-3" style={{ color: "var(--color-ink)" }}>Pengaturan Stage</p>
-            <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Nama</label>
-            <input value={project.name} onChange={(e) => patch({ name: e.target.value })} className={`${numInput} mb-3`} style={numStyle} />
-            <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Rasio</label>
-            <Select value={project.ratio} onChange={(e) => patch({ ratio: e.target.value as CanvasRatio })} className="mb-3">
-              <option value="1:1">Persegi 1:1</option>
-              <option value="16:9">Landscape 16:9</option>
-              <option value="9:16">Potrait 9:16</option>
-            </Select>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Background</label>
-                <input type="color" value={project.bg} onChange={(e) => patch({ bg: e.target.value })} className="w-full h-9 rounded-[8px] border cursor-pointer" style={{ borderColor: "var(--color-hairline)" }} />
-              </div>
-              <div>
-                <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Durasi (dtk)</label>
-                <input type="number" min={0.5} max={20} step={0.5} value={project.duration}
-                  onChange={(e) => patch({ duration: Math.max(0.5, Number(e.target.value)) })} className={numInput} style={numStyle} />
-              </div>
-            </div>
-          </div>
-
-          {/* Selected layer */}
+        {/* ── Right panel: Properties ── */}
+        <div className="flex-shrink-0 border-l overflow-y-auto" style={{ width: 260, background: "#1e1e1e", borderColor: "#333" }}>
           {selected ? (
-            <div className="rounded-[14px] border p-4" style={{ borderColor: "var(--color-hairline)", background: "var(--color-surface-card)" }}>
+            <div className="p-3">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-[12px] font-bold" style={{ color: "var(--color-ink)" }}>Properti Layer</p>
-                <button onClick={() => deleteLayer(selected.id)}
-                  className="text-[12px] font-semibold flex items-center gap-1" style={{ color: "#C64545" }}>
-                  <Icon name="trash" size={12} /> Hapus
+                <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "#888" }}>Properti Layer</p>
+                <button onClick={() => deleteLayer(selected.id)} className="flex items-center gap-1 text-[11px] hover:opacity-80" style={{ color: "#c46" }}>
+                  <Icon name="trash" size={11} /> Hapus
                 </button>
+              </div>
+
+              {/* Position & size */}
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div><label className={fieldLabel} style={fieldLabelStyle}>X</label><input type="number" value={selected.x} onChange={(e) => patchLayer(selected.id, { x: Number(e.target.value) })} className={numInput} style={numStyle} /></div>
+                <div><label className={fieldLabel} style={fieldLabelStyle}>Y</label><input type="number" value={selected.y} onChange={(e) => patchLayer(selected.id, { y: Number(e.target.value) })} className={numInput} style={numStyle} /></div>
+                <div><label className={fieldLabel} style={fieldLabelStyle}>Lebar</label><input type="number" value={selected.w} onChange={(e) => patchLayer(selected.id, { w: Number(e.target.value) })} className={numInput} style={numStyle} /></div>
+                <div><label className={fieldLabel} style={fieldLabelStyle}>Tinggi</label><input type="number" value={selected.h} onChange={(e) => patchLayer(selected.id, { h: Number(e.target.value) })} className={numInput} style={numStyle} /></div>
               </div>
 
               {selected.kind === "text" && (
                 <>
-                  <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Teks</label>
-                  <input value={selected.text ?? ""} onChange={(e) => patchLayer(selected.id, { text: e.target.value })} className={`${numInput} mb-3`} style={numStyle} />
-                  <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Ukuran Font</label>
-                  <input type="number" min={12} max={300} value={selected.fontSize ?? 64} onChange={(e) => patchLayer(selected.id, { fontSize: Number(e.target.value) })} className={`${numInput} mb-3`} style={numStyle} />
+                  <label className={fieldLabel} style={fieldLabelStyle}>Teks</label>
+                  <input value={selected.text ?? ""} onChange={(e) => patchLayer(selected.id, { text: e.target.value })} className={`${numInput} mb-2`} style={numStyle} />
+                  <label className={fieldLabel} style={fieldLabelStyle}>Ukuran Font</label>
+                  <input type="number" min={12} max={300} value={selected.fontSize ?? 64} onChange={(e) => patchLayer(selected.id, { fontSize: Number(e.target.value) })} className={`${numInput} mb-2`} style={numStyle} />
                 </>
               )}
               {selected.kind === "rect" && (
                 <>
-                  <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Sudut (radius)</label>
-                  <input type="number" min={0} max={400} value={selected.radius ?? 0} onChange={(e) => patchLayer(selected.id, { radius: Number(e.target.value) })} className={`${numInput} mb-3`} style={numStyle} />
+                  <label className={fieldLabel} style={fieldLabelStyle}>Sudut (radius)</label>
+                  <input type="number" min={0} max={400} value={selected.radius ?? 0} onChange={(e) => patchLayer(selected.id, { radius: Number(e.target.value) })} className={`${numInput} mb-2`} style={numStyle} />
                 </>
               )}
               {selected.kind !== "image" && (
                 <>
-                  <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Warna</label>
-                  <input type="color" value={selected.color} onChange={(e) => patchLayer(selected.id, { color: e.target.value })} className="w-full h-9 rounded-[8px] border cursor-pointer mb-3" style={{ borderColor: "var(--color-hairline)" }} />
+                  <label className={fieldLabel} style={fieldLabelStyle}>Warna</label>
+                  <input type="color" value={selected.color} onChange={(e) => patchLayer(selected.id, { color: e.target.value })} className="w-full h-8 rounded-[6px] border cursor-pointer mb-3" style={{ borderColor: "#3a3a3a" }} />
                 </>
               )}
 
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Lebar</label>
-                  <input type="number" value={selected.w} onChange={(e) => patchLayer(selected.id, { w: Number(e.target.value) })} className={numInput} style={numStyle} />
-                </div>
-                <div>
-                  <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Tinggi</label>
-                  <input type="number" value={selected.h} onChange={(e) => patchLayer(selected.id, { h: Number(e.target.value) })} className={numInput} style={numStyle} />
-                </div>
-              </div>
+              <div className="h-px my-3" style={{ background: "#333" }} />
 
-              <div className="h-px my-3" style={{ background: "var(--color-hairline)" }} />
-
-              {/* ── Animasi Masuk (In) ── */}
-              <div className="flex items-center gap-2 mb-2">
-                <Icon name="arrow-right" size={12} style={{ color: "var(--color-primary)" }} />
-                <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted-soft)" }}>Animasi Masuk</p>
-              </div>
-              {/* Template grid */}
-              <div className="grid grid-cols-2 gap-1.5 mb-3">
+              {/* In animation */}
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "#5cf0a0" }}>Animasi Masuk</p>
+              <div className="grid grid-cols-2 gap-1 mb-2">
                 {IN_TEMPLATES.map((t) => {
                   const on = selected.preset === t.value;
                   return (
                     <button key={t.value}
                       onClick={() => { patchLayer(selected.id, { preset: t.value }); replay(); }}
-                      className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11.5px] font-medium border transition-all"
-                      style={{
-                        borderColor: on ? "var(--color-primary)" : "var(--color-hairline)",
-                        background: on ? "var(--color-primary-light)" : "var(--color-surface)",
-                        color: on ? "var(--color-primary-ink)" : "var(--color-body)",
-                      }}>
-                      <Icon name={t.icon as never} size={11} /> <span className="truncate">{t.label}</span>
+                      className="px-2 py-1.5 rounded-md text-[11px] font-medium border transition-all text-left"
+                      style={{ borderColor: on ? "#5cf0a0" : "#333", background: on ? "rgba(92,240,160,0.1)" : "#2a2a2a", color: on ? "#c2f0df" : "#aaa" }}>
+                      {t.label}
                     </button>
                   );
                 })}
               </div>
-              <div className="grid grid-cols-3 gap-2 mb-3">
-                <div>
-                  <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Durasi</label>
-                  <input type="number" min={0.1} step={0.1} value={selected.duration} onChange={(e) => patchLayer(selected.id, { duration: Math.max(0.1, Number(e.target.value)) })} className={numInput} style={numStyle} />
-                </div>
-                <div>
-                  <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Delay</label>
-                  <input type="number" min={0} step={0.1} value={selected.delay} onChange={(e) => patchLayer(selected.id, { delay: Math.max(0, Number(e.target.value)) })} className={numInput} style={numStyle} />
-                </div>
-                <div>
-                  <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Easing</label>
-                  <Select value={selected.easing} onChange={(e) => { patchLayer(selected.id, { easing: e.target.value as Easing }); replay(); }} className="!px-1.5 !text-[11px]">
+              <div className="grid grid-cols-3 gap-1.5 mb-2">
+                <div><label className={fieldLabel} style={fieldLabelStyle}>Durasi</label>
+                  <input type="number" min={0.1} step={0.1} value={selected.duration} onChange={(e) => patchLayer(selected.id, { duration: Math.max(0.1, Number(e.target.value)) })} className={numInput} style={numStyle} /></div>
+                <div><label className={fieldLabel} style={fieldLabelStyle}>Delay</label>
+                  <input type="number" min={0} step={0.1} value={selected.delay} onChange={(e) => patchLayer(selected.id, { delay: Math.max(0, Number(e.target.value)) })} className={numInput} style={numStyle} /></div>
+                <div><label className={fieldLabel} style={fieldLabelStyle}>Easing</label>
+                  <Select value={selected.easing} onChange={(e) => { patchLayer(selected.id, { easing: e.target.value as Easing }); replay(); }} className="!text-[10px] !px-1 !py-1">
                     {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                  </Select>
-                </div>
+                  </Select></div>
               </div>
-
-              {/* Manual ("custom") entry transform — animate FROM these values */}
               {selected.preset === "custom" && (
-                <div className="rounded-[10px] p-2.5 mb-1" style={{ background: "var(--color-canvas)", border: "1px solid var(--color-hairline)" }}>
-                  <p className="text-[10.5px] font-semibold mb-2" style={{ color: "var(--color-muted)" }}>Mulai dari posisi (animasi ke posisi asli)</p>
-                  <div className="grid grid-cols-2 gap-2 mb-2">
-                    <div>
-                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Geser X (px)</label>
-                      <input type="number" step={10} value={selected.fromDX ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDX: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
-                    </div>
-                    <div>
-                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Geser Y (px)</label>
-                      <input type="number" step={10} value={selected.fromDY ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDY: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
-                    </div>
+                <div className="rounded-[8px] p-2 mb-2" style={{ background: "#252525", border: "1px solid #333" }}>
+                  <p className="text-[9px] font-semibold mb-2" style={{ color: "#888" }}>Mulai dari</p>
+                  <div className="grid grid-cols-2 gap-1.5 mb-1.5">
+                    <div><label className={fieldLabel} style={fieldLabelStyle}>DX</label><input type="number" step={10} value={selected.fromDX ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDX: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                    <div><label className={fieldLabel} style={fieldLabelStyle}>DY</label><input type="number" step={10} value={selected.fromDY ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDY: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Skala</label>
-                      <input type="number" step={0.1} value={selected.fromScale ?? 1} onChange={(e) => { patchLayer(selected.id, { fromScale: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
-                    </div>
-                    <div>
-                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Rotasi°</label>
-                      <input type="number" step={15} value={selected.fromRotate ?? 0} onChange={(e) => { patchLayer(selected.id, { fromRotate: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
-                    </div>
-                    <div>
-                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Opasitas</label>
-                      <input type="number" min={0} max={1} step={0.1} value={selected.fromOpacity ?? 0} onChange={(e) => { patchLayer(selected.id, { fromOpacity: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
-                    </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <div><label className={fieldLabel} style={fieldLabelStyle}>Scale</label><input type="number" step={0.1} value={selected.fromScale ?? 1} onChange={(e) => { patchLayer(selected.id, { fromScale: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                    <div><label className={fieldLabel} style={fieldLabelStyle}>Rotasi°</label><input type="number" step={15} value={selected.fromRotate ?? 0} onChange={(e) => { patchLayer(selected.id, { fromRotate: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                    <div><label className={fieldLabel} style={fieldLabelStyle}>Opasitas</label><input type="number" min={0} max={1} step={0.1} value={selected.fromOpacity ?? 0} onChange={(e) => { patchLayer(selected.id, { fromOpacity: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
                   </div>
                 </div>
               )}
 
-              <div className="h-px my-3" style={{ background: "var(--color-hairline)" }} />
+              <div className="h-px my-3" style={{ background: "#333" }} />
 
-              {/* ── Animasi Keluar (Out) ── */}
-              <div className="flex items-center gap-2 mb-2">
-                <Icon name="arrow-left" size={12} style={{ color: "#d98a3c" }} />
-                <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--color-muted-soft)" }}>Animasi Keluar</p>
-              </div>
-              <div className="grid grid-cols-2 gap-1.5 mb-3">
-                <button
-                  onClick={() => { patchLayer(selected.id, { outPreset: "none" }); replay(); }}
-                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11.5px] font-medium border transition-all col-span-2"
-                  style={{
-                    borderColor: (!selected.outPreset || selected.outPreset === "none") ? "#d98a3c" : "var(--color-hairline)",
-                    background: (!selected.outPreset || selected.outPreset === "none") ? "rgba(217,138,60,0.12)" : "var(--color-surface)",
-                    color: "var(--color-body)",
-                  }}>
-                  <Icon name="x" size={11} /> Tanpa animasi keluar
-                </button>
+              {/* Out animation */}
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "#f0a05c" }}>Animasi Keluar</p>
+              <div className="grid grid-cols-2 gap-1 mb-2">
                 {OUT_TEMPLATES.map((t) => {
-                  const on = selected.outPreset === t.value;
+                  const on = (!selected.outPreset && t.value === "none") || selected.outPreset === t.value;
                   return (
                     <button key={t.value}
                       onClick={() => { patchLayer(selected.id, { outPreset: t.value }); replay(); }}
-                      className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11.5px] font-medium border transition-all"
-                      style={{
-                        borderColor: on ? "#d98a3c" : "var(--color-hairline)",
-                        background: on ? "rgba(217,138,60,0.12)" : "var(--color-surface)",
-                        color: "var(--color-body)",
-                      }}>
-                      <Icon name={t.icon as never} size={11} /> <span className="truncate">{t.label}</span>
+                      className="px-2 py-1.5 rounded-md text-[11px] font-medium border transition-all text-left"
+                      style={{ borderColor: on ? "#f0a05c" : "#333", background: on ? "rgba(240,160,92,0.1)" : "#2a2a2a", color: on ? "#ffd0a0" : "#aaa" }}>
+                      {t.label}
                     </button>
                   );
                 })}
               </div>
               {selected.outPreset && selected.outPreset !== "none" && (
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Durasi</label>
-                    <input type="number" min={0.1} step={0.1} value={selected.outDuration ?? 0.6}
-                      onChange={(e) => patchLayer(selected.id, { outDuration: Math.max(0.1, Number(e.target.value)) })} className={numInput} style={numStyle} />
+                <>
+                  <div className="grid grid-cols-3 gap-1.5 mb-2">
+                    <div><label className={fieldLabel} style={fieldLabelStyle}>Durasi</label><input type="number" min={0.1} step={0.1} value={selected.outDuration ?? 0.6} onChange={(e) => patchLayer(selected.id, { outDuration: Math.max(0.1, Number(e.target.value)) })} className={numInput} style={numStyle} /></div>
+                    <div><label className={fieldLabel} style={fieldLabelStyle}>Mulai</label><input type="number" min={0} step={0.1} value={Number(layerOutStart(selected, project.duration).toFixed(2))} onChange={(e) => patchLayer(selected.id, { outStart: Math.max(layerInEnd(selected), Number(e.target.value)) })} className={numInput} style={numStyle} /></div>
+                    <div><label className={fieldLabel} style={fieldLabelStyle}>Easing</label>
+                      <Select value={selected.outEasing ?? "ease-in"} onChange={(e) => { patchLayer(selected.id, { outEasing: e.target.value as Easing }); replay(); }} className="!text-[10px] !px-1 !py-1">
+                        {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                      </Select></div>
                   </div>
-                  <div>
-                    <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Mulai</label>
-                    <input type="number" min={0} step={0.1} value={Number(layerOutStart(selected, project.duration).toFixed(2))}
-                      onChange={(e) => patchLayer(selected.id, { outStart: Math.max(layerInEnd(selected), Number(e.target.value)) })} className={numInput} style={numStyle} />
-                  </div>
-                  <div>
-                    <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Easing</label>
-                    <Select value={selected.outEasing ?? "ease-in"} onChange={(e) => { patchLayer(selected.id, { outEasing: e.target.value as Easing }); replay(); }} className="!px-1.5 !text-[11px]">
-                      {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                    </Select>
-                  </div>
-                </div>
-              )}
-
-              {/* Manual ("custom") exit transform — animate TO these values */}
-              {selected.outPreset === "custom-out" && (
-                <div className="rounded-[10px] p-2.5 mt-2" style={{ background: "var(--color-canvas)", border: "1px solid var(--color-hairline)" }}>
-                  <p className="text-[10.5px] font-semibold mb-2" style={{ color: "var(--color-muted)" }}>Akhiri di posisi (animasi menuju ke sini)</p>
-                  <div className="grid grid-cols-2 gap-2 mb-2">
-                    <div>
-                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Geser X (px)</label>
-                      <input type="number" step={10} value={selected.toDX ?? 0} onChange={(e) => { patchLayer(selected.id, { toDX: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
+                  {selected.outPreset === "custom-out" && (
+                    <div className="rounded-[8px] p-2" style={{ background: "#252525", border: "1px solid #333" }}>
+                      <p className="text-[9px] font-semibold mb-2" style={{ color: "#888" }}>Akhiri di</p>
+                      <div className="grid grid-cols-2 gap-1.5 mb-1.5">
+                        <div><label className={fieldLabel} style={fieldLabelStyle}>DX</label><input type="number" step={10} value={selected.toDX ?? 0} onChange={(e) => { patchLayer(selected.id, { toDX: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                        <div><label className={fieldLabel} style={fieldLabelStyle}>DY</label><input type="number" step={10} value={selected.toDY ?? 0} onChange={(e) => { patchLayer(selected.id, { toDY: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <div><label className={fieldLabel} style={fieldLabelStyle}>Scale</label><input type="number" step={0.1} value={selected.toScale ?? 1} onChange={(e) => { patchLayer(selected.id, { toScale: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                        <div><label className={fieldLabel} style={fieldLabelStyle}>Rotasi°</label><input type="number" step={15} value={selected.toRotate ?? 0} onChange={(e) => { patchLayer(selected.id, { toRotate: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                        <div><label className={fieldLabel} style={fieldLabelStyle}>Opasitas</label><input type="number" min={0} max={1} step={0.1} value={selected.toOpacity ?? 0} onChange={(e) => { patchLayer(selected.id, { toOpacity: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
+                      </div>
                     </div>
-                    <div>
-                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Geser Y (px)</label>
-                      <input type="number" step={10} value={selected.toDY ?? 0} onChange={(e) => { patchLayer(selected.id, { toDY: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Skala</label>
-                      <input type="number" step={0.1} value={selected.toScale ?? 1} onChange={(e) => { patchLayer(selected.id, { toScale: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
-                    </div>
-                    <div>
-                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Rotasi°</label>
-                      <input type="number" step={15} value={selected.toRotate ?? 0} onChange={(e) => { patchLayer(selected.id, { toRotate: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
-                    </div>
-                    <div>
-                      <label className={fieldLabel} style={{ color: "var(--color-muted-soft)" }}>Opasitas</label>
-                      <input type="number" min={0} max={1} step={0.1} value={selected.toOpacity ?? 0} onChange={(e) => { patchLayer(selected.id, { toOpacity: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} />
-                    </div>
-                  </div>
-                </div>
+                  )}
+                </>
               )}
             </div>
           ) : (
-            <div className="rounded-[14px] border border-dashed p-6 text-center" style={{ borderColor: "var(--color-hairline)" }}>
-              <Icon name="shapes" size={22} style={{ color: "var(--color-muted-soft)" }} />
-              <p className="mt-2 text-[12.5px]" style={{ color: "var(--color-muted)" }}>Pilih layer di stage atau daftar untuk mengedit propertinya.</p>
+            <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+              <Icon name="shapes" size={24} style={{ color: "#444" }} />
+              <p className="mt-3 text-[12px]" style={{ color: "#555" }}>Pilih layer untuk edit propertinya</p>
             </div>
           )}
         </div>
       </div>
-    </ShellLayout>
+
+      {/* ── Bottom: Timeline ── */}
+      <div className="flex-shrink-0 border-t" style={{ background: "#1e1e1e", borderColor: "#333", height: 160 }}>
+        <div className="flex items-center justify-between px-3 py-1.5 border-b" style={{ borderColor: "#333" }}>
+          <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "#666" }}>Timeline · {project.layers.length} layer</p>
+          <div className="flex items-center gap-3 text-[9px]" style={{ color: "#666" }}>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm inline-block" style={{ background: "#5cf0a0" }} /> Masuk</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm inline-block" style={{ background: "#f0a05c" }} /> Keluar</span>
+          </div>
+        </div>
+
+        {project.layers.length === 0 ? (
+          <p className="text-[11px] px-3 py-3" style={{ color: "#555" }}>Tambahkan elemen dari panel kiri.</p>
+        ) : (
+          <div className="flex h-[calc(100%-28px)] overflow-hidden">
+            {/* Layer name column */}
+            <div className="flex-shrink-0 border-r overflow-y-auto" style={{ width: 160, borderColor: "#333" }}>
+              <div className="h-5 border-b" style={{ borderColor: "#333" }} />
+              {[...project.layers].reverse().map((l) => (
+                <div key={l.id}
+                  className="flex items-center gap-1.5 px-2.5 h-8 border-b cursor-pointer"
+                  style={{ borderColor: "#2a2a2a", background: selectedId === l.id ? "#2a3d33" : "transparent" }}
+                  onClick={() => { setSelectedId(l.id); setPlaying(false); setScrubTime(timeRef.current); }}>
+                  <Icon name={layerIcon(l) as never} size={11} style={{ color: selectedId === l.id ? "#7ecfb0" : "#555", flexShrink: 0 }} />
+                  <span className="text-[11px] truncate font-medium" style={{ color: selectedId === l.id ? "#c2f0df" : "#999" }}>{layerLabel(l)}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Tracks + ruler */}
+            <div className="relative flex-1 overflow-x-auto">
+              {/* Ruler / scrub area */}
+              <div ref={timelineRef}
+                className="relative h-5 border-b cursor-ew-resize touch-none select-none sticky top-0 z-10"
+                style={{ borderColor: "#333", background: "#181818" }}
+                onPointerDown={onScrubDown} onPointerMove={onScrubMove} onPointerUp={onScrubUp}>
+                {ticks.map((t) => (
+                  <div key={t} className="absolute top-0 bottom-0 flex items-end pb-0.5" style={{ left: pct(t) }}>
+                    <div className="absolute top-0 w-px h-1.5" style={{ background: "#333" }} />
+                    <span className="text-[8px] pl-0.5" style={{ color: "#555" }}>{t}s</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Track rows */}
+              {[...project.layers].reverse().map((l) => {
+                const inStart = l.preset === "none" ? 0 : l.delay;
+                const inW = l.preset === "none" ? 0 : l.duration;
+                const hasOut = !!l.outPreset && l.outPreset !== "none";
+                const oStart = layerOutStart(l, project.duration);
+                const oDur = l.outDuration ?? 0.6;
+                const isSel = selectedId === l.id;
+                return (
+                  <div key={l.id} className="relative h-8 border-b" style={{ borderColor: "#2a2a2a", background: isSel ? "rgba(42,61,51,0.3)" : "transparent" }}
+                    onPointerMove={onBarMove} onPointerUp={onBarUp}
+                    onClick={() => setSelectedId(l.id)}>
+                    {/* Full lifespan bg */}
+                    <div className="absolute top-1/2 -translate-y-1/2 h-3.5 rounded"
+                      style={{ left: pct(inStart), width: pct(Math.max(0.001, (hasOut ? oStart + oDur : project.duration) - inStart)), background: "#2a2a2a", border: "1px solid #3a3a3a" }} />
+                    {/* Entry bar */}
+                    {l.preset !== "none" && (
+                      <div className="absolute top-1/2 -translate-y-1/2 h-3.5 rounded cursor-grab active:cursor-grabbing touch-none"
+                        title="Geser untuk mengubah delay"
+                        onPointerDown={(e) => onBarDown(e, l, "in")}
+                        style={{ left: pct(inStart), width: pct(inW), background: "#5cf0a0", opacity: 0.85 }} />
+                    )}
+                    {/* Exit bar */}
+                    {hasOut && (
+                      <div className="absolute top-1/2 -translate-y-1/2 h-3.5 rounded cursor-grab active:cursor-grabbing touch-none"
+                        title="Geser untuk mengubah waktu keluar"
+                        onPointerDown={(e) => onBarDown(e, l, "out")}
+                        style={{ left: pct(oStart), width: pct(oDur), background: "#f0a05c", opacity: 0.85 }} />
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Playhead */}
+              <div ref={playheadRef} className="absolute top-0 bottom-0 z-20 pointer-events-none" style={{ left: pct(scrubTime), width: 0 }}>
+                <div className="w-px h-full" style={{ background: "#e0533c" }} />
+                <div className="absolute -top-[1px] -left-[6px] w-[13px] h-[13px] rounded-full pointer-events-auto cursor-ew-resize touch-none"
+                  onPointerDown={onScrubDown} onPointerMove={onScrubMove} onPointerUp={onScrubUp}>
+                  <div className="absolute top-[3px] left-[3px] w-[7px] h-[7px] rounded-full" style={{ background: "#e0533c" }} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
