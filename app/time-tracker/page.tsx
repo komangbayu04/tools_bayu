@@ -25,7 +25,7 @@ const entryValue = (e: TimeEntry) => (e.seconds / 3600) * e.rate;
 
 export default function TimeTrackerPage() {
   const router = useRouter();
-  const { entries, active, startTimer, stopTimer, cancelTimer, addManualEntry, deleteEntry, markBilled } = useTimeTrackerStore();
+  const { entries, active, startTimer, stopTimer, cancelTimer, addManualEntry, deleteEntry, updateEntry, markBilled } = useTimeTrackerStore();
   const { clients } = useClientStore();
   const setPrefill = useInvoicePrefillStore((s) => s.setPrefill);
 
@@ -51,6 +51,19 @@ export default function TimeTrackerPage() {
   const [mHours, setMHours] = useState(1);
   const [mRate, setMRate] = useState(100000);
   const [mDate, setMDate] = useState(() => new Date().toISOString().slice(0, 10));
+
+  // Inline editing
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editFields, setEditFields] = useState<{ description: string; projectName: string; clientName: string; hours: string; rate: string; date: string }>({ description: "", projectName: "", clientName: "", hours: "", rate: "", date: "" });
+
+  const startEdit = (e: TimeEntry) => {
+    setEditingId(e.id);
+    setEditFields({ description: e.description, projectName: e.projectName ?? "", clientName: e.clientName ?? "", hours: (e.seconds / 3600).toString(), rate: e.rate.toString(), date: e.date });
+  };
+  const saveEdit = (id: string) => {
+    updateEntry(id, { description: editFields.description.trim() || "Sesi kerja", projectName: editFields.projectName.trim() || undefined, clientName: editFields.clientName.trim() || undefined, seconds: Math.round(Number(editFields.hours) * 3600), rate: Number(editFields.rate), date: editFields.date });
+    setEditingId(null);
+  };
 
   // Selection for invoicing
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -209,6 +222,27 @@ export default function TimeTrackerPage() {
           <div className="flex flex-col">
             {unbilled.map((e) => {
               const isSel = selected.has(e.id);
+              const isEditing = editingId === e.id;
+              if (isEditing) {
+                return (
+                  <div key={e.id} className="px-5 py-3 border-b" style={{ borderColor: "var(--color-hairline)", background: "var(--color-primary-light)" }}>
+                    <div className="flex flex-col gap-2">
+                      <Input value={editFields.description} onChange={(e2) => setEditFields((f) => ({ ...f, description: e2.target.value }))} placeholder="Deskripsi" className="bg-[var(--color-surface)]" />
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        <Input value={editFields.projectName} onChange={(e2) => setEditFields((f) => ({ ...f, projectName: e2.target.value }))} placeholder="Proyek" className="bg-[var(--color-surface)]" />
+                        <Input value={editFields.clientName} onChange={(e2) => setEditFields((f) => ({ ...f, clientName: e2.target.value }))} placeholder="Klien" className="bg-[var(--color-surface)]" />
+                        <Input type="number" step="0.25" value={editFields.hours} onChange={(e2) => setEditFields((f) => ({ ...f, hours: e2.target.value }))} placeholder="Jam" className="bg-[var(--color-surface)]" />
+                        <Input type="number" value={editFields.rate} onChange={(e2) => setEditFields((f) => ({ ...f, rate: e2.target.value }))} placeholder="Rate/jam" className="bg-[var(--color-surface)]" />
+                        <Input type="date" value={editFields.date} onChange={(e2) => setEditFields((f) => ({ ...f, date: e2.target.value }))} className="bg-[var(--color-surface)]" />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Batal</Button>
+                        <Button size="sm" onClick={() => saveEdit(e.id)}>Simpan</Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div key={e.id} className="flex items-center gap-3 px-5 py-3.5 border-b last:border-b-0 group" style={{ borderColor: "var(--color-hairline)" }}>
                   <button onClick={() => toggleSelect(e.id)} className="w-5 h-5 rounded-[6px] border flex items-center justify-center flex-shrink-0 transition-colors"
@@ -227,6 +261,9 @@ export default function TimeTrackerPage() {
                     <p className="text-[13.5px] font-semibold tabular-nums" style={{ color: "var(--color-ink)" }}>{fmtHours(e.seconds)} jam</p>
                     <p className="text-[12px]" style={{ color: "var(--color-muted)" }}>{fmtIDR(entryValue(e))}</p>
                   </div>
+                  <button onClick={() => startEdit(e)} className="p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: "var(--color-primary)" }}>
+                    <Icon name="edit" size={13} />
+                  </button>
                   <button onClick={() => deleteEntry(e.id)} className="p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: "#C64545" }}>
                     <Icon name="trash" size={13} />
                   </button>

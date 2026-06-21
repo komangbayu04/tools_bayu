@@ -136,8 +136,10 @@ export interface MotionLayer {
   outDuration?: number; // seconds — exit duration
   outStart?: number; // seconds — when the exit begins (defaults to end - outDuration)
   outEasing?: Easing;
-  // manual ("custom") entry transform — where the layer animates FROM
+  // manual ("custom") entry transform — where the layer animates FROM and TO
   fromDX?: number; fromDY?: number; fromScale?: number; fromRotate?: number; fromOpacity?: number;
+  // custom entry "to" values (defaults: dx=0, dy=0, scale=1, rotate=0, opacity=1)
+  toDXEntry?: number; toDYEntry?: number; toScaleEntry?: number; toRotateEntry?: number; toOpacityEntry?: number;
   // manual ("custom") exit transform — where the layer animates TO
   toDX?: number; toDY?: number; toScale?: number; toRotate?: number; toOpacity?: number;
   // outline / stroke (rect + circle)
