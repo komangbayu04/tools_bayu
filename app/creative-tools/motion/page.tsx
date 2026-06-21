@@ -546,6 +546,18 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
 
   const replay = () => { setScrubTime(0); setPlaying(false); setTimeout(() => setPlaying(true), 20); };
 
+  // Pause + jump the playhead so the canvas shows a specific moment of the
+  // selected layer's entry: "from" = the start (initial state), "to" = the
+  // end of the entry (target state). Used so adjusting From/To shows the result.
+  const previewEntry = (which: "from" | "to") => {
+    if (!selected) return;
+    setPlaying(false);
+    const t = which === "from"
+      ? selected.delay + 0.0001
+      : selected.delay + Math.max(0.0001, selected.duration);
+    setScrubTime(Math.min(project.duration, t));
+  };
+
   const layerLabel = (l: MotionLayer) => l.kind === "text" ? (l.text?.slice(0, 14) || "Teks") : l.kind === "rect" ? "Kotak" : l.kind === "circle" ? "Lingkaran" : "Gambar";
   const layerIcon = (l: MotionLayer) => l.kind === "text" ? "type" : l.kind === "rect" ? "square" : l.kind === "circle" ? "circle" : "image";
   const pct = (t: number) => `${(t / project.duration) * 100}%`;
@@ -1059,11 +1071,11 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                               <div className="grid grid-cols-2 gap-2">
                                 <div>
                                   <label className="text-[10px] mb-1 block" style={{ color: "#888" }}>From</label>
-                                  <input type="number" step={0.05} value={selected.fromScale ?? 0} onChange={(e) => patchLayer(selected.id, { fromScale: Number(e.target.value) })} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                  <input type="number" step={0.05} value={selected.fromScale ?? 0} onFocus={() => previewEntry("from")} onChange={(e) => { patchLayer(selected.id, { fromScale: Number(e.target.value) }); previewEntry("from"); }} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
                                 </div>
                                 <div>
                                   <label className="text-[10px] mb-1 block" style={{ color: "#888" }}>To</label>
-                                  <input type="number" step={0.05} value={selected.toScaleEntry ?? 1} onChange={(e) => patchLayer(selected.id, { toScaleEntry: Number(e.target.value) })} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                  <input type="number" step={0.05} value={selected.toScaleEntry ?? 1} onFocus={() => previewEntry("to")} onChange={(e) => { patchLayer(selected.id, { toScaleEntry: Number(e.target.value) }); previewEntry("to"); }} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
                                 </div>
                               </div>
                             </div>
@@ -1074,11 +1086,11 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                               <div className="grid grid-cols-2 gap-2">
                                 <div>
                                   <label className="text-[10px] mb-1 block" style={{ color: "#888" }}>From</label>
-                                  <input type="number" step={15} value={selected.fromRotate ?? 0} onChange={(e) => patchLayer(selected.id, { fromRotate: Number(e.target.value) })} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                  <input type="number" step={15} value={selected.fromRotate ?? 0} onFocus={() => previewEntry("from")} onChange={(e) => { patchLayer(selected.id, { fromRotate: Number(e.target.value) }); previewEntry("from"); }} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
                                 </div>
                                 <div>
                                   <label className="text-[10px] mb-1 block" style={{ color: "#888" }}>To</label>
-                                  <input type="number" step={15} value={selected.toRotateEntry ?? 0} onChange={(e) => patchLayer(selected.id, { toRotateEntry: Number(e.target.value) })} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                  <input type="number" step={15} value={selected.toRotateEntry ?? 0} onFocus={() => previewEntry("to")} onChange={(e) => { patchLayer(selected.id, { toRotateEntry: Number(e.target.value) }); previewEntry("to"); }} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
                                 </div>
                               </div>
                             </div>
@@ -1089,22 +1101,22 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                               <div className="grid grid-cols-2 gap-2 mb-2">
                                 <div>
                                   <label className="text-[10px] mb-1 block" style={{ color: "#888" }}>From X</label>
-                                  <input type="number" step={10} value={selected.fromDX ?? 0} onChange={(e) => patchLayer(selected.id, { fromDX: Number(e.target.value) })} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                  <input type="number" step={10} value={selected.fromDX ?? 0} onFocus={() => previewEntry("from")} onChange={(e) => { patchLayer(selected.id, { fromDX: Number(e.target.value) }); previewEntry("from"); }} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
                                 </div>
                                 <div>
                                   <label className="text-[10px] mb-1 block" style={{ color: "#888" }}>To X</label>
-                                  <input type="number" step={10} value={selected.toDXEntry ?? 0} onChange={(e) => patchLayer(selected.id, { toDXEntry: Number(e.target.value) })} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                  <input type="number" step={10} value={selected.toDXEntry ?? 0} onFocus={() => previewEntry("to")} onChange={(e) => { patchLayer(selected.id, { toDXEntry: Number(e.target.value) }); previewEntry("to"); }} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
                                 </div>
                               </div>
                               <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#666" }}>Move Y (px)</p>
                               <div className="grid grid-cols-2 gap-2">
                                 <div>
                                   <label className="text-[10px] mb-1 block" style={{ color: "#888" }}>From Y</label>
-                                  <input type="number" step={10} value={selected.fromDY ?? 0} onChange={(e) => patchLayer(selected.id, { fromDY: Number(e.target.value) })} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                  <input type="number" step={10} value={selected.fromDY ?? 0} onFocus={() => previewEntry("from")} onChange={(e) => { patchLayer(selected.id, { fromDY: Number(e.target.value) }); previewEntry("from"); }} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
                                 </div>
                                 <div>
                                   <label className="text-[10px] mb-1 block" style={{ color: "#888" }}>To Y</label>
-                                  <input type="number" step={10} value={selected.toDYEntry ?? 0} onChange={(e) => patchLayer(selected.id, { toDYEntry: Number(e.target.value) })} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                  <input type="number" step={10} value={selected.toDYEntry ?? 0} onFocus={() => previewEntry("to")} onChange={(e) => { patchLayer(selected.id, { toDYEntry: Number(e.target.value) }); previewEntry("to"); }} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
                                 </div>
                               </div>
                             </div>
@@ -1115,11 +1127,11 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                               <div className="grid grid-cols-2 gap-2">
                                 <div>
                                   <label className="text-[10px] mb-1 block" style={{ color: "#888" }}>From</label>
-                                  <input type="number" min={0} max={1} step={0.1} value={selected.fromOpacity ?? 0} onChange={(e) => patchLayer(selected.id, { fromOpacity: Number(e.target.value) })} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                  <input type="number" min={0} max={1} step={0.1} value={selected.fromOpacity ?? 0} onFocus={() => previewEntry("from")} onChange={(e) => { patchLayer(selected.id, { fromOpacity: Number(e.target.value) }); previewEntry("from"); }} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
                                 </div>
                                 <div>
                                   <label className="text-[10px] mb-1 block" style={{ color: "#888" }}>To</label>
-                                  <input type="number" min={0} max={1} step={0.1} value={selected.toOpacityEntry ?? 1} onChange={(e) => patchLayer(selected.id, { toOpacityEntry: Number(e.target.value) })} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                  <input type="number" min={0} max={1} step={0.1} value={selected.toOpacityEntry ?? 1} onFocus={() => previewEntry("to")} onChange={(e) => { patchLayer(selected.id, { toOpacityEntry: Number(e.target.value) }); previewEntry("to"); }} className="w-full text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
                                 </div>
                               </div>
                             </div>
