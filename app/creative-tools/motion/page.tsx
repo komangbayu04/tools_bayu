@@ -269,6 +269,7 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
   const [animView, setAnimView] = useState<AnimView>("list");
   type AnimProp = "scale" | "rotate" | "move" | "opacity" | "color" | "layer-blur" | "corner-radius" | "stroke";
   const [animProp, setAnimProp] = useState<AnimProp | null>(null);
+  const [pickerTab, setPickerTab] = useState<"presets" | "custom" | "effects">("presets");
   // Timeline height (drag top edge up to expand)
   const [timelineH, setTimelineH] = useState(160);
   const tlResizing = useRef(false);
@@ -846,7 +847,7 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                     {animView === "list" && (
                       <div className="p-3">
                         <button
-                          onClick={() => setAnimView("picker")}
+                          onClick={() => { setPickerTab("presets"); setAnimView("picker"); }}
                           className="w-full py-2.5 rounded-[10px] text-[13px] font-semibold mb-4 transition-colors hover:opacity-90"
                           style={{ background: "#7c6fff", color: "#fff" }}>
                           + New Animation
@@ -884,7 +885,7 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                             <div className="text-2xl mb-2">🤖</div>
                             <p className="text-[13px] font-bold mb-1" style={{ color: "#e8e8e8" }}>Idea → Motion</p>
                             <p className="text-[11px] mb-3" style={{ color: "#888" }}>Buat animasi dari deskripsi teks, pilih preset, lalu sesuaikan.</p>
-                            <button onClick={() => setAnimView("picker")} className="w-full py-2 rounded-[8px] text-[12px] font-semibold" style={{ background: "#1a1a1a", color: "#e8e8e8", border: "1px solid #444" }}>
+                            <button onClick={() => { setPickerTab("presets"); setAnimView("picker"); }} className="w-full py-2 rounded-[8px] text-[12px] font-semibold" style={{ background: "#1a1a1a", color: "#e8e8e8", border: "1px solid #444" }}>
                               ✦ Pilih Animasi
                             </button>
                           </div>
@@ -892,70 +893,137 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                       </div>
                     )}
 
-                    {/* ── VIEW: picker ── */}
+                    {/* ── VIEW: picker (tabbed: Presets / Custom / Effects) ── */}
                     {animView === "picker" && (
-                      <div className="p-3">
-                        <button onClick={() => setAnimView("list")} className="flex items-center gap-1.5 text-[11px] mb-3 hover:opacity-80" style={{ color: "#888" }}>
-                          <Icon name="arrow-left" size={11} /> Kembali
-                        </button>
-                        <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "#5cf0a0" }}>Animasi Masuk</p>
-                        <div className="grid grid-cols-2 gap-1.5 mb-4">
-                          {IN_TEMPLATES.map((t) => {
-                            const on = selected.preset === t.value;
+                      <div className="flex flex-col">
+                        {/* Header */}
+                        <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+                          <button onClick={() => setAnimView("list")} className="flex items-center gap-1.5 text-[11px] hover:opacity-80" style={{ color: "#888" }}>
+                            <Icon name="arrow-left" size={11} /> Kembali
+                          </button>
+                        </div>
+
+                        {/* Picker tabs */}
+                        <div className="flex border-b sticky top-0 z-10" style={{ borderColor: "#333", background: "#1e1e1e" }}>
+                          {(["presets", "custom", "effects"] as const).map((tab) => {
+                            const on = pickerTab === tab;
                             return (
-                              <button key={t.value}
-                                onClick={() => { patchLayer(selected.id, { preset: t.value }); if (t.value !== "none" && t.value !== "custom") { setAnimProp(null); setAnimView("detail"); } replay(); }}
-                                className="px-2 py-2.5 rounded-[8px] text-[11px] font-medium border transition-all text-center"
-                                style={{ borderColor: on ? "#5cf0a0" : "#333", background: on ? "rgba(92,240,160,0.1)" : "#262626", color: on ? "#c2f0df" : "#aaa" }}>
-                                {t.label}
+                              <button key={tab} onClick={() => setPickerTab(tab)}
+                                className="flex-1 py-2 text-[10px] font-bold tracking-wider transition-colors relative"
+                                style={{ color: on ? "#fff" : "#777", background: on ? "#8a76ff" : "transparent" }}>
+                                {tab.toUpperCase()}
                               </button>
                             );
                           })}
                         </div>
-                        <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "#f0a05c" }}>Animasi Keluar</p>
-                        <div className="grid grid-cols-2 gap-1.5 mb-4">
-                          {OUT_TEMPLATES.map((t) => {
-                            const on = (!selected.outPreset && t.value === "none") || selected.outPreset === t.value;
-                            return (
-                              <button key={t.value}
-                                onClick={() => { patchLayer(selected.id, { outPreset: t.value }); if (t.value !== "none" && t.value !== "custom-out") { setAnimProp(null); setAnimView("detail"); } replay(); }}
-                                className="px-2 py-2.5 rounded-[8px] text-[11px] font-medium border transition-all text-center"
-                                style={{ borderColor: on ? "#f0a05c" : "#333", background: on ? "rgba(240,160,92,0.1)" : "#262626", color: on ? "#ffd0a0" : "#aaa" }}>
-                                {t.label}
-                              </button>
-                            );
-                          })}
+
+                        <div className="p-3">
+                          {/* ─── PRESETS: categorized animation cards ─── */}
+                          {pickerTab === "presets" && (
+                            <>
+                              {([
+                                { group: "Fade", cards: [
+                                  { label: "Fade", patch: { preset: "fade" } as Partial<MotionLayer> },
+                                  { label: "Slide", patch: { preset: "slide-up" } as Partial<MotionLayer> },
+                                ]},
+                                { group: "Scale", cards: [
+                                  { label: "Grow", patch: { preset: "pop" } as Partial<MotionLayer> },
+                                  { label: "Shrink", patch: { preset: "custom", fromScale: 1.4, fromOpacity: 0, fromDX: 0, fromDY: 0, fromRotate: 0 } as Partial<MotionLayer> },
+                                  { label: "Spin", patch: { preset: "rotate" } as Partial<MotionLayer> },
+                                  { label: "Twist", patch: { preset: "custom", fromRotate: 180, fromScale: 0.6, fromOpacity: 0, fromDX: 0, fromDY: 0 } as Partial<MotionLayer> },
+                                  { label: "Move & Scale", patch: { preset: "custom", fromDX: -120, fromScale: 0.7, fromOpacity: 0, fromDY: 0, fromRotate: 0 } as Partial<MotionLayer> },
+                                ]},
+                                { group: "Pantul", cards: [
+                                  { label: "Bounce", patch: { preset: "bounce" } as Partial<MotionLayer> },
+                                  { label: "Pop In", patch: { preset: "custom", fromScale: 0.2, fromOpacity: 0, fromDX: 0, fromDY: 0, fromRotate: 0 } as Partial<MotionLayer> },
+                                ]},
+                                { group: "Geser", cards: [
+                                  { label: "Slide Up", patch: { preset: "slide-up" } as Partial<MotionLayer> },
+                                  { label: "Slide Down", patch: { preset: "slide-down" } as Partial<MotionLayer> },
+                                  { label: "Slide Left", patch: { preset: "slide-left" } as Partial<MotionLayer> },
+                                  { label: "Slide Right", patch: { preset: "slide-right" } as Partial<MotionLayer> },
+                                ]},
+                              ]).map(({ group, cards }) => (
+                                <div key={group} className="mb-4">
+                                  <p className="text-[12px] font-bold mb-2" style={{ color: "#e8e8e8" }}>{group}</p>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {cards.map((c) => (
+                                      <button key={c.label}
+                                        onClick={() => { patchLayer(selected.id, c.patch); setAnimProp(null); setAnimView("detail"); replay(); }}
+                                        className="flex flex-col items-center group/card">
+                                        <div className="w-full aspect-[4/3] rounded-[8px] flex items-center justify-center mb-1.5 transition-all group-hover/card:ring-2"
+                                          style={{ background: "#2b2b2b", border: "1px solid #333" }}>
+                                          <div className="w-10 h-8 rounded-[4px]" style={{ background: "#9a9a9a" }} />
+                                        </div>
+                                        <span className="text-[11px]" style={{ color: "#aaa" }}>{c.label}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </>
+                          )}
+
+                          {/* ─── CUSTOM: property list ─── */}
+                          {pickerTab === "custom" && (
+                            <>
+                              {([
+                                { section: "Transform", items: [
+                                  { id: "scale" as AnimProp, label: "Scale", icon: "expand" },
+                                  { id: "rotate" as AnimProp, label: "Rotate", icon: "rotate" },
+                                  { id: "move" as AnimProp, label: "Move", icon: "move" },
+                                ]},
+                                { section: "Style", items: [
+                                  { id: "opacity" as AnimProp, label: "Opacity", icon: "eye" },
+                                  { id: "color" as AnimProp, label: "Color", icon: "palette" },
+                                  { id: "corner-radius" as AnimProp, label: "Corner Radius", icon: "square" },
+                                  { id: "stroke" as AnimProp, label: "Stroke", icon: "minus" },
+                                ]},
+                              ] as { section: string; items: { id: AnimProp; label: string; icon: string }[] }[]).map(({ section, items }) => (
+                                <div key={section} className="mb-3">
+                                  <p className="text-[12px] font-bold mb-1.5" style={{ color: "#e8e8e8" }}>{section}</p>
+                                  {items.map((item) => (
+                                    <button key={item.id}
+                                      onClick={() => { setAnimProp(item.id); setAnimView("detail"); if (item.id === "scale") patchLayer(selected.id, { preset: "custom", fromScale: 0.5, fromOpacity: 0 }); else if (item.id === "rotate") patchLayer(selected.id, { preset: "custom", fromRotate: 90, fromOpacity: 0 }); else if (item.id === "move") patchLayer(selected.id, { preset: "custom", fromDX: -80, fromOpacity: 0 }); else if (item.id === "opacity") patchLayer(selected.id, { preset: "fade" }); replay(); }}
+                                      className="w-full flex items-center gap-2.5 px-2 py-2 rounded-[7px] text-left text-[12.5px] transition-colors hover:bg-white/5"
+                                      style={{ color: "#ccc" }}>
+                                      <Icon name={item.icon as never} size={14} style={{ color: "#8a76ff", flexShrink: 0 }} />
+                                      {item.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              ))}
+                            </>
+                          )}
+
+                          {/* ─── EFFECTS: visual filter cards ─── */}
+                          {pickerTab === "effects" && (
+                            <>
+                              <p className="text-[12px] font-bold mb-2" style={{ color: "#e8e8e8" }}>Filter</p>
+                              <div className="grid grid-cols-2 gap-2">
+                                {([
+                                  { id: "layer-blur" as AnimProp, label: "Layer Blur", patch: { blur: 8 } },
+                                  { id: null, label: "Grayscale", patch: { grayscale: 1 } },
+                                  { id: null, label: "Sepia", patch: { sepia: 0.8 } },
+                                  { id: null, label: "Brightness", patch: { brightness: 1.4 } },
+                                  { id: null, label: "Contrast", patch: { contrast: 1.4 } },
+                                  { id: null, label: "Saturate", patch: { saturate: 2 } },
+                                ] as { id: AnimProp | null; label: string; patch: Partial<MotionLayer> }[]).map((c) => (
+                                  <button key={c.label}
+                                    onClick={() => { patchLayer(selected.id, c.patch); if (c.id) { setAnimProp(c.id); setAnimView("detail"); } setLayerTab(c.id ? "animate" : "design"); replay(); }}
+                                    className="flex flex-col items-center group/card">
+                                    <div className="w-full aspect-[4/3] rounded-[8px] flex items-center justify-center mb-1.5 transition-all group-hover/card:ring-2"
+                                      style={{ background: "#2b2b2b", border: "1px solid #333" }}>
+                                      <Icon name="circle" size={20} style={{ color: "#9a9a9a" }} />
+                                    </div>
+                                    <span className="text-[11px]" style={{ color: "#aaa" }}>{c.label}</span>
+                                  </button>
+                                ))}
+                              </div>
+                              <p className="text-[10px] mt-3 leading-relaxed" style={{ color: "#666" }}>Filter visual diterapkan statis ke layer. Atur lebih lanjut di tab Design.</p>
+                            </>
+                          )}
                         </div>
-                        <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "#888" }}>Custom Property</p>
-                        {([
-                          { section: "Transform", items: [
-                            { id: "scale" as AnimProp, label: "Scale", icon: "expand" },
-                            { id: "rotate" as AnimProp, label: "Rotate", icon: "rotate" },
-                            { id: "move" as AnimProp, label: "Move", icon: "move" },
-                          ]},
-                          { section: "Style", items: [
-                            { id: "opacity" as AnimProp, label: "Opacity", icon: "eye" },
-                            { id: "color" as AnimProp, label: "Color", icon: "palette" },
-                            { id: "corner-radius" as AnimProp, label: "Corner Radius", icon: "square" },
-                            { id: "stroke" as AnimProp, label: "Stroke", icon: "minus" },
-                          ]},
-                          { section: "Effects", items: [
-                            { id: "layer-blur" as AnimProp, label: "Layer Blur", icon: "circle" },
-                          ]},
-                        ] as { section: string; items: { id: AnimProp; label: string; icon: string }[] }[]).map(({ section, items }) => (
-                          <div key={section} className="mb-3">
-                            <p className="text-[9px] font-semibold uppercase tracking-wider mb-1 px-1" style={{ color: "#666" }}>{section}</p>
-                            {items.map((item) => (
-                              <button key={item.id}
-                                onClick={() => { setAnimProp(item.id); setAnimView("detail"); if (item.id === "scale") patchLayer(selected.id, { preset: "custom", fromScale: 0.5, fromOpacity: 0 }); else if (item.id === "rotate") patchLayer(selected.id, { preset: "custom", fromRotate: 90, fromOpacity: 0 }); else if (item.id === "move") patchLayer(selected.id, { preset: "custom", fromDX: -80, fromOpacity: 0 }); else if (item.id === "opacity") patchLayer(selected.id, { preset: "fade" }); else if (item.id === "layer-blur") patchLayer(selected.id, { blur: 8 }); replay(); }}
-                                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[7px] text-left text-[12px] transition-colors hover:bg-white/5"
-                                style={{ color: "#ccc" }}>
-                                <Icon name={item.icon as never} size={13} style={{ color: "#8a76ff", flexShrink: 0 }} />
-                                {item.label}
-                              </button>
-                            ))}
-                          </div>
-                        ))}
                       </div>
                     )}
 
