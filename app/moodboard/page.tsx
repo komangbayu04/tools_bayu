@@ -190,36 +190,23 @@ export default function MoodboardPage() {
   // ── Paste from clipboard (Figma export, image file, web image, image URL) ──
   const [pasteToast, setPasteToast] = useState<string | null>(null);
   useEffect(() => {
-    // Add a reference straight to the board from an image file.
+    // Add one reference from a file.
     const addPastedFile = async (file: File, title?: string) => {
-      setPasteToast("Menempelkan ke moodboard…");
-      try {
-        const dataUrl = await readFileAsDataUrl(file);
-        const uploaded = await uploadMedia(file);
-        addItem({
-          url: "",
-          title: title || "Pasted reference",
-          source_domain: "",
-          category: activeCategory === "all" ? "graphic_design" : activeCategory,
-          tags: [],
-          note: "",
-          color: "linear-gradient(135deg,#6ba539,#2e4d1b)",
-          image_url: uploaded || dataUrl,
-          media_type: file.type.startsWith("video/") ? "video" : "image",
-          createdAt: Date.now(),
-          projectId: activeFolder ?? undefined,
-        });
-      } catch (err) {
-        console.error("[moodboard] gagal paste:", err);
-      }
-      setPasteToast(null);
+      const dataUrl = await readFileAsDataUrl(file);
+      const uploaded = await uploadMedia(file);
+      addItem({
+        url: "", title: title || "Pasted reference", source_domain: "",
+        category: activeCategory === "all" ? "graphic_design" : activeCategory,
+        tags: [], note: "", color: "linear-gradient(135deg,#6ba539,#2e4d1b)",
+        image_url: uploaded || dataUrl,
+        media_type: file.type.startsWith("video/") ? "video" : "image",
+        createdAt: Date.now(), projectId: activeFolder ?? undefined,
+      });
     };
 
-    // Add from an image URL (web page <img> or pasted link).
+    // Add one reference from a URL.
     const addPastedUrl = async (url: string) => {
-      setPasteToast("Menempelkan ke moodboard…");
-      let imageUrl = url;
-      let domain = "";
+      let imageUrl = url, domain = "";
       try { domain = new URL(url).hostname.replace("www.", ""); } catch {}
       try {
         const res = await fetch(url);
@@ -229,9 +216,7 @@ export default function MoodboardPage() {
           const uploaded = await uploadMedia(file);
           imageUrl = uploaded || (await readFileAsDataUrl(file));
         }
-      } catch {
-        // CORS / fetch failure — keep the original URL as the image source.
-      }
+      } catch { /* CORS/fetch fail — use URL directly */ }
       addItem({
         url: "", title: "Pasted reference", source_domain: domain,
         category: activeCategory === "all" ? "graphic_design" : activeCategory,
@@ -239,11 +224,9 @@ export default function MoodboardPage() {
         image_url: imageUrl, media_type: "image",
         createdAt: Date.now(), projectId: activeFolder ?? undefined,
       });
-      setPasteToast(null);
     };
 
     const onPaste = async (e: ClipboardEvent) => {
-      // Don't intercept paste inside form fields (the Add dialog, folder inputs…)
       const el = document.activeElement;
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el as HTMLElement | null)?.isContentEditable) return;
       if (showModal) return;
@@ -252,26 +235,48 @@ export default function MoodboardPage() {
       if (!dt) return;
       const itemsArr = Array.from(dt.items ?? []);
 
-      // 1) Raw image/video bytes
-      const fileItem = itemsArr.find((i) => i.kind === "file" && (i.type.startsWith("image/") || i.type.startsWith("video/")));
-      if (fileItem) {
-        const file = fileItem.getAsFile();
-        if (file) { e.preventDefault(); await addPastedFile(file, file.name.replace(/\.[^.]+$/, "")); return; }
+      // 1) Raw image/video bytes — collect ALL, not just the first.
+      const fileItems = itemsArr.filter((i) => i.kind === "file" && (i.type.startsWith("image/") || i.type.startsWith("video/")));
+      const files = fileItems.map((i) => i.getAsFile()).filter((f): f is File => !!f);
+      // Also check dt.files (populated when copying files from the OS).
+      const dtFiles = Array.from(dt.files ?? []).filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
+      // Merge, deduplicate by name+size.
+      const seen = new Set<string>();
+      const allFiles: File[] = [];
+      for (const f of [...files, ...dtFiles]) {
+        const key = `${f.name}-${f.size}`;
+        if (!seen.has(key)) { seen.add(key); allFiles.push(f); }
       }
-      const dtFile = Array.from(dt.files ?? []).find((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
-      if (dtFile) { e.preventDefault(); await addPastedFile(dtFile, dtFile.name.replace(/\.[^.]+$/, "")); return; }
+      if (allFiles.length > 0) {
+        e.preventDefault();
+        setPasteToast(`Menempelkan ${allFiles.length} gambar…`);
+        await Promise.all(allFiles.map((f) => addPastedFile(f, f.name.replace(/\.[^.]+$/, ""))));
+        setPasteToast(null);
+        return;
+      }
 
-      // 2) HTML fragment with <img src> (image copied from a web page)
+      // 2) HTML with one or more <img src> tags.
       const html = dt.getData("text/html");
       if (html) {
-        const src = /<img[^>]+src=["']([^"']+)["']/i.exec(html)?.[1];
-        if (src) { e.preventDefault(); await addPastedUrl(src); return; }
+        const srcs = Array.from(html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)).map((m) => m[1]);
+        if (srcs.length > 0) {
+          e.preventDefault();
+          setPasteToast(`Menempelkan ${srcs.length} gambar…`);
+          await Promise.all(srcs.map(addPastedUrl));
+          setPasteToast(null);
+          return;
+        }
       }
 
-      // 3) Plain-text image URL
+      // 3) Plain text — one URL or multiple lines of image URLs.
       const text = dt.getData("text/plain").trim();
-      if (/^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg|avif)(\?\S*)?$/i.test(text)) {
-        e.preventDefault(); await addPastedUrl(text); return;
+      const imgUrlRe = /^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg|avif)(\?\S*)?$/i;
+      const urls = text.split(/\s+/).filter((u) => imgUrlRe.test(u));
+      if (urls.length > 0) {
+        e.preventDefault();
+        setPasteToast(`Menempelkan ${urls.length} gambar…`);
+        await Promise.all(urls.map(addPastedUrl));
+        setPasteToast(null);
       }
     };
     window.addEventListener("paste", onPaste);
