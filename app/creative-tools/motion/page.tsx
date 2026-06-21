@@ -257,12 +257,24 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
   const playheadRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const timeLabelRef = useRef<HTMLSpanElement>(null);
+  const canvasWrapRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [scrubTime, setScrubTime] = useState(0);
   const [tick, setTick] = useState(0);
-  const [propTab, setPropTab] = useState<"presets" | "custom" | "effects">("presets");
+  // Design vs Animate mode
+  const [layerTab, setLayerTab] = useState<"design" | "animate">("design");
+  type AnimView = "list" | "picker" | "detail";
+  const [animView, setAnimView] = useState<AnimView>("list");
+  type AnimProp = "scale" | "rotate" | "move" | "opacity" | "color" | "layer-blur" | "corner-radius" | "stroke";
+  const [animProp, setAnimProp] = useState<AnimProp | null>(null);
+  // Timeline height (drag top edge up to expand)
+  const [timelineH, setTimelineH] = useState(160);
+  const tlResizing = useRef(false);
+  const tlResizeStart = useRef({ y: 0, h: 0 });
+  // Canvas zoom
+  const [zoom, setZoom] = useState(1);
 
   const { w: W, h: H } = DIMS[project.ratio];
   const selected = project.layers.find((l) => l.id === selectedId) ?? null;
@@ -422,6 +434,32 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
     }
   };
   const onBarUp = () => { barDrag.current = null; };
+
+  // ── Timeline resize (drag top edge upward) ──
+  const onTlResizeDown = (e: React.PointerEvent) => {
+    tlResizing.current = true;
+    tlResizeStart.current = { y: e.clientY, h: timelineH };
+    (e.target as Element).setPointerCapture(e.pointerId);
+  };
+  const onTlResizeMove = (e: React.PointerEvent) => {
+    if (!tlResizing.current) return;
+    const dy = tlResizeStart.current.y - e.clientY;
+    setTimelineH(Math.max(80, Math.min(400, tlResizeStart.current.h + dy)));
+  };
+  const onTlResizeUp = () => { tlResizing.current = false; };
+
+  // ── Canvas zoom (Ctrl+wheel) ──
+  useEffect(() => {
+    const el = canvasWrapRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      setZoom((z) => Math.max(0.25, Math.min(3, z - e.deltaY * 0.001)));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
 
   // ── Canvas pointer drag ──
   const drag = useRef<{ id: string; offX: number; offY: number } | null>(null);
@@ -647,48 +685,59 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
         </div>
 
         {/* ── Center: Canvas ── */}
-        <div className="flex-1 overflow-hidden flex items-center justify-center"
+        <div ref={canvasWrapRef} className="flex-1 overflow-hidden flex items-center justify-center relative"
           style={{ background: "#111", backgroundImage: "radial-gradient(#2a2a2a 1px, transparent 1px)", backgroundSize: "24px 24px" }}>
-          <div className="relative" style={{ lineHeight: 0, maxWidth: "calc(100% - 32px)", maxHeight: "calc(100% - 32px)" }}>
-            <canvas
-              ref={canvasRef}
-              width={W} height={H}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              className="rounded-[8px] shadow-2xl touch-none cursor-move"
-              style={{ display: "block", maxWidth: "100%", maxHeight: "calc(100vh - 11rem - 44px)", aspectRatio: `${W} / ${H}`, background: project.bg }}
-            />
-            {/* Selection handles */}
-            {selected && !playing && (
-              <div className="absolute inset-0 pointer-events-none">
-                <div
-                  className="absolute"
-                  onPointerMove={onHandleMove}
-                  onPointerUp={onHandleUp}
-                  style={{
-                    left: `${(selected.x / W) * 100}%`, top: `${(selected.y / H) * 100}%`,
-                    width: `${(selected.w / W) * 100}%`, height: `${(selected.h / H) * 100}%`,
-                    border: "1.5px solid #5cf0a0", boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
-                    pointerEvents: "none",
-                  }}>
-                  {[
-                    { id: "nw", l: 0, t: 0, c: "nwse-resize" }, { id: "n", l: 0.5, t: 0, c: "ns-resize" }, { id: "ne", l: 1, t: 0, c: "nesw-resize" },
-                    { id: "e", l: 1, t: 0.5, c: "ew-resize" }, { id: "se", l: 1, t: 1, c: "nwse-resize" }, { id: "s", l: 0.5, t: 1, c: "ns-resize" },
-                    { id: "sw", l: 0, t: 1, c: "nesw-resize" }, { id: "w", l: 0, t: 0.5, c: "ew-resize" },
-                  ].map((hnd) => (
-                    <div key={hnd.id}
-                      onPointerDown={(e) => onHandleDown(e, hnd.id)}
-                      className="absolute rounded-sm touch-none"
-                      style={{ left: `${hnd.l * 100}%`, top: `${hnd.t * 100}%`, width: 9, height: 9, transform: "translate(-50%,-50%)", background: "#fff", border: "1.5px solid #5cf0a0", cursor: hnd.c, pointerEvents: "auto" }} />
-                  ))}
+          {/* Zoom controls */}
+          <div className="absolute bottom-3 right-3 flex items-center gap-1 z-20" style={{ background: "rgba(24,24,24,0.92)", borderRadius: 8, padding: "3px 8px", border: "1px solid #333" }}>
+            <button onClick={() => setZoom((z) => Math.max(0.25, +(z - 0.1).toFixed(2)))} className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-base leading-none" style={{ color: "#aaa" }}>−</button>
+            <span className="text-[11px] tabular-nums min-w-[38px] text-center" style={{ color: "#888" }}>{Math.round(zoom * 100)}%</span>
+            <button onClick={() => setZoom((z) => Math.min(3, +(z + 0.1).toFixed(2)))} className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-base leading-none" style={{ color: "#aaa" }}>+</button>
+            <div className="w-px h-4 mx-1" style={{ background: "#333" }} />
+            <button onClick={() => setZoom(1)} className="text-[10px] px-1.5 py-0.5 rounded hover:bg-white/10" style={{ color: "#888" }}>Fit</button>
+          </div>
+
+          <div style={{ transform: `scale(${zoom})`, transformOrigin: "center center", lineHeight: 0 }}>
+            <div className="relative" style={{ lineHeight: 0 }}>
+              <canvas
+                ref={canvasRef}
+                width={W} height={H}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                className="rounded-[8px] shadow-2xl touch-none cursor-move"
+                style={{ display: "block", maxWidth: `${Math.floor((100 / zoom))}%`, maxHeight: `calc((100vh - 11rem - 44px) / ${zoom})`, aspectRatio: `${W} / ${H}`, background: project.bg, width: "min(700px, 60vw)" }}
+              />
+              {/* Selection handles */}
+              {selected && !playing && (
+                <div className="absolute inset-0 pointer-events-none">
+                  <div
+                    className="absolute"
+                    onPointerMove={onHandleMove}
+                    onPointerUp={onHandleUp}
+                    style={{
+                      left: `${(selected.x / W) * 100}%`, top: `${(selected.y / H) * 100}%`,
+                      width: `${(selected.w / W) * 100}%`, height: `${(selected.h / H) * 100}%`,
+                      border: "1.5px solid #5cf0a0", boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
+                      pointerEvents: "none",
+                    }}>
+                    {[
+                      { id: "nw", l: 0, t: 0, c: "nwse-resize" }, { id: "n", l: 0.5, t: 0, c: "ns-resize" }, { id: "ne", l: 1, t: 0, c: "nesw-resize" },
+                      { id: "e", l: 1, t: 0.5, c: "ew-resize" }, { id: "se", l: 1, t: 1, c: "nwse-resize" }, { id: "s", l: 0.5, t: 1, c: "ns-resize" },
+                      { id: "sw", l: 0, t: 1, c: "nesw-resize" }, { id: "w", l: 0, t: 0.5, c: "ew-resize" },
+                    ].map((hnd) => (
+                      <div key={hnd.id}
+                        onPointerDown={(e) => onHandleDown(e, hnd.id)}
+                        className="absolute rounded-sm touch-none"
+                        style={{ left: `${hnd.l * 100}%`, top: `${hnd.t * 100}%`, width: 9, height: 9, transform: "translate(-50%,-50%)", background: "#fff", border: "1.5px solid #5cf0a0", cursor: hnd.c, pointerEvents: "auto" }} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
-        {/* ── Right panel: Properties (tabbed) ── */}
+        {/* ── Right panel: Design / Animate ── */}
         <div className="flex-shrink-0 border-l flex flex-col overflow-hidden" style={{ width: 264, background: "#1e1e1e", borderColor: "#333" }}>
           {selected ? (
             <>
@@ -703,97 +752,36 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                 </button>
               </div>
 
-              {/* Tabs */}
+              {/* Design / Animate switcher */}
               <div className="flex flex-shrink-0 border-b" style={{ borderColor: "#333" }}>
-                {([
-                  { id: "presets" as const, label: "PRESETS" },
-                  { id: "custom" as const, label: "CUSTOM" },
-                  { id: "effects" as const, label: "EFFECTS" },
-                ]).map((t) => {
-                  const on = propTab === t.id;
+                {(["design", "animate"] as const).map((t) => {
+                  const on = layerTab === t;
                   return (
-                    <button key={t.id} onClick={() => setPropTab(t.id)}
-                      className="flex-1 py-2 text-[10px] font-bold tracking-wider transition-colors relative"
-                      style={{ color: on ? "#c2b6ff" : "#777", background: on ? "rgba(124,108,255,0.12)" : "transparent" }}>
-                      {t.label}
-                      {on && <span className="absolute bottom-0 left-0 right-0 h-[2px]" style={{ background: "#8a76ff" }} />}
+                    <button key={t}
+                      onClick={() => { setLayerTab(t); if (t === "animate") { setAnimView("list"); setAnimProp(null); } }}
+                      className="flex-1 py-2.5 text-[12px] font-semibold capitalize tracking-wide transition-colors relative"
+                      style={{ color: on ? "#e8e8e8" : "#666", background: "transparent" }}>
+                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                      {on && <span className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full" style={{ background: "#8a76ff" }} />}
                     </button>
                   );
                 })}
               </div>
 
-              <div className="flex-1 overflow-y-auto p-3">
-                {/* ── PRESETS TAB ── */}
-                {propTab === "presets" && (
-                  <>
-                    {/* Entry presets */}
-                    <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "#5cf0a0" }}>Animasi Masuk</p>
-                    <div className="grid grid-cols-2 gap-1.5 mb-2">
-                      {IN_TEMPLATES.map((t) => {
-                        const on = selected.preset === t.value;
-                        return (
-                          <button key={t.value}
-                            onClick={() => { patchLayer(selected.id, { preset: t.value }); replay(); }}
-                            className="px-2 py-2 rounded-md text-[11px] font-medium border transition-all text-center"
-                            style={{ borderColor: on ? "#5cf0a0" : "#333", background: on ? "rgba(92,240,160,0.1)" : "#262626", color: on ? "#c2f0df" : "#aaa" }}>
-                            {t.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="grid grid-cols-3 gap-1.5 mb-4">
-                      <div><label className={fieldLabel} style={fieldLabelStyle}>Durasi</label>
-                        <input type="number" min={0.1} step={0.1} value={selected.duration} onChange={(e) => patchLayer(selected.id, { duration: Math.max(0.1, Number(e.target.value)) })} className={numInput} style={numStyle} /></div>
-                      <div><label className={fieldLabel} style={fieldLabelStyle}>Delay</label>
-                        <input type="number" min={0} step={0.1} value={selected.delay} onChange={(e) => patchLayer(selected.id, { delay: Math.max(0, Number(e.target.value)) })} className={numInput} style={numStyle} /></div>
-                      <div><label className={fieldLabel} style={fieldLabelStyle}>Easing</label>
-                        <Select value={selected.easing} onChange={(e) => { patchLayer(selected.id, { easing: e.target.value as Easing }); replay(); }} className="!text-[10px] !px-1 !py-1">
-                          {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                        </Select></div>
-                    </div>
+              <div className="flex-1 overflow-y-auto">
 
-                    {/* Exit presets */}
-                    <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "#f0a05c" }}>Animasi Keluar</p>
-                    <div className="grid grid-cols-2 gap-1.5 mb-2">
-                      {OUT_TEMPLATES.map((t) => {
-                        const on = (!selected.outPreset && t.value === "none") || selected.outPreset === t.value;
-                        return (
-                          <button key={t.value}
-                            onClick={() => { patchLayer(selected.id, { outPreset: t.value }); replay(); }}
-                            className="px-2 py-2 rounded-md text-[11px] font-medium border transition-all text-center"
-                            style={{ borderColor: on ? "#f0a05c" : "#333", background: on ? "rgba(240,160,92,0.1)" : "#262626", color: on ? "#ffd0a0" : "#aaa" }}>
-                            {t.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {selected.outPreset && selected.outPreset !== "none" && (
-                      <div className="grid grid-cols-3 gap-1.5">
-                        <div><label className={fieldLabel} style={fieldLabelStyle}>Durasi</label><input type="number" min={0.1} step={0.1} value={selected.outDuration ?? 0.6} onChange={(e) => patchLayer(selected.id, { outDuration: Math.max(0.1, Number(e.target.value)) })} className={numInput} style={numStyle} /></div>
-                        <div><label className={fieldLabel} style={fieldLabelStyle}>Mulai</label><input type="number" min={0} step={0.1} value={Number(layerOutStart(selected, project.duration).toFixed(2))} onChange={(e) => patchLayer(selected.id, { outStart: Math.max(layerInEnd(selected), Number(e.target.value)) })} className={numInput} style={numStyle} /></div>
-                        <div><label className={fieldLabel} style={fieldLabelStyle}>Easing</label>
-                          <Select value={selected.outEasing ?? "ease-in"} onChange={(e) => { patchLayer(selected.id, { outEasing: e.target.value as Easing }); replay(); }} className="!text-[10px] !px-1 !py-1">
-                            {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                          </Select></div>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* ── CUSTOM TAB ── */}
-                {propTab === "custom" && (
-                  <>
-                    {/* Transform */}
-                    <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "#888" }}>Transform</p>
+                {/* ═══ DESIGN TAB ═══ */}
+                {layerTab === "design" && (
+                  <div className="p-3">
+                    <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "#666" }}>Transform</p>
                     <div className="grid grid-cols-2 gap-2 mb-3">
                       <div><label className={fieldLabel} style={fieldLabelStyle}>X</label><input type="number" value={selected.x} onChange={(e) => patchLayer(selected.id, { x: Number(e.target.value) })} className={numInput} style={numStyle} /></div>
                       <div><label className={fieldLabel} style={fieldLabelStyle}>Y</label><input type="number" value={selected.y} onChange={(e) => patchLayer(selected.id, { y: Number(e.target.value) })} className={numInput} style={numStyle} /></div>
                       <div><label className={fieldLabel} style={fieldLabelStyle}>Lebar</label><input type="number" value={selected.w} onChange={(e) => patchLayer(selected.id, { w: Number(e.target.value) })} className={numInput} style={numStyle} /></div>
                       <div><label className={fieldLabel} style={fieldLabelStyle}>Tinggi</label><input type="number" value={selected.h} onChange={(e) => patchLayer(selected.id, { h: Number(e.target.value) })} className={numInput} style={numStyle} /></div>
                     </div>
-
-                    {/* Style */}
-                    <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "#888" }}>Style</p>
+                    <div className="h-px mb-3" style={{ background: "#2a2a2a" }} />
+                    <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "#666" }}>Style</p>
                     {selected.kind === "text" && (
                       <>
                         <label className={fieldLabel} style={fieldLabelStyle}>Teks</label>
@@ -804,112 +792,324 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
                     )}
                     {selected.kind === "rect" && (
                       <>
-                        <label className={fieldLabel} style={fieldLabelStyle}>Sudut (radius)</label>
+                        <label className={fieldLabel} style={fieldLabelStyle}>Corner Radius</label>
                         <input type="number" min={0} max={400} value={selected.radius ?? 0} onChange={(e) => patchLayer(selected.id, { radius: Number(e.target.value) })} className={`${numInput} mb-2`} style={numStyle} />
                       </>
                     )}
                     {selected.kind !== "image" && (
                       <>
                         <label className={fieldLabel} style={fieldLabelStyle}>Warna</label>
-                        <input type="color" value={selected.color} onChange={(e) => patchLayer(selected.id, { color: e.target.value })} className="w-full h-8 rounded-[6px] border cursor-pointer mb-3" style={{ borderColor: "#3a3a3a" }} />
+                        <input type="color" value={selected.color} onChange={(e) => patchLayer(selected.id, { color: e.target.value })} className="w-full h-8 rounded-[6px] border cursor-pointer mb-2" style={{ borderColor: "#3a3a3a" }} />
                       </>
                     )}
                     {(selected.kind === "rect" || selected.kind === "circle") && (
                       <div className="grid grid-cols-2 gap-2 mb-3">
                         <div>
-                          <label className={fieldLabel} style={fieldLabelStyle}>Stroke</label>
+                          <label className={fieldLabel} style={fieldLabelStyle}>Stroke Warna</label>
                           <input type="color" value={selected.strokeColor ?? "#000000"} onChange={(e) => patchLayer(selected.id, { strokeColor: e.target.value })} className="w-full h-8 rounded-[6px] border cursor-pointer" style={{ borderColor: "#3a3a3a" }} />
                         </div>
                         <div>
-                          <label className={fieldLabel} style={fieldLabelStyle}>Tebal Stroke</label>
-                          <input type="number" min={0} max={60} value={selected.strokeWidth ?? 0} onChange={(e) => patchLayer(selected.id, { strokeWidth: Math.max(0, Number(e.target.value)) })} className={numInput} style={numStyle} />
+                          <label className={fieldLabel} style={fieldLabelStyle}>Tebal</label>
+                          <input type="number" min={0} max={60} value={selected.strokeWidth ?? 0} onChange={(e) => patchLayer(selected.id, { strokeWidth: Number(e.target.value) })} className={numInput} style={numStyle} />
                         </div>
                       </div>
                     )}
-
-                    <div className="h-px my-3" style={{ background: "#333" }} />
-
-                    {/* Custom movement — entry (active when preset = custom) */}
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#5cf0a0" }}>Gerakan Masuk</p>
-                      {selected.preset !== "custom" && (
-                        <button onClick={() => { patchLayer(selected.id, { preset: "custom" }); replay(); }} className="text-[10px] font-medium" style={{ color: "#7c6fff" }}>Aktifkan</button>
-                      )}
-                    </div>
-                    {selected.preset === "custom" ? (
-                      <div className="rounded-[8px] p-2 mb-3" style={{ background: "#252525", border: "1px solid #333" }}>
-                        <div className="grid grid-cols-2 gap-1.5 mb-1.5">
-                          <div><label className={fieldLabel} style={fieldLabelStyle}>Geser X</label><input type="number" step={10} value={selected.fromDX ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDX: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                          <div><label className={fieldLabel} style={fieldLabelStyle}>Geser Y</label><input type="number" step={10} value={selected.fromDY ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDY: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-1.5">
-                          <div><label className={fieldLabel} style={fieldLabelStyle}>Scale</label><input type="number" step={0.1} value={selected.fromScale ?? 1} onChange={(e) => { patchLayer(selected.id, { fromScale: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                          <div><label className={fieldLabel} style={fieldLabelStyle}>Rotasi°</label><input type="number" step={15} value={selected.fromRotate ?? 0} onChange={(e) => { patchLayer(selected.id, { fromRotate: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                          <div><label className={fieldLabel} style={fieldLabelStyle}>Opasitas</label><input type="number" min={0} max={1} step={0.1} value={selected.fromOpacity ?? 0} onChange={(e) => { patchLayer(selected.id, { fromOpacity: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-[10px] mb-3" style={{ color: "#666" }}>Pilih preset “Custom” untuk mengatur gerakan masuk manual.</p>
-                    )}
-
-                    {/* Custom movement — exit (active when outPreset = custom-out) */}
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#f0a05c" }}>Gerakan Keluar</p>
-                      {selected.outPreset !== "custom-out" && (
-                        <button onClick={() => { patchLayer(selected.id, { outPreset: "custom-out" }); replay(); }} className="text-[10px] font-medium" style={{ color: "#7c6fff" }}>Aktifkan</button>
-                      )}
-                    </div>
-                    {selected.outPreset === "custom-out" ? (
-                      <div className="rounded-[8px] p-2" style={{ background: "#252525", border: "1px solid #333" }}>
-                        <div className="grid grid-cols-2 gap-1.5 mb-1.5">
-                          <div><label className={fieldLabel} style={fieldLabelStyle}>Geser X</label><input type="number" step={10} value={selected.toDX ?? 0} onChange={(e) => { patchLayer(selected.id, { toDX: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                          <div><label className={fieldLabel} style={fieldLabelStyle}>Geser Y</label><input type="number" step={10} value={selected.toDY ?? 0} onChange={(e) => { patchLayer(selected.id, { toDY: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-1.5">
-                          <div><label className={fieldLabel} style={fieldLabelStyle}>Scale</label><input type="number" step={0.1} value={selected.toScale ?? 1} onChange={(e) => { patchLayer(selected.id, { toScale: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                          <div><label className={fieldLabel} style={fieldLabelStyle}>Rotasi°</label><input type="number" step={15} value={selected.toRotate ?? 0} onChange={(e) => { patchLayer(selected.id, { toRotate: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                          <div><label className={fieldLabel} style={fieldLabelStyle}>Opasitas</label><input type="number" min={0} max={1} step={0.1} value={selected.toOpacity ?? 0} onChange={(e) => { patchLayer(selected.id, { toOpacity: Number(e.target.value) }); replay(); }} className={numInput} style={numStyle} /></div>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-[10px]" style={{ color: "#666" }}>Pilih preset keluar “Custom” untuk mengatur gerakan keluar manual.</p>
-                    )}
-                  </>
-                )}
-
-                {/* ── EFFECTS TAB ── */}
-                {propTab === "effects" && (
-                  <>
-                    <p className="text-[10px] font-bold uppercase tracking-wider mb-3" style={{ color: "#888" }}>Filter Visual</p>
+                    <div className="h-px my-3" style={{ background: "#2a2a2a" }} />
+                    <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "#666" }}>Effects</p>
                     {([
                       { key: "blur" as const, label: "Layer Blur", min: 0, max: 40, step: 1, def: 0, unit: "px" },
-                      { key: "grayscale" as const, label: "Grayscale", min: 0, max: 1, step: 0.05, def: 0, unit: "" },
-                      { key: "sepia" as const, label: "Sepia", min: 0, max: 1, step: 0.05, def: 0, unit: "" },
-                      { key: "saturate" as const, label: "Saturasi", min: 0, max: 3, step: 0.05, def: 1, unit: "×" },
                       { key: "brightness" as const, label: "Brightness", min: 0, max: 2, step: 0.05, def: 1, unit: "×" },
                       { key: "contrast" as const, label: "Contrast", min: 0, max: 2, step: 0.05, def: 1, unit: "×" },
+                      { key: "saturate" as const, label: "Saturation", min: 0, max: 3, step: 0.05, def: 1, unit: "×" },
+                      { key: "grayscale" as const, label: "Grayscale", min: 0, max: 1, step: 0.05, def: 0, unit: "" },
                     ]).map((fx) => {
                       const val = (selected[fx.key] as number | undefined) ?? fx.def;
                       return (
-                        <div key={fx.key} className="mb-3">
+                        <div key={fx.key} className="mb-2.5">
                           <div className="flex items-center justify-between mb-1">
-                            <label className="text-[10px] font-bold uppercase tracking-wider" style={fieldLabelStyle}>{fx.label}</label>
-                            <span className="text-[10px] tabular-nums" style={{ color: "#aaa" }}>{val}{fx.unit}</span>
+                            <label className="text-[10px] font-medium" style={{ color: "#999" }}>{fx.label}</label>
+                            <span className="text-[10px] tabular-nums" style={{ color: "#777" }}>{val}{fx.unit}</span>
                           </div>
                           <input type="range" min={fx.min} max={fx.max} step={fx.step} value={val}
                             onChange={(e) => patchLayer(selected.id, { [fx.key]: Number(e.target.value) } as Partial<MotionLayer>)}
-                            className="w-full accent-[#8a76ff]" style={{ accentColor: "#8a76ff" }} />
+                            className="w-full" style={{ accentColor: "#8a76ff" }} />
                         </div>
                       );
                     })}
-                    <button
-                      onClick={() => patchLayer(selected.id, { blur: 0, grayscale: 0, sepia: 0, saturate: 1, brightness: 1, contrast: 1 })}
-                      className="w-full mt-1 py-1.5 rounded-md text-[11px] font-medium border transition-colors hover:bg-white/5"
-                      style={{ borderColor: "#333", color: "#aaa" }}>
-                      Reset semua filter
-                    </button>
+                  </div>
+                )}
+
+                {/* ═══ ANIMATE TAB ═══ */}
+                {layerTab === "animate" && (
+                  <>
+                    {/* ── VIEW: list ── */}
+                    {animView === "list" && (
+                      <div className="p-3">
+                        <button
+                          onClick={() => setAnimView("picker")}
+                          className="w-full py-2.5 rounded-[10px] text-[13px] font-semibold mb-4 transition-colors hover:opacity-90"
+                          style={{ background: "#7c6fff", color: "#fff" }}>
+                          + New Animation
+                        </button>
+                        {/* Existing anim cards */}
+                        {selected.preset !== "none" && (
+                          <div className="rounded-[10px] border mb-2 p-3 cursor-pointer hover:border-[#555] transition-colors"
+                            onClick={() => { setAnimView("detail"); setAnimProp(null); }}
+                            style={{ borderColor: "#333", background: "#252525" }}>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-[12px] font-semibold capitalize" style={{ color: "#e8e8e8" }}>Entry · {selected.preset}</p>
+                                <p className="text-[10px] mt-0.5" style={{ color: "#888" }}>{selected.duration}s · delay {selected.delay}s</p>
+                              </div>
+                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: "#5cf0a0" }} />
+                            </div>
+                          </div>
+                        )}
+                        {selected.outPreset && selected.outPreset !== "none" && (
+                          <div className="rounded-[10px] border mb-2 p-3 cursor-pointer hover:border-[#555] transition-colors"
+                            onClick={() => { setAnimView("detail"); setAnimProp(null); }}
+                            style={{ borderColor: "#333", background: "#252525" }}>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-[12px] font-semibold capitalize" style={{ color: "#e8e8e8" }}>Exit · {selected.outPreset}</p>
+                                <p className="text-[10px] mt-0.5" style={{ color: "#888" }}>{selected.outDuration ?? 0.6}s</p>
+                              </div>
+                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: "#f0a05c" }} />
+                            </div>
+                          </div>
+                        )}
+                        {selected.preset === "none" && (!selected.outPreset || selected.outPreset === "none") && (
+                          <div className="rounded-[14px] p-4 mt-1" style={{ background: "#252525", border: "1px solid #2e2e2e" }}>
+                            <div className="text-xl mb-2">🤖</div>
+                            <p className="text-[13px] font-bold mb-1" style={{ color: "#e8e8e8" }}>Idea → Motion</p>
+                            <p className="text-[11px] mb-3 leading-relaxed" style={{ color: "#888" }}>Pilih animasi dari preset atau buat gerakan custom.</p>
+                            <button onClick={() => setAnimView("picker")} className="w-full py-2 rounded-[8px] text-[12px] font-semibold" style={{ background: "#1a1a1a", color: "#e8e8e8", border: "1px solid #444" }}>
+                              ✦ Pilih Animasi
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ── VIEW: picker ── */}
+                    {animView === "picker" && (
+                      <div className="p-3">
+                        <button onClick={() => setAnimView("list")} className="flex items-center gap-1.5 text-[11px] mb-3 hover:opacity-80" style={{ color: "#888" }}>
+                          <Icon name="arrow-left" size={11} /> Kembali
+                        </button>
+                        <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "#5cf0a0" }}>Animasi Masuk</p>
+                        <div className="grid grid-cols-2 gap-1.5 mb-4">
+                          {IN_TEMPLATES.map((t) => {
+                            const on = selected.preset === t.value;
+                            return (
+                              <button key={t.value}
+                                onClick={() => { patchLayer(selected.id, { preset: t.value }); replay(); setAnimView("detail"); setAnimProp(null); }}
+                                className="px-2 py-2.5 rounded-[8px] text-[11px] font-medium border transition-all text-center"
+                                style={{ borderColor: on ? "#5cf0a0" : "#333", background: on ? "rgba(92,240,160,0.1)" : "#262626", color: on ? "#c2f0df" : "#aaa" }}>
+                                {t.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "#f0a05c" }}>Animasi Keluar</p>
+                        <div className="grid grid-cols-2 gap-1.5 mb-4">
+                          {OUT_TEMPLATES.map((t) => {
+                            const on = (!selected.outPreset && t.value === "none") || selected.outPreset === t.value;
+                            return (
+                              <button key={t.value}
+                                onClick={() => { patchLayer(selected.id, { outPreset: t.value }); replay(); setAnimView("detail"); setAnimProp(null); }}
+                                className="px-2 py-2.5 rounded-[8px] text-[11px] font-medium border transition-all text-center"
+                                style={{ borderColor: on ? "#f0a05c" : "#333", background: on ? "rgba(240,160,92,0.1)" : "#262626", color: on ? "#ffd0a0" : "#aaa" }}>
+                                {t.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className="text-[9px] font-bold uppercase tracking-wider mb-1" style={{ color: "#888" }}>Custom Property</p>
+                        {([
+                          { section: "Transform", items: [
+                            { id: "scale" as const, label: "Scale" },
+                            { id: "rotate" as const, label: "Rotate" },
+                            { id: "move" as const, label: "Move" },
+                          ]},
+                          { section: "Style", items: [
+                            { id: "opacity" as const, label: "Opacity" },
+                            { id: "color" as const, label: "Color" },
+                            { id: "corner-radius" as const, label: "Corner Radius" },
+                            { id: "stroke" as const, label: "Stroke" },
+                          ]},
+                          { section: "Effects", items: [
+                            { id: "layer-blur" as const, label: "Layer Blur" },
+                          ]},
+                        ] as { section: string; items: { id: AnimProp; label: string }[] }[]).map(({ section, items }) => (
+                          <div key={section} className="mb-2">
+                            <p className="text-[9px] font-semibold uppercase tracking-wider mb-1 px-1" style={{ color: "#555" }}>{section}</p>
+                            {items.map((item) => (
+                              <button key={item.id}
+                                onClick={() => {
+                                  setAnimProp(item.id);
+                                  setAnimView("detail");
+                                  if (item.id === "scale") patchLayer(selected.id, { preset: "custom", fromScale: 0.5, fromOpacity: 0 });
+                                  else if (item.id === "rotate") patchLayer(selected.id, { preset: "custom", fromRotate: 90, fromOpacity: 0 });
+                                  else if (item.id === "move") patchLayer(selected.id, { preset: "custom", fromDX: -80, fromOpacity: 0 });
+                                  else if (item.id === "opacity") patchLayer(selected.id, { preset: "fade" });
+                                  else if (item.id === "layer-blur") patchLayer(selected.id, { blur: (selected.blur ?? 0) > 0 ? selected.blur : 8 });
+                                  replay();
+                                }}
+                                className="w-full flex items-center px-2.5 py-2 rounded-[7px] text-left text-[12px] transition-colors hover:bg-white/5"
+                                style={{ color: "#ccc" }}>
+                                <span className="w-1.5 h-1.5 rounded-full mr-2.5 flex-shrink-0" style={{ background: "#8a76ff" }} />
+                                {item.label}
+                              </button>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* ── VIEW: detail ── */}
+                    {animView === "detail" && (
+                      <div className="p-3">
+                        <button onClick={() => setAnimView("picker")} className="flex items-center gap-1.5 text-[11px] mb-3 hover:opacity-80" style={{ color: "#888" }}>
+                          <Icon name="arrow-left" size={11} /> Kembali
+                        </button>
+                        <p className="text-[13px] font-bold mb-4 capitalize" style={{ color: "#e8e8e8" }}>
+                          {animProp ? animProp.replace(/-/g, " ") : selected.preset !== "none" ? selected.preset : "Animation"}
+                        </p>
+
+                        {/* Entry section */}
+                        <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "#5cf0a0" }}>Entry</p>
+                        <div className="rounded-[10px] p-3 mb-3" style={{ background: "#252525", border: "1px solid #2e2e2e" }}>
+                          <div className="flex items-center justify-between mb-3">
+                            <span className="text-[11px]" style={{ color: "#aaa" }}>Preset</span>
+                            <Select value={selected.preset} onChange={(e) => { patchLayer(selected.id, { preset: e.target.value as AnimPreset }); replay(); }} className="!text-[11px] !py-0.5 !px-2 w-[110px]">
+                              {IN_TEMPLATES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                            </Select>
+                          </div>
+                          {/* Property-specific from value */}
+                          {animProp === "scale" && selected.preset === "custom" && (
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-[11px]" style={{ color: "#aaa" }}>Initial value</span>
+                              <div className="flex items-center gap-1.5">
+                                <input type="number" step={0.05} value={selected.fromScale ?? 0} onChange={(e) => { patchLayer(selected.id, { fromScale: Number(e.target.value) }); replay(); }} className="w-[64px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                <span className="text-[10px]" style={{ color: "#666" }}>→ 1.0</span>
+                              </div>
+                            </div>
+                          )}
+                          {animProp === "rotate" && selected.preset === "custom" && (
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-[11px]" style={{ color: "#aaa" }}>Initial value</span>
+                              <div className="flex items-center gap-1.5">
+                                <input type="number" step={15} value={selected.fromRotate ?? 0} onChange={(e) => { patchLayer(selected.id, { fromRotate: Number(e.target.value) }); replay(); }} className="w-[64px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                <span className="text-[10px]" style={{ color: "#666" }}>°→ 0°</span>
+                              </div>
+                            </div>
+                          )}
+                          {animProp === "move" && selected.preset === "custom" && (
+                            <>
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-[11px]" style={{ color: "#aaa" }}>From X</span>
+                                <input type="number" step={10} value={selected.fromDX ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDX: Number(e.target.value) }); replay(); }} className="w-[72px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                              </div>
+                              <div className="flex items-center justify-between mb-3">
+                                <span className="text-[11px]" style={{ color: "#aaa" }}>From Y</span>
+                                <input type="number" step={10} value={selected.fromDY ?? 0} onChange={(e) => { patchLayer(selected.id, { fromDY: Number(e.target.value) }); replay(); }} className="w-[72px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                              </div>
+                            </>
+                          )}
+                          {animProp === "opacity" && (
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-[11px]" style={{ color: "#aaa" }}>Initial value</span>
+                              <div className="flex items-center gap-1.5">
+                                <input type="number" min={0} max={1} step={0.1} value={selected.fromOpacity ?? 0} onChange={(e) => { patchLayer(selected.id, { fromOpacity: Number(e.target.value) }); replay(); }} className="w-[64px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                <span className="text-[10px]" style={{ color: "#666" }}>→ 1.0</span>
+                              </div>
+                            </div>
+                          )}
+                          {animProp === "layer-blur" && (
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-[11px]" style={{ color: "#aaa" }}>Blur amount</span>
+                              <div className="flex items-center gap-1.5">
+                                <input type="number" min={0} max={40} step={1} value={selected.blur ?? 0} onChange={(e) => patchLayer(selected.id, { blur: Number(e.target.value) })} className="w-[64px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                <span className="text-[10px]" style={{ color: "#666" }}>px</span>
+                              </div>
+                            </div>
+                          )}
+                          {animProp === "corner-radius" && selected.kind === "rect" && (
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-[11px]" style={{ color: "#aaa" }}>To (radius)</span>
+                              <input type="number" min={0} max={400} step={4} value={selected.radius ?? 0} onChange={(e) => patchLayer(selected.id, { radius: Number(e.target.value) })} className="w-[72px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                            </div>
+                          )}
+                          {animProp === "stroke" && (
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-[11px]" style={{ color: "#aaa" }}>Stroke width</span>
+                              <input type="number" min={0} max={60} step={1} value={selected.strokeWidth ?? 0} onChange={(e) => patchLayer(selected.id, { strokeWidth: Number(e.target.value) })} className="w-[72px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                            </div>
+                          )}
+                          <div className="h-px mb-3" style={{ background: "#333" }} />
+                          <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "#666" }}>Animation</p>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[11px]" style={{ color: "#aaa" }}>Duration</span>
+                            <div className="flex items-center gap-1">
+                              <input type="number" min={0.1} step={0.1} value={selected.duration} onChange={(e) => patchLayer(selected.id, { duration: Math.max(0.1, Number(e.target.value)) })} className="w-[56px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                              <span className="text-[10px]" style={{ color: "#666" }}>s</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[11px]" style={{ color: "#aaa" }}>Delay</span>
+                            <div className="flex items-center gap-1">
+                              <input type="number" min={0} step={0.1} value={selected.delay} onChange={(e) => patchLayer(selected.id, { delay: Math.max(0, Number(e.target.value)) })} className="w-[56px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                              <span className="text-[10px]" style={{ color: "#666" }}>s</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px]" style={{ color: "#aaa" }}>Easing</span>
+                            <Select value={selected.easing} onChange={(e) => { patchLayer(selected.id, { easing: e.target.value as Easing }); replay(); }} className="!text-[11px] !py-0.5 !px-2 w-[110px]">
+                              {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                            </Select>
+                          </div>
+                        </div>
+
+                        {/* Exit section */}
+                        <p className="text-[9px] font-bold uppercase tracking-wider mb-2" style={{ color: "#f0a05c" }}>Exit</p>
+                        <div className="rounded-[10px] p-3 mb-4" style={{ background: "#252525", border: "1px solid #2e2e2e" }}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[11px]" style={{ color: "#aaa" }}>Preset</span>
+                            <Select value={selected.outPreset ?? "none"} onChange={(e) => { patchLayer(selected.id, { outPreset: e.target.value as AnimOut }); replay(); }} className="!text-[11px] !py-0.5 !px-2 w-[110px]">
+                              {OUT_TEMPLATES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                            </Select>
+                          </div>
+                          {selected.outPreset && selected.outPreset !== "none" && (
+                            <>
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-[11px]" style={{ color: "#aaa" }}>Duration</span>
+                                <div className="flex items-center gap-1">
+                                  <input type="number" min={0.1} step={0.1} value={selected.outDuration ?? 0.6} onChange={(e) => patchLayer(selected.id, { outDuration: Math.max(0.1, Number(e.target.value)) })} className="w-[56px] text-right text-[11px] rounded-[5px] border px-1.5 py-0.5" style={{ background: "#1a1a1a", borderColor: "#444", color: "#e8e8e8" }} />
+                                  <span className="text-[10px]" style={{ color: "#666" }}>s</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px]" style={{ color: "#aaa" }}>Easing</span>
+                                <Select value={selected.outEasing ?? "ease-in"} onChange={(e) => { patchLayer(selected.id, { outEasing: e.target.value as Easing }); replay(); }} className="!text-[11px] !py-0.5 !px-2 w-[110px]">
+                                  {EASINGS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                                </Select>
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => { replay(); setAnimView("list"); }}
+                          className="w-full py-2.5 rounded-[10px] text-[13px] font-semibold transition-colors hover:opacity-90"
+                          style={{ background: "rgba(124,111,255,0.15)", color: "#c2b6ff", border: "1px solid rgba(124,111,255,0.3)" }}>
+                          ✓ Apply Animation
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
+
               </div>
             </>
           ) : (
@@ -921,9 +1121,17 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
         </div>
       </div>
 
-      {/* ── Bottom: Timeline ── */}
-      <div className="flex-shrink-0 border-t" style={{ background: "#1e1e1e", borderColor: "#333", height: 160 }}>
-        <div className="flex items-center justify-between px-3 py-1.5 border-b" style={{ borderColor: "#333" }}>
+      {/* ── Bottom: Timeline (resizable) ── */}
+      <div className="flex-shrink-0 border-t flex flex-col" style={{ background: "#1e1e1e", borderColor: "#333", height: timelineH }}
+        onPointerMove={onTlResizeMove} onPointerUp={onTlResizeUp}>
+        {/* Drag handle — pull up to expand */}
+        <div
+          className="w-full flex-shrink-0 flex items-center justify-center hover:bg-[#8a76ff]/20 transition-colors cursor-ns-resize touch-none"
+          style={{ height: 8 }}
+          onPointerDown={onTlResizeDown}>
+          <div className="w-8 h-[3px] rounded-full" style={{ background: "#3a3a3a" }} />
+        </div>
+        <div className="flex items-center justify-between px-3 py-1 border-b flex-shrink-0" style={{ borderColor: "#333" }}>
           <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "#666" }}>Timeline · {project.layers.length} layer</p>
           <div className="flex items-center gap-3 text-[9px]" style={{ color: "#666" }}>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm inline-block" style={{ background: "#5cf0a0" }} /> Masuk</span>
@@ -934,7 +1142,7 @@ function Editor({ project, onBack }: { project: MotionProject; onBack: () => voi
         {project.layers.length === 0 ? (
           <p className="text-[11px] px-3 py-3" style={{ color: "#555" }}>Tambahkan elemen dari panel kiri.</p>
         ) : (
-          <div className="flex h-[calc(100%-28px)] overflow-hidden">
+          <div className="flex flex-1 overflow-hidden">
             {/* Layer name column */}
             <div className="flex-shrink-0 border-r overflow-y-auto" style={{ width: 160, borderColor: "#333" }}>
               <div className="h-5 border-b" style={{ borderColor: "#333" }} />
