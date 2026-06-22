@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { persist, createJSONStorage } from "zustand/middleware"
-import { supabaseStorage } from "./supabase"
+import { supabaseStorage, deleteMedia } from "./supabase"
 
 const cloud = () => createJSONStorage(() => supabaseStorage)
 
@@ -170,6 +170,8 @@ interface MoodStore {
   addItem: (item: Omit<MoodItem, "id">) => void
   deleteItem: (id: string) => void
   moveItem: (itemId: string, projectId: string | null) => void
+  // Remove every item in a folder (projectId null = Global) AND its Storage files.
+  clearFolder: (projectId: string | null) => Promise<number>
   addProject: (name: string) => string
   renameProject: (id: string, name: string) => void
   deleteProject: (id: string) => void
@@ -177,14 +179,28 @@ interface MoodStore {
 
 export const useMoodStore = create<MoodStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       items: [],
       projects: [],
       addItem: (item) => set((s) => ({ items: [{ ...item, id: crypto.randomUUID(), createdAt: item.createdAt ?? Date.now() }, ...s.items] })),
-      deleteItem: (id) => set((s) => ({ items: s.items.filter(i => i.id !== id) })),
+      deleteItem: (id) => set((s) => {
+        const item = s.items.find(i => i.id === id)
+        // Free the Storage file too (fire-and-forget); only Storage URLs are removed.
+        if (item?.image_url) void deleteMedia(item.image_url)
+        return { items: s.items.filter(i => i.id !== id) }
+      }),
       moveItem: (itemId, projectId) => set((s) => ({
         items: s.items.map(i => i.id === itemId ? { ...i, projectId: projectId ?? undefined } : i),
       })),
+      clearFolder: async (projectId) => {
+        const all = get().items
+        const target = all.filter(i => projectId === null ? !i.projectId : i.projectId === projectId)
+        const urls = target.map(i => i.image_url).filter((u): u is string => !!u)
+        const removed = await deleteMedia(urls)
+        const ids = new Set(target.map(i => i.id))
+        set((s) => ({ items: s.items.filter(i => !ids.has(i.id)) }))
+        return removed
+      },
       addProject: (name) => {
         const id = crypto.randomUUID()
         set((s) => ({ projects: [...s.projects, { id, name, createdAt: Date.now() }] }))

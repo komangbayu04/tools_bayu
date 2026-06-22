@@ -67,7 +67,7 @@ function folderCovers(items: { projectId?: string; image_url?: string; color: st
 }
 
 export default function MoodboardPage() {
-  const { items, projects, addItem, deleteItem, moveItem, addProject, renameProject, deleteProject } = useMoodStore();
+  const { items, projects, addItem, deleteItem, moveItem, clearFolder, addProject, renameProject, deleteProject } = useMoodStore();
 
   // ── Folder state ──
   const [activeFolder, setActiveFolder] = useState<ActiveFolder>(null);
@@ -304,6 +304,18 @@ export default function MoodboardPage() {
     deleteProject(id);
     if (activeFolder === id) setActiveFolder(null);
     setFolderMenuId(null);
+  };
+
+  // Empty a folder: delete every item in it AND its Supabase Storage files.
+  const handleClearFolder = async (projectId: string | null, label: string) => {
+    const count = items.filter(i => projectId === null ? !i.projectId : i.projectId === projectId).length;
+    if (count === 0) return;
+    if (!confirm(`Hapus ${count} gambar di "${label}" beserta filenya di Supabase Storage? Tindakan ini permanen.`)) return;
+    setFolderMenuId(null);
+    setPasteToast(`Menghapus ${count} gambar…`);
+    const removed = await clearFolder(projectId);
+    setPasteToast(`${removed} file dihapus dari Storage`);
+    setTimeout(() => setPasteToast(null), 2500);
   };
 
   const selectFolder = (id: string | null) => {
@@ -559,11 +571,18 @@ export default function MoodboardPage() {
                                       <Icon name="edit" size={11} /> Rename
                                     </button>
                                     <button
+                                      onClick={(e) => { e.stopPropagation(); handleClearFolder(proj.id, proj.name); }}
+                                      className="w-full text-left px-3 py-2 text-[12px] font-medium hover:bg-red-50 flex items-center gap-2"
+                                      style={{ color: "#c64545" }}
+                                    >
+                                      <Icon name="image" size={11} /> Kosongkan isi
+                                    </button>
+                                    <button
                                       onClick={(e) => { e.stopPropagation(); handleDeleteFolder(proj.id); }}
                                       className="w-full text-left px-3 py-2 text-[12px] font-medium hover:bg-red-50 flex items-center gap-2"
                                       style={{ color: "#c64545" }}
                                     >
-                                      <Icon name="trash" size={11} /> Hapus
+                                      <Icon name="trash" size={11} /> Hapus folder
                                     </button>
                                   </motion.div>
                                 )}
@@ -591,6 +610,15 @@ export default function MoodboardPage() {
           </button>
           <Icon name="chevron-right" size={11} style={{ color: "var(--color-muted-soft)" }} />
           <span className="text-[12.5px] font-semibold" style={{ color: "var(--color-ink)" }}>{activeFolderName}</span>
+          {filtered.length > 0 && (
+            <button
+              onClick={() => handleClearFolder(activeFolder, activeFolderName ?? "Folder")}
+              className="ml-2 flex items-center gap-1 text-[12px] font-semibold px-2.5 py-1 rounded-lg transition-colors hover:bg-red-50"
+              style={{ color: "#c64545" }}
+            >
+              <Icon name="trash" size={11} /> Kosongkan folder ({filtered.length})
+            </button>
+          )}
         </div>
       )}
 

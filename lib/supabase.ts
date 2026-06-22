@@ -176,6 +176,36 @@ export async function uploadDataUrl(dataUrl: string, namePrefix = "media"): Prom
   }
 }
 
+// Delete media file(s) from Storage given their public URL(s). Used when a
+// moodboard item/folder is removed so the underlying file is freed too —
+// otherwise deleting items only drops the URL from state and the bucket fills
+// up. Silently ignores non-Storage URLs (e.g. inline data URLs / external links)
+// and any failures. Returns the number of objects actually requested for removal.
+export async function deleteMedia(urls: string | string[]): Promise<number> {
+  await userReady;
+  if (!supabase || !currentUserId) return 0;
+  const list = Array.isArray(urls) ? urls : [urls];
+  const marker = `/object/public/${MEDIA_BUCKET}/`;
+  const paths = list
+    .map((u) => {
+      const i = u?.indexOf(marker) ?? -1;
+      return i >= 0 ? decodeURIComponent(u.slice(i + marker.length)) : null;
+    })
+    .filter((p): p is string => !!p);
+  if (paths.length === 0) return 0;
+  try {
+    const { error } = await supabase.storage.from(MEDIA_BUCKET).remove(paths);
+    if (error) {
+      console.warn("[supabase] deleteMedia failed:", error.message);
+      return 0;
+    }
+    return paths.length;
+  } catch (e) {
+    console.warn("[supabase] deleteMedia threw:", e);
+    return 0;
+  }
+}
+
 // ─── Debounced cloud writes ───────────────────────────────────────
 // The localStorage mirror is updated synchronously (instant local persistence),
 // while cloud upserts for the same key are coalesced so a burst of edits (e.g.
